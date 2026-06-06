@@ -1,0 +1,65 @@
+package xyz.jasenon.lab.common.exception;
+
+
+import xyz.jasenon.lab.common.util.R;
+
+/**
+ * 业务异常 - 用于包装 R 响应为异常抛出
+ * @author Jasenon_ce
+ */
+public class BusinessException extends RuntimeException {
+
+    private final Integer code;
+    private final boolean ok;
+    private final Object data;
+    private final R<?> r;
+
+    public Integer getCode() {
+        return code;
+    }
+
+    public boolean isOk() {
+        return ok;
+    }
+
+    public Object getData() {
+        return data;
+    }
+
+    public R<?> getR() {
+        return r;
+    }
+
+    /**
+     * 从 R 构造业务异常
+     */
+    public <T> BusinessException(R<T> r) {
+        super(r.getMsg());
+        this.code = r.getCode();
+        this.ok = r.isOk();
+        this.data = r.getData();
+        this.r = r;
+    }
+
+    /**
+     * 构造业务异常
+     */
+    public BusinessException(Integer code, String message) {
+        super(message);
+        this.code = code;
+        this.ok = false;
+        this.data = null;
+        this.r = null;
+    }
+
+    /**
+     * 构造业务异常（带数据）
+     */
+    public BusinessException(Integer code, String message, Object data) {
+        super(message);
+        this.code = code;
+        this.ok = false;
+        this.data = data;
+        this.r = null;
+    }
+}

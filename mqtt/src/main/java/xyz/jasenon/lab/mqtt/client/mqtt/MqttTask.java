@@ -129,7 +129,8 @@ public class MqttTask extends Task {
         return Objects.hash(
                 getGatewayId(),
                 type,
-                deviceId
+                deviceId,
+                commandLine
         );
     }
 
@@ -140,7 +141,8 @@ public class MqttTask extends Task {
         MqttTask task = (MqttTask) obj;
         return Objects.equals(getGatewayId(), task.getGatewayId())
                 && type == task.type
-                && Objects.equals(deviceId, task.deviceId);
+                && Objects.equals(deviceId, task.deviceId)
+                && Objects.equals(commandLine, task.commandLine);
     }
 
     static class Explainer {

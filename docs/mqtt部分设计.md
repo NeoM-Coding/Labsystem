@@ -132,8 +132,9 @@ SetQueue<Poll<REQ>>
 - `gatewayId`
 - `type`
 - `deviceId`
+- `commandLine`
 
-因此同一网关、同一设备类型、同一设备 id 会被认为是同一个轮询任务。
+因此同一网关、同一设备类型、同一设备 id、同一指令 会被认为是同一个轮询任务。
 
 ## MqttTask
 

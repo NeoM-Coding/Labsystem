@@ -75,7 +75,7 @@ public abstract class AbstractSysClient<REQ extends Task> extends MqttClient {
         }
     }
 
-    public void recevive(Task resp){
+    public void receive(Task resp){
         PendingRequest<REQ> pending = current;
         if (pending != null && match(pending.getRequest(), resp)){
             pending.getFuture().complete(resp);

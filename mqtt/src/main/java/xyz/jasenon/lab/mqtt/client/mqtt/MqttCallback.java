@@ -59,7 +59,7 @@ public class MqttCallback implements MqttCallbackExtended {
 
     @Override
     public void messageArrived(String topic, MqttMessage mqttMessage) throws Exception {
-        client.recevive(new Task(client.gatewayId, mqttMessage.getPayload()));
+        client.receive(new Task(client.gatewayId, mqttMessage.getPayload()));
     }
 
     @Override

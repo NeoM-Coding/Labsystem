@@ -17,13 +17,16 @@
         <module>common</module>
         <module>mqtt</module>
         <module>web</module>
+        <module>edu</module>
+        <module>quartz</module>
     </modules>
     <packaging>pom</packaging>
 
     <properties>
-        <java.version>21</java.version>
+        <java.version>17</java.version>
         <spring-cloud.version>2025.0.0</spring-cloud.version>
         <spring-cloud-alibaba.version>2025.0.0.0</spring-cloud-alibaba.version>
+        <version>0.0.1</version>
     </properties>
 
     <dependencyManagement>
@@ -44,6 +47,12 @@
                 <version>${spring-cloud-alibaba.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-resolver-dns-native-macos</artifactId>
+                <classifier>osx-aarch_64</classifier>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -79,6 +88,12 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <dependency>
+            <groupId>cn.hutool</groupId>
+            <artifactId>hutool-all</artifactId>
+            <version>5.8.40</version>
+        </dependency>
     </dependencies>
 
     <build>
@@ -86,6 +101,7 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <inherited>false</inherited>
             </plugin>
         </plugins>
     </build>

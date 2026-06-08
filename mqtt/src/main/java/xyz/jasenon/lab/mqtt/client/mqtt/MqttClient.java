@@ -17,13 +17,11 @@ public class MqttClient extends AbstractSysClient<MqttTask> {
     private static final Logger log = LoggerFactory.getLogger(MqttClient.class);
     public final String sendTopic;
     public final String acceptTopic;
-    public final String version;
 
-    public MqttClient(String serverURI, String clientId, String gatewayId, String sendTopic, String acceptTopic, String version) throws MqttException {
+    public MqttClient(String serverURI, String clientId, String gatewayId, String sendTopic, String acceptTopic) throws MqttException {
         super(serverURI, clientId, gatewayId);
         this.sendTopic = sendTopic;
         this.acceptTopic = acceptTopic;
-        this.version = version;
     }
 
     @Override
@@ -48,12 +46,12 @@ public class MqttClient extends AbstractSysClient<MqttTask> {
         if (!Objects.equals(mqttTask.getGatewayId(), resp.getGatewayId())) {
             return false;
         }
-        if (mqttTask.getCommand() == null) {
+        if (mqttTask.getCommandLine() == null) {
             return false;
         }
 
-        SeqGenerator reqGenerator = SeqGeneratorManager.get(mqttTask.getCommand().getReqSeq());
-        SeqGenerator respGenerator = SeqGeneratorManager.get(mqttTask.getCommand().getRespSeq());
+        SeqGenerator reqGenerator = SeqGeneratorManager.get(mqttTask.getCommandLine().getReqSeq());
+        SeqGenerator respGenerator = SeqGeneratorManager.get(mqttTask.getCommandLine().getRespSeq());
         if (reqGenerator == null || respGenerator == null) {
             return false;
         }

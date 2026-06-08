@@ -1,0 +1,9 @@
+seq AccessReq {
+  address = 0
+  function_code = 1,2
+}
+
+seq AccessResp {
+  address = 0
+  function_code = 1,2
+}

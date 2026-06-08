@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.github.sunjieyi60.uid.starter.worker.dao.WorkerNodeDAO">
+    <resultMap id="workerNodeRes" type="io.github.sunjieyi60.uid.starter.worker.entity.WorkerNodeEntity">
+        <id column="ID" jdbcType="BIGINT" property="id"/>
+        <result column="HOST_NAME" jdbcType="VARCHAR" property="hostName"/>
+        <result column="PORT" jdbcType="VARCHAR" property="port"/>
+        <result column="TYPE" jdbcType="INTEGER" property="type"/>
+        <result column="LAUNCH_DATE" jdbcType="DATE" property="launchDate"/>
+        <result column="MODIFIED" jdbcType="TIMESTAMP" property="modified"/>
+        <result column="CREATED" jdbcType="TIMESTAMP" property="created"/>
+    </resultMap>
+
+    <insert id="addWorkerNode" useGeneratedKeys="true" keyProperty="id"
+            parameterType="io.github.sunjieyi60.uid.starter.worker.entity.WorkerNodeEntity">
+        INSERT INTO tf_ap_worker_node(HOST_NAME, PORT, TYPE, LAUNCH_DATE, MODIFIED, CREATED)
+        VALUES (#{hostName}, #{port}, #{type}, #{launchDate}, NOW(), NOW())
+    </insert>
+
+    <update id="updateWorkerNode" parameterType="io.github.sunjieyi60.uid.starter.worker.entity.WorkerNodeEntity">
+        UPDATE tf_ap_worker_node
+        <set>
+            <if test="hostName != null and hostName != ''">HOST_NAME = #{hostName},</if>
+            <if test="hostName != null and hostName != ''">MODIFIED = NOW(),</if>
+            <if test="port != null and port != ''">PORT = #{port},</if>
+            <if test="type != null and type != ''">TYPE = #{type},</if>
+            LAUNCH_DATE = NOW()
+        </set>
+        where HOST_NAME = #{hostName} AND PORT = #{port}
+    </update>
+
+    <select id="getWorkerNodeByHostPort" resultMap="workerNodeRes">
+        SELECT ID, HOST_NAME, PORT, TYPE, LAUNCH_DATE, MODIFIED, CREATED
+        FROM tf_ap_worker_node
+        WHERE HOST_NAME = #{hostName}
+          AND PORT = #{port}
+    </select>
+
+    <select id="queryTableExist" resultType="java.lang.Integer">
+        select count(1)
+        from INFORMATION_SCHEMA.TABLES
+        where lower(TABLE_NAME) = 'tf_ap_worker_node';
+    </select>
+
+    <update id="createTable">
+        CREATE TABLE `tf_ap_worker_node`
+        (
+            `id`          bigint(20)  NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+            `created`     datetime    NOT NULL COMMENT 'created time',
+            `host_name`   varchar(64) NOT NULL COMMENT 'host name',
+            `launch_date` datetime    NOT NULL COMMENT 'launch date',
+            `modified`    datetime    NOT NULL COMMENT 'modified time',
+            `port`        varchar(64) NOT NULL COMMENT 'port',
+            `type`        tinyint(2)  NOT NULL COMMENT 'node type: ACTUAL or CONTAINER',
+            PRIMARY KEY (`id`)
+        ) ENGINE = InnoDB
+          AUTO_INCREMENT = 4
+          DEFAULT CHARSET = utf8mb4;
+    </update>
+
+    <select id="queryDatabaseExist" resultType="java.lang.Integer">
+        select count(1)
+        from information_schema.SCHEMATA
+        where SCHEMA_NAME = 'fun_cloud_base'
+    </select>
+
+    <update id="createDatabase">
+        CREATE DATABASE `fun_cloud_base` CHARACTER SET 'utf8mb4' COLLATE 'utf8mb4_general_ci';
+    </update>
+
+</mapper>

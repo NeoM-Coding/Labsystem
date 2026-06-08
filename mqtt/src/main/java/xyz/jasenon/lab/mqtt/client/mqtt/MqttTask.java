@@ -1,11 +1,14 @@
 package xyz.jasenon.lab.mqtt.client.mqtt;
 
-import xyz.jasenon.lab.common.DeviceType;
+import lombok.Getter;
+import lombok.Setter;
+import xyz.jasenon.lab.common.model.device.DeviceType;
 import xyz.jasenon.lab.common.command.CommandLine;
 import xyz.jasenon.lab.common.command.Task;
 import xyz.jasenon.lab.common.command.checker.CheckType;
 import xyz.jasenon.lab.common.command.checker.CrcChecker;
 import xyz.jasenon.lab.common.command.checker.SumChecker;
+import xyz.jasenon.lab.api.mqtt.dto.MqttTaskDto;
 import xyz.jasenon.lab.mqtt.client.common.PendingRequest;
 
 import java.io.ByteArrayOutputStream;
@@ -13,6 +16,8 @@ import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.Objects;
 
+@Getter
+@Setter
 public class MqttTask extends Task {
 
     // 指令
@@ -28,92 +33,15 @@ public class MqttTask extends Task {
         super(gatewayId, new byte[]{});
     }
 
-    public static MqttTask fromDto(String gatewayId, Dto dto) {
+    public static MqttTask fromDto(String gatewayId, MqttTaskDto dto) {
         Objects.requireNonNull(dto, "dto must not be null");
         MqttTask task = new MqttTask(gatewayId);
-        task.setCommand(dto.getCommandLine());
+        task.setCommandLine(dto.getCommandLine());
         task.setArgs(dto.getArgs());
         task.setType(dto.getType());
         task.setDeviceId(dto.getDeviceId());
+        task.convert();
         return task;
-    }
-
-    public CommandLine getCommand() {
-        return commandLine;
-    }
-
-    public void setCommand(CommandLine commandLine) {
-        this.commandLine = commandLine;
-    }
-
-    public int[] getArgs() {
-        return args;
-    }
-
-    public void setArgs(int[] args) {
-        this.args = args;
-    }
-
-    public DeviceType getType() {
-        return type;
-    }
-
-    public void setType(DeviceType type) {
-        this.type = type;
-    }
-
-    public String getDeviceId() {
-        return deviceId;
-    }
-
-    public void setDeviceId(String deviceId) {
-        this.deviceId = deviceId;
-    }
-
-    public static class Dto {
-        // 指令
-        private CommandLine commandLine;
-        // 操作数
-        private int[] args;
-        // 设备类型
-        private DeviceType type;
-        // 设备id
-        private String deviceId;
-
-        public CommandLine getCommandLine() {
-            return commandLine;
-        }
-
-        public void setCommandLine(CommandLine commandLine) {
-            this.commandLine = commandLine;
-        }
-
-        public int[] getArgs() {
-            return args;
-        }
-
-        public void setArgs(int[] args) {
-            this.args = args;
-        }
-
-        public DeviceType getType() {
-            return type;
-        }
-
-        public void setType(DeviceType type) {
-            this.type = type;
-        }
-
-        public String getDeviceId() {
-            return deviceId;
-        }
-
-        public void setDeviceId(String deviceId) {
-            this.deviceId = deviceId;
-        }
-
-        public Dto() {
-        }
     }
 
     public MqttTask convert(){

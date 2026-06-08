@@ -40,3 +40,6 @@ docs/device_docs
 ### maven
 mvnw
 mvnw.cmd
+
+### env
+.env

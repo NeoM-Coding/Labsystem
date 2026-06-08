@@ -7,7 +7,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import xyz.jasenon.lab.common.DeviceType;
+import xyz.jasenon.lab.api.mqtt.dto.MqttTaskDto;
+import xyz.jasenon.lab.common.model.device.DeviceType;
 import xyz.jasenon.lab.common.command.CommandLine;
 import xyz.jasenon.lab.common.command.Task;
 import xyz.jasenon.lab.common.command.seq.SeqGeneratorManager;
@@ -32,8 +33,8 @@ import static org.junit.jupiter.api.Assumptions.assumeFalse;
 class MqttClientSendIntegrationTests {
 
     private static final String SERVER_URI = "tcp://localhost:1883";
-    private static final String SEND_TOPIC = "test/accept";
-    private static final String ACCEPT_TOPIC = "test/send";
+    private static final String SEND_TOPIC = "test/accept/1";
+    private static final String ACCEPT_TOPIC = "test/send/1";
 
     private static final String GATEWAY_ID = "gateway-1";
     private static final long RESPONSE_TIMEOUT_SECONDS = 10L;
@@ -226,8 +227,8 @@ class MqttClientSendIntegrationTests {
         return options;
     }
 
-    private static MqttTask.Dto requestDto() {
-        MqttTask.Dto dto = new MqttTask.Dto();
+    private static MqttTaskDto requestDto() {
+        MqttTaskDto dto = new MqttTaskDto();
         dto.setCommandLine(CommandLine.OPEN_ACCESS_ONCE);
         dto.setArgs(new int[]{1});
         dto.setType(DeviceType.Access);
@@ -235,12 +236,12 @@ class MqttClientSendIntegrationTests {
         return dto;
     }
 
-    private static MqttTask.Dto pollDto(){
+    private static MqttTaskDto pollDto(){
         return pollDto("access-1");
     }
 
-    private static MqttTask.Dto pollDto(String deviceId){
-        MqttTask.Dto dto = new MqttTask.Dto();
+    private static MqttTaskDto pollDto(String deviceId){
+        MqttTaskDto dto = new MqttTaskDto();
         dto.setCommandLine(CommandLine.REQUEST_ACCESS_DATA);
         dto.setArgs(new int[]{1});
         dto.setType(DeviceType.Access);
@@ -248,8 +249,8 @@ class MqttClientSendIntegrationTests {
         return dto;
     }
 
-    private static MqttTask.Dto closeAccessDto() {
-        MqttTask.Dto dto = new MqttTask.Dto();
+    private static MqttTaskDto closeAccessDto() {
+        MqttTaskDto dto = new MqttTaskDto();
         dto.setCommandLine(CommandLine.CLOSE_ACCESS_ONCE);
         dto.setArgs(new int[]{1});
         dto.setType(DeviceType.Access);
@@ -257,8 +258,8 @@ class MqttClientSendIntegrationTests {
         return dto;
     }
 
-    private static MqttTask.Dto keepAccessDto() {
-        MqttTask.Dto dto = new MqttTask.Dto();
+    private static MqttTaskDto keepAccessDto() {
+        MqttTaskDto dto = new MqttTaskDto();
         dto.setCommandLine(CommandLine.KEEP_ACCESS_STATUS_LOCK);
         dto.setArgs(new int[]{1});
         dto.setType(DeviceType.Access);
@@ -295,7 +296,7 @@ class MqttClientSendIntegrationTests {
                 String sendTopic,
                 String acceptTopic
         ) throws MqttException {
-            super(serverURI, clientId, gatewayId, sendTopic, acceptTopic, "1");
+            super(serverURI, clientId, gatewayId, sendTopic, acceptTopic);
         }
 
         private void offerUserAndWaitForMatchedResponse(MqttTask request, long timeoutSeconds) throws Exception {
@@ -421,13 +422,13 @@ class MqttClientSendIntegrationTests {
         protected void send(MqttTask mqttTask) {
             log.info("current pending request type:{}", currentType());
             if (serialExecution != null) {
-                if (mqttTask.getCommand() == CommandLine.REQUEST_ACCESS_DATA) {
+                if (mqttTask.getCommandLine() == CommandLine.REQUEST_ACCESS_DATA) {
                     recordSerialEvent("send:poll");
                 } else {
                     recordSerialEvent("send:user");
                 }
             }
-            if (multiDevicePollSends != null && mqttTask.getCommand() == CommandLine.REQUEST_ACCESS_DATA) {
+            if (multiDevicePollSends != null && mqttTask.getCommandLine() == CommandLine.REQUEST_ACCESS_DATA) {
                 polledDeviceIds.add(mqttTask.getDeviceId());
                 multiDevicePollEvents.add(mqttTask.getDeviceId());
                 multiDevicePollSends.countDown();
@@ -464,7 +465,7 @@ class MqttClientSendIntegrationTests {
                 pollTimeoutCount.incrementAndGet();
                 pollTimeouts.countDown();
             }
-            if (serialExecution != null && mqttTask.getCommand() != CommandLine.REQUEST_ACCESS_DATA) {
+            if (serialExecution != null && mqttTask.getCommandLine() != CommandLine.REQUEST_ACCESS_DATA) {
                 recordSerialEvent("timeout:user");
             }
         }

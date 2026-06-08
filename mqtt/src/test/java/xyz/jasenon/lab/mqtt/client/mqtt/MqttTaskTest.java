@@ -3,11 +3,10 @@ package xyz.jasenon.lab.mqtt.client.mqtt;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import xyz.jasenon.lab.common.DeviceType;
+import xyz.jasenon.lab.common.model.device.DeviceType;
 import xyz.jasenon.lab.common.command.CommandLine;
 
 import java.io.ByteArrayOutputStream;
-import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
 import java.util.Arrays;
 
@@ -43,10 +42,10 @@ public class MqttTaskTest {
         task.setArgs(new int[]{1});
         task.setDeviceId("1");
         task.setType(DeviceType.Access);
-        task.setCommand(CommandLine.OPEN_ACCESS_ONCE);
+        task.setCommandLine(CommandLine.OPEN_ACCESS_ONCE);
         byte[] sendReq = task.convert().getPayload();
         log.info("bytes:{}",sendReq);
-        assertTrue(MqttTask.Explainer.verifier(task.getCommand().getCommand().getCheckType(),sendReq));
+        assertTrue(MqttTask.Explainer.verifier(task.getCommandLine().getCommand().getCheckType(),sendReq));
     }
 
 }

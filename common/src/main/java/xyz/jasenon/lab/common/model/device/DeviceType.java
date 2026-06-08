@@ -1,4 +1,4 @@
-package xyz.jasenon.lab.common;
+package xyz.jasenon.lab.common.model.device;
 
 public enum DeviceType {
     // 门板

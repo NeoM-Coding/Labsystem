@@ -1,0 +1,14 @@
+spring:
+  application:
+    name: mqtt
+
+mybatis-plus:
+  mapper-locations: classpath*:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+
+mqtt:
+  url: ${MQTT_URL:tcp://localhost:1883}
+  username: ${MQTT_USERNAME:}
+  password: ${MQTT_PASSWORD:}
+  mqtt-qos: ${MQTT_QOS:AT_LEAST_ONCE}

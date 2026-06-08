@@ -3,7 +3,8 @@ package xyz.jasenon.lab.mqtt.client.mqtt;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import xyz.jasenon.lab.common.DeviceType;
+import xyz.jasenon.lab.api.mqtt.dto.MqttTaskDto;
+import xyz.jasenon.lab.common.model.device.DeviceType;
 import xyz.jasenon.lab.common.SetQueue;
 import xyz.jasenon.lab.common.command.CommandLine;
 import xyz.jasenon.lab.common.command.Task;
@@ -127,7 +128,7 @@ class MqttClientMatchTests {
 
     private static MqttTask request(String gatewayId, byte[] payload) {
         MqttTask req = new MqttTask(gatewayId);
-        req.setCommand(CommandLine.OPEN_ACCESS_ONCE);
+        req.setCommandLine(CommandLine.OPEN_ACCESS_ONCE);
         req.setPayload(payload);
         return req;
     }
@@ -138,15 +139,15 @@ class MqttClientMatchTests {
 
     private static MqttTask pollTask(String gatewayId, String deviceId, int arg) {
         MqttTask req = new MqttTask(gatewayId);
-        req.setCommand(CommandLine.REQUEST_ACCESS_DATA);
+        req.setCommandLine(CommandLine.REQUEST_ACCESS_DATA);
         req.setArgs(new int[]{arg});
         req.setType(DeviceType.Access);
         req.setDeviceId(deviceId);
         return req;
     }
 
-    private static MqttTask.Dto accessDto(String deviceId) {
-        MqttTask.Dto dto = new MqttTask.Dto();
+    private static MqttTaskDto accessDto(String deviceId) {
+        MqttTaskDto dto = new MqttTaskDto();
         dto.setCommandLine(CommandLine.OPEN_ACCESS_ONCE);
         dto.setArgs(new int[]{1});
         dto.setType(DeviceType.Access);

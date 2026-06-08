@@ -1,0 +1,5 @@
+# Auto Configure
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+    io.github.sunjieyi60.uid.starter.config.UidGeneratorAutoConfigure,\
+    io.github.sunjieyi60.uid.starter.config.UidDatasourceAssignerConfigure,\
+    io.github.sunjieyi60.uid.starter.config.UidRedisAssignerConfigure

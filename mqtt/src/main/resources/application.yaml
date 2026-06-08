@@ -1,3 +1,19 @@
 spring:
   application:
     name: mqtt
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/lab_sys?useUnicode=true&characterEncoding=utf-8
+    username: root
+    password: sbx159357!?.
+
+server:
+  port: 3333
+
+dubbo:
+  application:
+    name: ${spring.application.name}
+
+mqtt:
+  url: tcp://localhost:1883
+  mqtt-qos: at_least_once

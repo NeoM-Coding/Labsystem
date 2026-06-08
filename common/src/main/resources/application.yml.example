@@ -1,0 +1,10 @@
+fun:
+  uid:
+    assigner-mode: db
+    generator-mode: none
+    # 独立数据源配置（不与 spring.datasource 冲突）
+    datasource:
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      url: jdbc:mysql://localhost:3306/fun_cloud_base?useUnicode=true&characterEncoding=utf-8
+      username: root
+      password: your-passwd

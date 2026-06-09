@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS `device` (
     `polling` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否开启轮询',
     `gateway_id` VARCHAR(64) NULL COMMENT 'RS485网关ID',
     `address` INT NOT NULL DEFAULT 0 COMMENT '设备地址',
-    `self_id` INT NOT NULL DEFAULT 0 COMMENT '同地址下设备编号',
+    `self_id` INT NULL DEFAULT NULL COMMENT '同地址下设备编号',
     `socket_gateway_id` VARCHAR(64) NULL COMMENT 'Socket网关ID',
     `group_id` VARCHAR(64) NULL COMMENT '空调机组ID',
     `is_lock` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '设备锁定/状态',

@@ -20,4 +20,12 @@
     <select id="getDeviceById" resultMap="DeviceResultMap">
         SELECT * FROM `device` WHERE `delete_at` IS NULL AND `id` = #{device_id} LIMIT 1;
     </select>
+
+    <select id="listAll" resultMap="DeviceResultMap">
+        SELECT * FROM `device` WHERE `dalete_at` IS NULL;
+    </select>
+
+    <update id="updateDevice">
+        UPDATE `device` SET VALUE(#{device...}) WHERE `id` = #{device.id};
+    </update>
 </mapper>

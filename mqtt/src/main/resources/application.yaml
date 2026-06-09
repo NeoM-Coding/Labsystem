@@ -13,6 +13,9 @@ server:
 dubbo:
   application:
     name: ${spring.application.name}
+    qos-port: 4444
+  provider:
+    timeout: 5_000
 
 mqtt:
   url: tcp://localhost:1883

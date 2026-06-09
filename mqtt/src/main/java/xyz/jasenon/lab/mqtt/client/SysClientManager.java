@@ -6,8 +6,9 @@ import org.eclipse.paho.client.mqttv3.MqttException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Component;
+import xyz.jasenon.lab.api.mqtt.MqttGatewayCRUD;
 import xyz.jasenon.lab.api.mqtt.MqttIo;
+import xyz.jasenon.lab.api.mqtt.dto.MqttResponseDto;
 import xyz.jasenon.lab.api.mqtt.dto.MqttTaskDto;
 import xyz.jasenon.lab.common.command.Task;
 import xyz.jasenon.lab.common.exception.BusinessException;
@@ -28,11 +29,10 @@ import java.util.Set;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
-@Component
 @DubboService
-public class SysClientMananger implements MqttIo {
+public class SysClientManager implements MqttIo, MqttGatewayCRUD {
 
-    private static final Logger log = LoggerFactory.getLogger(SysClientMananger.class);
+    private static final Logger log = LoggerFactory.getLogger(SysClientManager.class);
     private static final long WATCHDOG_INTERVAL_MILLIS = 6_0000L;
 
     private final static Map<String, AbstractSysClient<? extends Task>> clients = new ConcurrentHashMap<>();
@@ -41,7 +41,7 @@ public class SysClientMananger implements MqttIo {
     private final Thread watchdog;
     private final MqttOptions options;
 
-    public SysClientMananger(TaskHelper thelper, GatewayHelper ghelper, MqttOptions options) {
+    public SysClientManager(TaskHelper thelper, GatewayHelper ghelper, MqttOptions options) {
         this.thelper = thelper;
         this.ghelper = ghelper;
         this.options = options;
@@ -51,28 +51,35 @@ public class SysClientMananger implements MqttIo {
         watchdog.start();
     }
 
-    public Object syncSend(MqttTaskDto dto) throws ExecutionException, InterruptedException, TimeoutException {
+    public MqttResponseDto syncSend(MqttTaskDto dto) throws ExecutionException, InterruptedException, TimeoutException {
         MqttTask userTask = thelper.help(dto);
         if (userTask == null) throw new BusinessException(HttpStatus.NOT_FOUND.value(),"device doesn't exist!");
         var client = (AbstractSysClient<MqttTask>) clients.get(userTask.getGatewayId());
         if (client != null){
             PendingRequest<MqttTask> task = userTask.decorat();
             client.offer(task);
-            return task.getFuture().get(task.getTimeout(), TimeUnit.MILLISECONDS);
+            return toResponseDto(task.getFuture().get(task.getTimeout(), TimeUnit.MILLISECONDS));
         }
         throw new BusinessException(HttpStatus.NOT_FOUND.value(),"gateway doesn't exist!");
     }
 
-    public CompletableFuture<Object> asyncSend(MqttTaskDto dto) {
+    public CompletableFuture<MqttResponseDto> asyncSend(MqttTaskDto dto) {
         MqttTask userTask = thelper.help(dto);
         if (userTask == null) throw new BusinessException(HttpStatus.NOT_FOUND.value(),"device doesn't exist!");
         var client = (AbstractSysClient<MqttTask>) clients.get(userTask.getGatewayId());
         if (client != null){
             PendingRequest<MqttTask> task = userTask.decorat();
             client.offer(task);
-            return task.getFuture();
+            return task.getFuture().thenApply(this::toResponseDto);
         }
         throw new BusinessException(HttpStatus.NOT_FOUND.value(),"gateway doesn't exist!");
+    }
+
+    private MqttResponseDto toResponseDto(Object resp) {
+        if (resp instanceof Task task) {
+            return MqttResponseDto.of(task.getGatewayId(), task.getPayload());
+        }
+        throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR.value(), "unsupported mqtt response type");
     }
 
     public static void remove(AbstractSysClient<? extends Task> client) {
@@ -112,7 +119,7 @@ public class SysClientMananger implements MqttIo {
                                 continue;
                             }
 
-                            log.warn("gateway-id:{} client missing, watchdog restarting", gateway.getId());
+                            log.warn("[GatewayWatchDog] gateway-id:{} client missing, watchdog restarting", gateway.getId());
                             start(gateway);
                         }
 
@@ -135,11 +142,11 @@ public class SysClientMananger implements MqttIo {
 
     private void start(RS485Gateway gateway) {
         if (gateway.getSendTopic() == null || gateway.getAcceptTopic() == null) {
-            log.warn("gateway-id:{} topic missing, skip client restart", gateway.getId());
+            log.warn("[GatewayWatchDog] gateway-id:{} topic missing, skip client restart", gateway.getId());
             return;
         }
         if (options.getUrl() == null || options.getUrl().isBlank()) {
-            log.warn("gateway-id:{} mqtt url missing, skip client restart", gateway.getId());
+            log.warn("[GatewayWatchDog] gateway-id:{} mqtt url missing, skip client restart", gateway.getId());
             return;
         }
 
@@ -156,12 +163,12 @@ public class SysClientMananger implements MqttIo {
             register(client);
             client.connect(connectOptions());
             if (clients.get(gateway.getId()) == client) {
-                log.info("gateway-id:{} client restarted by watchdog", gateway.getId());
+                log.info("[GatewayWatchDog] gateway-id:{} client restarted by watchdog", gateway.getId());
             } else {
                 close(client);
             }
         } catch (MqttException e) {
-            log.warn("gateway-id:{} client restart failed", gateway.getId(), e);
+            log.warn("[GatewayWatchDog] gateway-id:{} client restart failed", gateway.getId(), e);
             clients.remove(gateway.getId(), client);
             close(client);
         }
@@ -191,13 +198,13 @@ public class SysClientMananger implements MqttIo {
                 client.disconnect();
             }
         } catch (MqttException e) {
-            log.warn("gateway-id:{} disconnect failed", client.gatewayId, e);
+            log.warn("[GatewayWatchDog] gateway-id:{} disconnect failed", client.gatewayId, e);
         }
 
         try {
             client.close();
         } catch (MqttException e) {
-            log.warn("gateway-id:{} close failed", client.gatewayId, e);
+            log.warn("[GatewayWatchDog] gateway-id:{} close failed", client.gatewayId, e);
         }
     }
 

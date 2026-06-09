@@ -7,7 +7,7 @@ import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import xyz.jasenon.lab.common.command.Task;
-import xyz.jasenon.lab.mqtt.client.SysClientMananger;
+import xyz.jasenon.lab.mqtt.client.SysClientManager;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -27,7 +27,7 @@ public class MqttCallback implements MqttCallbackExtended {
 
     /**
      * 指数回避  最多回避5次
-     * 超次后从 {@link SysClientMananger} remove this.client
+     * 超次后从 {@link SysClientManager} remove this.client
      * 交由 Manager中的watchdog 重新拉起
      */
     @Override
@@ -38,12 +38,12 @@ public class MqttCallback implements MqttCallbackExtended {
             return;
         }
 
-        SysClientMananger.remove(client);
+        SysClientManager.remove(client);
     }
 
     /**
      * 指数回避  最多回避5次
-     * 超次后从 {@link SysClientMananger} remove自己
+     * 超次后从 {@link SysClientManager} remove自己
      * 交由 Manager中的watchdog 重新拉起
      * @param throwable
      */
@@ -91,7 +91,7 @@ public class MqttCallback implements MqttCallbackExtended {
         }
 
         reconnecting.set(false);
-        SysClientMananger.remove(client);
+        SysClientManager.remove(client);
     }
 
     private boolean subscribeWithBackoff() {

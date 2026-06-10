@@ -7,7 +7,9 @@ import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import xyz.jasenon.lab.common.command.Task;
+import xyz.jasenon.lab.common.util.AsyncExecutor;
 import xyz.jasenon.lab.mqtt.client.SysClientManager;
+import xyz.jasenon.lab.mqtt.client.message_handler.MessageHandlerManager;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -59,7 +61,15 @@ public class MqttCallback implements MqttCallbackExtended {
 
     @Override
     public void messageArrived(String topic, MqttMessage mqttMessage) throws Exception {
-        client.receive(new Task(client.gatewayId, mqttMessage.getPayload()));
+        byte[] payload = mqttMessage.getPayload();
+        client.receive(new Task(client.gatewayId, payload));
+
+        // 后置处理消息持久化
+        var task = client.current();
+        if (MqttTask.Explainer.verifier(task.getRequest()
+                .getCommandLine().getCommand().getCheckType(), payload)){
+            MessageHandlerManager.persist(task, payload);
+        }
     }
 
     @Override

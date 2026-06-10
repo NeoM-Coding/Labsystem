@@ -18,5 +18,26 @@ dubbo:
     timeout: 5_000
 
 mqtt:
-  url: tcp://localhost:1883
-  mqtt-qos: at_least_once
+  connect:
+    url: tcp://localhost:1883
+    qos: at_least_once
+  poll:
+    interval-millis: 10_000
+    timeout-millis: 15_000
+    watchdog-interval-millis: 60_000
+  gateway:
+    watchdog-interval-millis: 60_000
+
+lab:
+  redis:
+    enabled: true
+    host: localhost
+    port: 6379
+    database: 0
+    timeout-millis: 15_000
+    pool:
+      max-total: 16
+      max-idle: 8
+      min-idle: 0
+      max-wait-millis: 2_000
+      test-on-borrow: true

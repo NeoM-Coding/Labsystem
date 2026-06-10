@@ -4,11 +4,8 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 
 public class DiyResponseEntity<T extends R<?>> extends ResponseEntity<T> {
-    public DiyResponseEntity(HttpStatusCode status) {
-        super(status);
-    }
 
-    public DiyResponseEntity(T data){
+    private DiyResponseEntity(T data){
         super(
                 data,
                 HttpStatusCode.valueOf(data.getCode())

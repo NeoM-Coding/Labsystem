@@ -4,7 +4,8 @@ import xyz.jasenon.lab.common.command.Task;
 
 import java.util.concurrent.CompletableFuture;
 
-public class PendingRequest<REQ extends Task> {
+
+public class PendingRequest<REQ extends Task> implements Cloneable {
 
     private CompletableFuture<Object> future;
 
@@ -52,9 +53,29 @@ public class PendingRequest<REQ extends Task> {
         return timeout;
     }
 
+    public long getInterval() { return interval; }
+
     public Poll<REQ> toPoll(){
         Poll<REQ> poll = new Poll<>(this.request, this.interval);
         poll.refresh();
         return poll;
     }
+
+    @Override
+    public PendingRequest<REQ> clone() {
+        try {
+            PendingRequest<REQ> copy = (PendingRequest<REQ>) super.clone();
+
+            return new PendingRequest<>(
+                    copy.request,
+                    copy.type,
+                    copy.timeout,
+                    copy.interval
+            );
+        } catch (CloneNotSupportedException e) {
+            throw new AssertionError();
+        }
+    }
+
+
 }

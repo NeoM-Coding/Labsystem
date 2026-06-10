@@ -72,3 +72,146 @@ CREATE TABLE IF NOT EXISTS `device` (
     CONSTRAINT `chk_device_self_id`
         CHECK (`self_id` >= 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='设备表';
+
+CREATE TABLE IF NOT EXISTS `access_record` (
+    `id` VARCHAR(64) NOT NULL COMMENT '记录ID',
+    `device_id` VARCHAR(64) NOT NULL COMMENT '设备ID',
+    `address` INT NOT NULL COMMENT '门禁地址',
+    `is_open` TINYINT(1) NOT NULL COMMENT '是否开门',
+    `is_lock` TINYINT(1) NOT NULL COMMENT '是否锁定门锁开关',
+    `lock_status` INT NOT NULL COMMENT '门锁锁定状态',
+    `delay_time` INT NOT NULL COMMENT '延迟关门时间',
+    `create_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `update_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    `delete_at` DATETIME(3) NULL,
+    PRIMARY KEY (`id`),
+    KEY `idx_access_record_device_time` (`device_id`, `create_at`),
+    KEY `idx_access_record_address_time` (`address`, `create_at`),
+    KEY `idx_access_record_delete` (`delete_at`),
+    CONSTRAINT `fk_access_record_device`
+        FOREIGN KEY (`device_id`) REFERENCES `device` (`id`)
+        ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT `chk_access_record_bool`
+        CHECK (`is_open` IN (0, 1) AND `is_lock` IN (0, 1)),
+    CONSTRAINT `chk_access_record_value`
+        CHECK (`address` >= 0 AND `lock_status` >= 0 AND `delay_time` >= 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='门禁状态记录表';
+
+CREATE TABLE IF NOT EXISTS `air_condition_record` (
+    `id` VARCHAR(64) NOT NULL COMMENT '记录ID',
+    `device_id` VARCHAR(64) NOT NULL COMMENT '设备ID',
+    `address` INT NOT NULL COMMENT '空调地址',
+    `self_id` INT NOT NULL COMMENT '内机编号',
+    `is_open` TINYINT(1) NOT NULL COMMENT '是否开启',
+    `mode` VARCHAR(32) NULL COMMENT '模式',
+    `temperature` INT NOT NULL COMMENT '设定温度',
+    `speed` VARCHAR(32) NULL COMMENT '风速',
+    `room_temperature` INT NOT NULL COMMENT '房间温度',
+    `error_code` INT NOT NULL COMMENT '错误码',
+    `create_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `update_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    `delete_at` DATETIME(3) NULL,
+    PRIMARY KEY (`id`),
+    KEY `idx_air_condition_record_device_time` (`device_id`, `create_at`),
+    KEY `idx_air_condition_record_addr_time` (`address`, `self_id`, `create_at`),
+    KEY `idx_air_condition_record_delete` (`delete_at`),
+    CONSTRAINT `fk_air_condition_record_device`
+        FOREIGN KEY (`device_id`) REFERENCES `device` (`id`)
+        ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT `chk_air_condition_record_bool`
+        CHECK (`is_open` IN (0, 1)),
+    CONSTRAINT `chk_air_condition_record_mode`
+        CHECK (`mode` IS NULL OR `mode` IN ('Cooling', 'Heating', 'Dehumidification', 'AirSupply')),
+    CONSTRAINT `chk_air_condition_record_speed`
+        CHECK (`speed` IS NULL OR `speed` IN ('Low', 'Middle', 'High', 'Auto')),
+    CONSTRAINT `chk_air_condition_record_value`
+        CHECK (`address` >= 0 AND `self_id` >= 0 AND `error_code` >= 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='空调状态记录表';
+
+CREATE TABLE IF NOT EXISTS `circuit_break_record` (
+    `id` VARCHAR(64) NOT NULL COMMENT '记录ID',
+    `device_id` VARCHAR(64) NOT NULL COMMENT '设备ID',
+    `address` INT NOT NULL COMMENT '断路器地址',
+    `is_open` TINYINT(1) NOT NULL COMMENT '是否合闸',
+    `is_fix` TINYINT(1) NOT NULL COMMENT '是否维修',
+    `is_lock` TINYINT(1) NOT NULL COMMENT '是否锁定',
+    `voltage` DECIMAL(10,3) NOT NULL COMMENT '电压',
+    `current` DECIMAL(10,3) NOT NULL COMMENT '电流',
+    `power` DECIMAL(10,3) NOT NULL COMMENT '功率',
+    `energy` DECIMAL(12,3) NOT NULL COMMENT '能耗',
+    `leakage` DECIMAL(10,3) NOT NULL COMMENT '漏电电流',
+    `temperature` DECIMAL(10,3) NOT NULL COMMENT '线温',
+    `create_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `update_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    `delete_at` DATETIME(3) NULL,
+    PRIMARY KEY (`id`),
+    KEY `idx_circuit_break_record_device_time` (`device_id`, `create_at`),
+    KEY `idx_circuit_break_record_addr_time` (`address`, `create_at`),
+    KEY `idx_circuit_break_record_delete` (`delete_at`),
+    CONSTRAINT `fk_circuit_break_record_device`
+        FOREIGN KEY (`device_id`) REFERENCES `device` (`id`)
+        ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT `chk_circuit_break_record_bool`
+        CHECK (`is_open` IN (0, 1) AND `is_fix` IN (0, 1) AND `is_lock` IN (0, 1)),
+    CONSTRAINT `chk_circuit_break_record_value`
+        CHECK (
+            `address` >= 0
+            AND `voltage` >= 0
+            AND `current` >= 0
+            AND `power` >= 0
+            AND `energy` >= 0
+            AND `leakage` >= 0
+        )
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='断路器状态记录表';
+
+CREATE TABLE IF NOT EXISTS `light_record` (
+    `id` VARCHAR(64) NOT NULL COMMENT '记录ID',
+    `device_id` VARCHAR(64) NOT NULL COMMENT '设备ID',
+    `address` INT NOT NULL COMMENT '灯地址',
+    `self_id` INT NOT NULL COMMENT '自编号',
+    `is_open` TINYINT(1) NOT NULL COMMENT '是否开启',
+    `is_lock` TINYINT(1) NOT NULL COMMENT '是否锁定',
+    `create_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `update_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    `delete_at` DATETIME(3) NULL,
+    PRIMARY KEY (`id`),
+    KEY `idx_light_record_device_time` (`device_id`, `create_at`),
+    KEY `idx_light_record_addr_time` (`address`, `self_id`, `create_at`),
+    KEY `idx_light_record_delete` (`delete_at`),
+    CONSTRAINT `fk_light_record_device`
+        FOREIGN KEY (`device_id`) REFERENCES `device` (`id`)
+        ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT `chk_light_record_bool`
+        CHECK (`is_open` IN (0, 1) AND `is_lock` IN (0, 1)),
+    CONSTRAINT `chk_light_record_value`
+        CHECK (`address` >= 0 AND `self_id` >= 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='灯状态记录表';
+
+CREATE TABLE IF NOT EXISTS `sensor_record` (
+    `id` VARCHAR(64) NOT NULL COMMENT '记录ID',
+    `device_id` VARCHAR(64) NOT NULL COMMENT '设备ID',
+    `address` INT NOT NULL COMMENT '传感器地址',
+    `self_id` INT NOT NULL COMMENT '内编号',
+    `temperature` DECIMAL(10,3) NOT NULL COMMENT '温度',
+    `humidity` DECIMAL(10,3) NOT NULL COMMENT '湿度',
+    `light` DECIMAL(12,3) NOT NULL COMMENT '光照强度',
+    `smoke` INT NOT NULL COMMENT '烟雾',
+    `create_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `update_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    `delete_at` DATETIME(3) NULL,
+    PRIMARY KEY (`id`),
+    KEY `idx_sensor_record_device_time` (`device_id`, `create_at`),
+    KEY `idx_sensor_record_addr_time` (`address`, `self_id`, `create_at`),
+    KEY `idx_sensor_record_delete` (`delete_at`),
+    CONSTRAINT `fk_sensor_record_device`
+        FOREIGN KEY (`device_id`) REFERENCES `device` (`id`)
+        ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT `chk_sensor_record_value`
+        CHECK (
+            `address` >= 0
+            AND `self_id` >= 0
+            AND `humidity` >= 0
+            AND `light` >= 0
+            AND `smoke` >= 0
+        )
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='传感器状态记录表';

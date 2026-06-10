@@ -29,6 +29,7 @@
         <module>uid-springboot-starter</module>
         <module>common</module>
         <module>api</module>
+        <module>redis</module>
         <module>mqtt</module>
         <module>web</module>
         <module>edu</module>
@@ -62,6 +63,13 @@
                 <groupId>com.baomidou</groupId>
                 <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
                 <version>3.5.16</version>
+            </dependency>
+
+            <!-- Redis client, shared by modules that need IPC/cache primitives -->
+            <dependency>
+                <groupId>redis.clients</groupId>
+                <artifactId>jedis</artifactId>
+                <version>6.0.0</version>
             </dependency>
 
         </dependencies>

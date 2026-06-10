@@ -15,12 +15,17 @@ public class MqttDeviceHelper implements DeviceHelper {
     private final DeviceMapper deviceMapper;
 
     @Override
+    public Device getDeviceById(String deviceId) {
+        return deviceMapper.getDeviceById(deviceId);
+    }
+
+    @Override
     public List<Device> listAll() {
         return deviceMapper.listAll();
     }
 
     @Override
     public boolean updateDevice(Device device) {
-        return false;
+        return deviceMapper.updateDevice(device);
     }
 }

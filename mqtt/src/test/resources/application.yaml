@@ -8,7 +8,14 @@ mybatis-plus:
     map-underscore-to-camel-case: true
 
 mqtt:
-  url: ${MQTT_URL:tcp://localhost:1883}
-  username: ${MQTT_USERNAME:}
-  password: ${MQTT_PASSWORD:}
-  mqtt-qos: ${MQTT_QOS:AT_LEAST_ONCE}
+  connect:
+    url: ${MQTT_URL:tcp://localhost:1883}
+    username: ${MQTT_USERNAME:}
+    password: ${MQTT_PASSWORD:}
+    qos: ${MQTT_QOS:AT_LEAST_ONCE}
+  poll:
+    interval-millis: ${MQTT_POLL_INTERVAL_MILLIS:2000}
+    timeout-millis: ${MQTT_POLL_TIMEOUT_MILLIS:5000}
+    watchdog-interval-millis: ${MQTT_POLL_WATCHDOG_INTERVAL_MILLIS:60000}
+  gateway:
+    watchdog-interval-millis: ${MQTT_GATEWAY_WATCHDOG_INTERVAL_MILLIS:60000}

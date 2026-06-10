@@ -8,6 +8,7 @@ import xyz.jasenon.lab.common.command.Task;
 import xyz.jasenon.lab.mqtt.client.common.PendingRequest;
 import xyz.jasenon.lab.mqtt.client.common.Poll;
 
+import java.util.Set;
 import java.util.concurrent.*;
 
 public abstract class AbstractSysClient<REQ extends Task> extends MqttClient {
@@ -79,8 +80,13 @@ public abstract class AbstractSysClient<REQ extends Task> extends MqttClient {
         PendingRequest<REQ> pending = current;
         if (pending != null && match(pending.getRequest(), resp)){
             pending.getFuture().complete(resp);
+            // 加入message_handler 处理设备信息
         }
         onMessage(resp);
+    }
+
+    public final PendingRequest<REQ> current(){
+        return this.current.clone();
     }
 
     // 发送逻辑
@@ -113,6 +119,10 @@ public abstract class AbstractSysClient<REQ extends Task> extends MqttClient {
 
     protected boolean remove(Poll<REQ> req) {
         return pollQueue.remove(req);
+    }
+
+    protected Set<Poll<REQ>> pollSnapshot() {
+        return pollQueue.activeSnapshot();
     }
 
 }

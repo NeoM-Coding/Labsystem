@@ -120,7 +120,7 @@ public class MqttTask extends Task {
 
     }
 
-    public PendingRequest<MqttTask> decorat(){
+    public PendingRequest<MqttTask> decorate(){
         return new PendingRequest<>(
                 this, PendingRequest.Type.USER, 5000L
         );

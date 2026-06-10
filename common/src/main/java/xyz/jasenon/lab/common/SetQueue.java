@@ -2,6 +2,7 @@ package xyz.jasenon.lab.common;
 
 import java.util.AbstractQueue;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Objects;
 import java.util.Queue;
@@ -100,6 +101,10 @@ public class SetQueue<E> extends AbstractQueue<E> {
 
     public synchronized int activeSize() {
         return set.size();
+    }
+
+    public synchronized Set<E> activeSnapshot() {
+        return new HashSet<>(set);
     }
 
     @Override

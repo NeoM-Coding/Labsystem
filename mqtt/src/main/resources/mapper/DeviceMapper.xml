@@ -22,10 +22,56 @@
     </select>
 
     <select id="listAll" resultMap="DeviceResultMap">
-        SELECT * FROM `device` WHERE `dalete_at` IS NULL;
+        SELECT * FROM `device` WHERE `delete_at` IS NULL;
     </select>
 
     <update id="updateDevice">
-        UPDATE `device` SET VALUE(#{device...}) WHERE `id` = #{device.id};
+        UPDATE `device`
+        <set>
+            <if test="device.deviceName != null">
+                `device_name` = #{device.deviceName},
+            </if>
+            <if test="device.belongTo != null">
+                `belong_to` = #{device.belongTo},
+            </if>
+            <if test="device.deviceType != null">
+                `device_type` = #{device.deviceType},
+            </if>
+            `polling` = #{device.polling},
+            <if test="device.gatewayId != null">
+                `gateway_id` = #{device.gatewayId},
+            </if>
+            <choose>
+                <when test="device.deviceType != null and device.deviceType.name() == 'Access'">
+                    `address` = #{device.address},
+                    `is_lock` = #{device.lock},
+                </when>
+                <when test="device.deviceType != null and device.deviceType.name() == 'AirCondition'">
+                    `address` = #{device.address},
+                    `self_id` = #{device.selfId},
+                    <if test="device.socketGatewayId != null">
+                        `socket_gateway_id` = #{device.socketGatewayId},
+                    </if>
+                    <if test="device.groupId != null">
+                        `group_id` = #{device.groupId},
+                    </if>
+                    `is_lock` = #{device.lock},
+                </when>
+                <when test="device.deviceType != null and device.deviceType.name() == 'CircuitBreak'">
+                    `address` = #{device.address},
+                </when>
+                <when test="device.deviceType != null and device.deviceType.name() == 'Light'">
+                    `address` = #{device.address},
+                    `self_id` = #{device.selfId},
+                    `is_lock` = #{device.lock},
+                </when>
+                <when test="device.deviceType != null and device.deviceType.name() == 'Sensor'">
+                    `address` = #{device.address},
+                    `self_id` = #{device.selfId},
+                </when>
+            </choose>
+            `update_at` = CURRENT_TIMESTAMP(3)
+        </set>
+        WHERE `delete_at` IS NULL AND `id` = #{device.id};
     </update>
 </mapper>

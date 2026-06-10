@@ -143,8 +143,15 @@ server:
   port: 3333
 
 mqtt:
-  url: tcp://localhost:1883
-  mqtt-qos: at_least_once
+  connect:
+    url: tcp://localhost:1883
+    qos: at_least_once
+  poll:
+    interval-millis: 2_000
+    timeout-millis: 5_000
+    watchdog-interval-millis: 60_000
+  gateway:
+    watchdog-interval-millis: 60_000
 ```
 
 本地启动前通常需要确认：
@@ -251,4 +258,3 @@ MQTT_REPLY_TOPIC_TEMPLATE=gateway/${gatewayId}/send
 - 本地系统文件：`.DS_Store`
 - 设备资料目录：`docs/device_docs`
 - Maven wrapper 文件：`mvnw`、`mvnw.cmd`、`.mvn`
-

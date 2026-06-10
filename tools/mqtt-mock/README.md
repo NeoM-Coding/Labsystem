@@ -16,11 +16,17 @@ npm run dev
 
 ```text
 MQTT_URL=mqtt://localhost:1883
-MQTT_SUBSCRIBE_TOPIC=test/accept
+MQTT_SUBSCRIBE_TOPIC=test/accept/+
 MQTT_REPLY_TOPIC=test/send
+MQTT_TOPIC_REGEX=^test/accept/(?<topicKey>[^/]+)$
+MQTT_REPLY_TOPIC_TEMPLATE=test/send/${topicKey}
 ```
 
-如果真实主题里带网关 id，可以使用正则提取并构造回复主题：
+这表示 mock 会订阅 `test/accept/+`，收到 `test/accept/1` 时回复到 `test/send/1`，收到 `test/accept/gateway-a` 时回复到 `test/send/gateway-a`。
+
+如果习惯写 `test/accept/*`，工具会自动把 `*` 转为 MQTT 标准单层通配符 `+`。
+
+如果真实主题里带更复杂的网关 id，可以使用正则提取并构造回复主题：
 
 ```text
 MQTT_SUBSCRIBE_TOPIC=gateway/+/accept

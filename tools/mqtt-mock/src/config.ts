@@ -21,16 +21,23 @@ function qos(value: string | undefined): 0 | 1 | 2 {
   return 0;
 }
 
+function mqttWildcardTopic(value: string): string {
+  return value
+    .split("/")
+    .map((segment) => segment === "*" ? "+" : segment)
+    .join("/");
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): MockConfig {
   return {
     mqttUrl: env.MQTT_URL ?? "mqtt://localhost:1883",
     clientId: env.MQTT_CLIENT_ID ?? `lab-system-mqtt-mock-${Date.now()}`,
     username: optional(env.MQTT_USERNAME),
     password: optional(env.MQTT_PASSWORD),
-    subscribeTopic: env.MQTT_SUBSCRIBE_TOPIC ?? "test/accept",
+    subscribeTopic: mqttWildcardTopic(env.MQTT_SUBSCRIBE_TOPIC ?? "test/accept/+"),
     fallbackReplyTopic: env.MQTT_REPLY_TOPIC ?? "test/send",
-    topicRegex: optional(env.MQTT_TOPIC_REGEX),
-    replyTopicTemplate: optional(env.MQTT_REPLY_TOPIC_TEMPLATE),
+    topicRegex: optional(env.MQTT_TOPIC_REGEX) ?? "^test/accept/(?<topicKey>[^/]+)$",
+    replyTopicTemplate: optional(env.MQTT_REPLY_TOPIC_TEMPLATE) ?? "test/send/${topicKey}",
     qos: qos(env.MQTT_QOS)
   };
 }

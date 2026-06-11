@@ -5,6 +5,7 @@ export interface HandlerContext {
   topic: string;
   deviceType: DeviceType;
   address: number;
+  selfId?: number;
 }
 
 export interface CommandHandler {

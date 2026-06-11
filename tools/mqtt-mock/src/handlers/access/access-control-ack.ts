@@ -15,6 +15,10 @@ export const accessControlAckHandler: CommandHandler = {
     if (!verifyUnsignedSum(payload)) {
       throw new Error("ACCESS_CONTROL_ACK checksum failed");
     }
-    return appendUnsignedSum([context.address, 0x0a, payload[2] & 0xff]);
+    if (payload[2] === 0x03) {
+      return appendUnsignedSum([context.address, 0x0a, 0x03, payload[3] & 0xff]);
+    }
+
+    return appendUnsignedSum([context.address, 0x0a, payload[2] & 0xff, payload[3] & 0xff]);
   }
 };

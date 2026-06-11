@@ -33,7 +33,7 @@
         <module>mqtt</module>
         <module>web</module>
         <module>edu</module>
-        <module>quartz</module>
+        <module>rule-engine</module>
     </modules>
     <packaging>pom</packaging>
 

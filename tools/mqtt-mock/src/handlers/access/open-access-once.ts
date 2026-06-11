@@ -13,6 +13,6 @@ export const openAccessOnceHandler: CommandHandler = {
     if (!verifyUnsignedSum(payload)) {
       throw new Error("OPEN_ACCESS_ONCE checksum failed");
     }
-    return appendUnsignedSum([context.address, 0x0a, 0x02]);
+    return appendUnsignedSum([context.address, 0x0a, 0x02, 0xff]);
   }
 };

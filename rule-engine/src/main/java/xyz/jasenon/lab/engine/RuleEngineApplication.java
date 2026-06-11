@@ -1,13 +1,13 @@
-package xyz.jasenon.lab.quartz;
+package xyz.jasenon.lab.engine;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class QuartzApplication {
+public class RuleEngineApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(QuartzApplication.class, args);
+        SpringApplication.run(RuleEngineApplication.class, args);
     }
 
 }

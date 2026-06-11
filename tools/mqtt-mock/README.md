@@ -43,3 +43,33 @@ MQTT_REPLY_TOPIC_TEMPLATE=gateway/${gatewayId}/send
 - 构造响应 payload
 
 公共能力放在 `src/protocol` 和 `src/topic`。
+
+## 当前支持
+
+mock 会按 payload 第 0 位地址区分设备类型：
+
+| 地址范围 | 设备类型 |
+| --- | --- |
+| 1-10 | Access |
+| 11-30 | CircuitBreak |
+| 31-40 | AirCondition |
+| 41-60 | Light |
+| 61-80 | Sensor |
+
+已覆盖的 `CommandLine`：
+
+| 设备 | 指令 |
+| --- | --- |
+| Access | `OPEN_ACCESS_ONCE`, `CLOSE_ACCESS_ONCE`, `REQUEST_ACCESS_DATA`, `SET_ACCESS_DELAY` |
+| CircuitBreak | `OPEN_CIRCUITBREAK`, `CLOSE_CIRCUITBREAK`, `REQUEST_CIRCUITBREAK_DATA` |
+| AirCondition | `OPEN_AIR_CONDITION_RS485`, `CLOSE_AIR_CONDITION_RS485`, `ENHANCE_CONTROL_AIR_CONDITION`, `REQUEST_AIR_CONDITION_DATA_RS485` |
+| Light | `OPEN_LIGHT`, `CLOSE_LIGHT`, `LOCK_LIGHT`, `UNLOCK_LIGHT`, `REQUEST_LIGHT_DATA` |
+| Sensor | `REQUEST_SENSOR_DATA` |
+
+查询类响应会根据 `address` 和 `selfId` 生成不同数据，便于验证多设备轮询、记录持久化和 Redis hash 的 field-level 访问。
+
+校验位会按 Java 端当前实现生成：
+
+- `UNSIGN_SUM` 对应 `SumChecker.calculateUnsignedByteCheckSum`
+- `SIGN_SUM` 对应 `SumChecker.calculateCheckSum`
+- `CRC16` 对应 `CrcChecker.generatePayload`

@@ -1,385 +1,411 @@
 # MQTT 部分设计
 
-本文档描述当前 `mqtt` 模块的实际代码设计，核心类包括：
+本文档描述 `mqtt` 模块当前代码现状。它不是单纯的 MQTT client 封装，而是承担了网关运行时管理、用户指令发送、后台轮询、响应匹配、设备状态解析、状态缓存和消息落库等职责。
 
-- `AbstractSysClient`
-- `SysClientMananger`
-- `MqttClient`
-- `MqttCallback`
-- `PendingRequest`
-- `Poll`
-- `SetQueue`
-- `MqttTask`
+## 模块目标
 
-## 总体目标
+`mqtt` 模块面向 RS485 网关和设备协议，核心目标是：
 
-MQTT 客户端负责把上层业务指令转换为底层 MQTT payload，发送到网关，并把网关响应匹配回当前请求。
+- 为每个 RS485 网关维护一个真实 MQTT client。
+- 将上层 `MqttTaskDto` 转换为底层设备协议 payload。
+- 保证同一网关下 MQTT 请求串行发送。
+- 支持用户主动请求和系统后台轮询两类任务。
+- 防止同一设备重复注册轮询任务。
+- 收到设备响应后完成当前请求的 future，并异步解析、缓存和持久化设备状态。
+- 通过 Dubbo 暴露 `MqttIo`、`MqttPollCo` 等服务契约。
 
-系统同时支持两类任务：
+## 关键类
 
-- `USER`：用户主动发起的同步请求，进入 `userQueue`。
-- `POLL`：系统后台轮询请求，进入 `pollQueue`。
-
-每个网关对应一个 `AbstractSysClient` 实例。客户端内部只有一个 worker 线程，因此同一网关下的请求天然串行执行。
-
-## 核心组件职责
-
-### AbstractSysClient
-
-`AbstractSysClient<REQ extends Task>` 继承 Paho 的 `MqttClient`，是网关客户端的调度基类。
-
-它维护两个队列：
-
-```java
-private final BlockingQueue<PendingRequest<REQ>> userQueue = new LinkedBlockingQueue<>();
-private final SetQueue<Poll<REQ>> pollQueue = new SetQueue<>(ConcurrentHashMap.newKeySet(), new DelayQueue<>());
+```text
+mqtt
+├── client
+│   ├── AbstractSysClient.java
+│   ├── ClientsRuntime.java
+│   ├── SysClientManager.java
+│   ├── SysPollingManager.java
+│   ├── common
+│   │   ├── PendingRequest.java
+│   │   └── Poll.java
+│   ├── event
+│   │   ├── GatewayClientReadyEvent.java
+│   │   └── GatewayClientsInitialRebuildCompletedEvent.java
+│   ├── itfc
+│   │   ├── DeviceHelper.java
+│   │   ├── GatewayHelper.java
+│   │   └── TaskHelper.java
+│   ├── message_handler
+│   │   ├── MessageHandler.java
+│   │   ├── MessageHandlerManager.java
+│   │   ├── MessagePersistent.java
+│   │   └── handlers/*.java
+│   └── mqtt
+│       ├── MqttCallback.java
+│       ├── MqttClient.java
+│       └── MqttTask.java
+└── config
+    └── MqttOptions.java
 ```
 
-其中：
+## 运行时分层
 
-- `userQueue` 保存用户主动请求。
-- `pollQueue` 保存后台轮询任务。
-- `current` 保存当前正在执行的 `PendingRequest`。
-- `worker` 是单线程调度器，负责不断从队列取任务并执行。
+### Dubbo 服务层
 
-调度顺序在 `next()` 中定义：
+`SysClientManager` 标注为 `@DubboService`，实现：
 
-```java
-PendingRequest<REQ> userReq = userQueue.poll();
-if (userReq != null){
-    return userReq;
-}
+- `MqttIo`：用户同步/异步发送 MQTT 指令。
+- `MqttGatewayCRUD`：预留网关 client 管理能力。
 
-Poll<REQ> poll = pollQueue.poll();
-if (poll != null){
-    return poll.poll();
-}
-```
+`SysPollingManager` 标注为 `@DubboService`，实现：
 
-因此 `userQueue` 优先级高于 `pollQueue`。只要存在用户请求，worker 会优先处理用户请求；只有用户请求为空时，才处理轮询请求。
+- `MqttPollCo`：启停设备轮询。
 
-### PendingRequest
+这意味着 `web` 等模块不直接依赖 Paho MQTT client，而是通过 `api` 模块中的 Dubbo 契约调用 `mqtt` 模块。
 
-`PendingRequest<REQ>` 表示一次正在执行或等待执行的请求。
+### 网关运行时层
 
-它包含：
-
-- `request`：实际请求任务。
-- `type`：`USER` 或 `POLL`。
-- `timeout`：等待响应的超时时间。
-- `interval`：仅用于 `POLL`，表示轮询间隔。
-- `future`：请求完成信号。
-
-`AbstractSysClient.execute()` 会发送请求，然后等待：
+`ClientsRuntime` 是进程内网关 client 注册表：
 
 ```java
-Object result = request.getFuture().get(request.getTimeout(), TimeUnit.MILLISECONDS);
+Map<String, AbstractSysClient<? extends Task>>
 ```
 
-响应到达时，`recevive()` 会尝试匹配当前请求；匹配成功后完成 `future`。
+key 是 `gatewayId`，value 是对应网关的运行时 client。它只负责内存态注册、移除、查询和快照，不直接创建 client。
 
-### Poll
+`SysClientManager` 的 watchdog 根据 `GatewayHelper.listAll()` 读取数据库中的 RS485 网关列表，然后用 `ClientsRuntime.clientIds()` 对比当前运行时状态：
 
-`Poll<REQ>` 表示一个轮询任务。
+- 数据库有、运行时没有：创建 `MqttClient`、设置 `MqttCallback`、连接 broker、注册到 `ClientsRuntime`。
+- 运行时有、数据库没有：从 `ClientsRuntime` 移除并关闭 client。
+- topic 或 MQTT url 缺失：跳过并记录 warn。
 
-它实现 `Delayed`，因此可以被 `DelayQueue` 按时间调度。`Poll.poll()` 会把轮询任务转换成一次 `PendingRequest.Type.POLL` 请求：
+首次重建成功后会发布：
 
 ```java
-return new PendingRequest<>(
-        this.request, PendingRequest.Type.POLL, timeout, interval
-);
+GatewayClientsInitialRebuildCompletedEvent
 ```
 
-轮询请求执行完成后，`AbstractSysClient.execute()` 的 `finally` 会调用：
+单个网关 client 创建成功后会发布：
 
 ```java
-pollQueue.returnToQueue(request.toPoll());
+GatewayClientReadyEvent
 ```
 
-这意味着轮询不是固定时间无脑发送，而是：
+这些事件用于驱动轮询管理器同步轮询任务。
 
-1. 到达轮询时间。
-2. worker 取出 `Poll`。
-3. 转换为 `PendingRequest.Type.POLL`。
-4. 发送 MQTT 请求。
-5. 等待响应或 timeout。
-6. 请求结束后重新生成 `Poll` 并按 interval 回填队列。
+### 单网关串行调度层
 
-所以下一轮轮询的时间点是“本轮结束后 + interval”。
-
-### SetQueue
-
-`SetQueue<E>` 是队列和 set 的组合。
-
-在 MQTT 轮询中实际使用的是：
+`AbstractSysClient<REQ extends Task>` 继承 Paho 的 `MqttClient`，是单个网关 client 的调度基类。它内部有一个 daemon worker 线程：
 
 ```java
-SetQueue<Poll<REQ>>
+private final BlockingQueue<PendingRequest<REQ>> userQueue;
+private final SetQueue<Poll<REQ>> pollQueue;
+private volatile PendingRequest<REQ> current;
 ```
 
-它的语义是：
+调度优先级固定为：
 
-- `queue` 负责实际调度。
-- `set` 负责记录当前活跃的轮询任务。
-- `poll()` 只从 queue 取出元素，不从 set 移除。
-- `remove()` 才从 queue 和 set 中释放任务。
-- `returnToQueue()` 只能把仍然 active 的任务放回 queue。
+1. 优先从 `userQueue` 取用户请求。
+2. 用户请求为空时，从 `pollQueue` 取到期轮询任务。
+3. 两者都没有时短暂 sleep。
 
-这样设计的目的是防止同一设备重复开启轮询。即使某个 `Poll` 被 worker 取出执行，它仍然保留在 set 中，因此重复提交同一设备的轮询任务会被拒绝。
+因此同一网关下不会并发 publish，多请求会被单 worker 串行化。这个设计对于 RS485 下位机链路尤其重要，因为很多设备协议天然不适合并发请求。
 
-`Poll.equals()` 依赖内部 `request.equals()`。当前 `MqttTask.equals()` 基于：
+## 请求模型
+
+### MqttTaskDto
+
+`api` 模块中的 `MqttTaskDto` 是远程调用入参，包含：
+
+- `commandLine`：设备指令枚举。
+- `args`：指令模板参数。
+- `type`：设备类型。
+- `deviceId`：设备 id。
+
+它不直接携带 `gatewayId`，因为网关归属应由设备数据决定。
+
+### TaskHelper
+
+`TaskHelper` 根据 `deviceId` 查询设备，补齐：
+
+- `gatewayId`
+- 设备地址
+- 自编号等协议参数
+
+然后构造 `MqttTask`。这样上层只需要知道“对哪个设备执行什么指令”，不需要关心该设备挂在哪个网关、地址是多少。
+
+### MqttTask
+
+`MqttTask` 继承 `Task`，在通用 `gatewayId + payload` 基础上增加：
+
+- `CommandLine commandLine`
+- `int[] args`
+- `DeviceType type`
+- `String deviceId`
+
+`MqttTask.fromDto(gatewayId, dto)` 会调用 `convert()`。转换过程是：
+
+1. 将 `args` 格式化为两位十六进制字符串。
+2. 用 `MessageFormat` 填充 `CommandLine` 中的命令模板。
+3. 将命令字符串转换为 byte payload。
+4. 根据 `CheckType` 追加校验：
+   - `CRC16`
+   - `SIGN_SUM`
+   - `UNSIGN_SUM`
+
+`MqttTask.equals()` 和 `hashCode()` 基于：
 
 - `gatewayId`
 - `type`
 - `deviceId`
 - `commandLine`
 
-因此同一网关、同一设备类型、同一设备 id、同一指令 会被认为是同一个轮询任务。
+这使它可以作为轮询去重的核心标识。
 
-## MqttTask
+## PendingRequest 与 Poll
 
-`MqttTask` 是 MQTT 模块的具体任务类型，继承 `Task`。
+### PendingRequest
 
-它额外包含：
+`PendingRequest<REQ>` 表示一次待执行或正在执行的请求，包含：
 
-- `commandLine`
-- `args`
-- `DeviceType type`
-- `deviceId`
+- `request`
+- `type`：`USER` 或 `POLL`
+- `timeout`
+- `interval`
+- `future`
 
-上层 DTO 通过：
+`USER` 请求由 `MqttTask.decorate()` 创建。`POLL` 请求由 `Poll.poll()` 创建。
 
-```java
-MqttTask.fromDto(gatewayId, dto)
-```
+执行时，`AbstractSysClient.execute()` 会：
 
-转换为 `MqttTask`。其中 `gatewayId` 来自外部上下文或 `TaskHelper`，不放在 DTO 内。
+1. 将请求设为 `current`。
+2. 调用 `send(request)`。
+3. 阻塞等待 `future.get(timeout)`。
+4. 收到匹配响应后完成 future。
+5. 超时或异常时完成异常。
+6. 如果是轮询请求，在 finally 中重新回填到 `pollQueue`。
 
-发送前需要调用：
+### Poll
 
-```java
-userTask.convert();
-```
+`Poll<REQ>` 实现 `Delayed`，用于 `DelayQueue` 定时调度。它保存：
 
-`convert()` 会根据 `CommandLine` 的命令模板和参数生成底层 payload，并按命令配置追加校验位。
+- 轮询任务本体。
+- 轮询间隔。
+- 下一次执行时间。
+- 单次响应超时时间。
 
-用户请求可以通过：
+轮询不是固定时间盲发，而是：
 
-```java
-userTask.decorat()
-```
+1. 到达 `nextTime`。
+2. worker 从 `DelayQueue` 取出 `Poll`。
+3. 转为 `PendingRequest.Type.POLL`。
+4. 发送请求并等待响应或超时。
+5. 执行结束后 `refresh()`，按 `interval` 计算下一次执行时间。
+6. 如果轮询仍然 active，则回填队列。
 
-包装成：
+## SetQueue 轮询语义
 
-```java
-PendingRequest<MqttTask>
-```
-
-其类型为 `PendingRequest.Type.USER`。
-
-## MqttClient
-
-`MqttClient` 是 MQTT 协议下的具体实现：
-
-```java
-public class MqttClient extends AbstractSysClient<MqttTask>
-```
-
-它负责：
-
-- 保存 `sendTopic`
-- 保存 `acceptTopic`
-- 保存 `version`
-- 把 `MqttTask.payload` publish 到 `sendTopic`
-- 根据 seq 规则匹配请求和响应
-
-发送逻辑：
+`pollQueue` 的类型是：
 
 ```java
-publish(sendTopic, new MqttMessage(mqttTask.getPayload()));
+SetQueue<Poll<MqttTask>>
 ```
 
-匹配逻辑：
+它由两部分组成：
+
+- `queue`：真实调度队列，这里是 `DelayQueue`。
+- `set`：活跃轮询集合，用来记录当前正在工作的轮询任务。
+
+关键语义：
+
+- `offer()` 同时写入 set 和 queue，set 已存在时拒绝重复 offer。
+- `poll()` 只从 queue 取出元素，不从 set 移除。
+- `returnToQueue()` 只有在 set 仍然包含该元素时才回填 queue。
+- `remove()` 同时移除 queue 和 set，表示彻底停止轮询。
+- `activeSnapshot()` 返回 set 快照，用于外部感知当前 active 轮询任务。
+
+这正好贴合当前业务语义：set 不是“队列里还有哪些元素”，而是“系统认为哪些轮询任务正在工作”。即使某个 `Poll` 已经被 worker 取出执行，它仍在 set 中，所以同一设备不会在执行窗口内被重复注册。
+
+## 用户请求链路
+
+```mermaid
+sequenceDiagram
+    participant Web as web/controller
+    participant Dubbo as Dubbo MqttIo
+    participant Manager as SysClientManager
+    participant Helper as TaskHelper
+    participant Client as MqttClient
+    participant Broker as MQTT Broker
+    participant Device as Gateway/Device
+
+    Web->>Dubbo: syncSend(MqttTaskDto)
+    Dubbo->>Manager: syncSend(dto)
+    Manager->>Helper: help(dto)
+    Helper-->>Manager: MqttTask(gatewayId,payload)
+    Manager->>Client: offer(PendingRequest.USER)
+    Client->>Broker: publish(sendTopic,payload)
+    Broker->>Device: 下发
+    Device-->>Broker: 响应
+    Broker-->>Client: messageArrived
+    Client->>Client: match(current.request,response)
+    Client-->>Manager: future complete
+    Manager-->>Web: MqttResponseDto
+```
+
+`MqttClient.match()` 使用 `CommandLine` 中的 `reqSeq` 和 `respSeq`，通过 `SeqGeneratorManager` 计算请求和响应序列。如果序列一致，就认为响应属于当前请求。
+
+## 轮询链路
+
+轮询由 `SysPollingManager` 管理，分为两条路径。
+
+### 手动启停
+
+`enable(deviceId)`：
+
+1. 读取设备。
+2. 将设备 `polling` 状态更新为 true。
+3. 根据设备类型构造 `Poll<MqttTask>`。
+4. 如果 gateway client 已就绪，则 `client.offer(poll)`。
+5. 如果 client 未就绪，只保留数据库状态，等待事件或 watchdog 后续同步。
+
+`disable(deviceId)`：
+
+1. 读取设备。
+2. 将设备 `polling` 状态更新为 false。
+3. 构造同一个语义的 `Poll<MqttTask>`。
+4. 如果 client 存在，则 `client.remove(poll)`。
+
+### 事件驱动同步
+
+`SysPollingManager` 监听：
+
+- `GatewayClientsInitialRebuildCompletedEvent`
+- `GatewayClientReadyEvent`
+
+当网关 client 首次重建完成或单个 client 就绪时，轮询管理器会读取所有 `polling=true` 的设备，按 `gatewayId` 分组，然后和各 client 的 `pollSnapshot()` 对比，只对缺失的 poll 执行 offer。
+
+这避免了“首次 watchdog 还没创建 client，轮询注册失败”的问题。
+
+### Watchdog 兜底
+
+事件驱动之外，`SysPollingManager` 还有自己的 watchdog。它不维护独立的 gateway flag，而是依赖：
 
 ```java
-String reqSeq = reqGenerator.generate(mqttTask.getPayload());
-String respSeq = respGenerator.generate(resp.getPayload());
-return Objects.equals(reqSeq, respSeq);
+SysClientManager.clientIds()
 ```
 
-匹配规则来自 `SeqGeneratorManager`。当前请求和响应分别使用 `CommandLine` 中配置的：
+周期性检查当前已经存在的 client，然后同步这些 client 应该拥有的轮询任务。这个 watchdog 是兜底机制，用来修复事件丢失、手动变更、运行时短暂不一致等情况。
 
-- `reqSeq`
-- `respSeq`
-
-如果 seq 规则缺失、payload 长度不够、命令为空或解析异常，则匹配失败。
-
-## MqttCallback
+## MQTT 回调与消息处理
 
 `MqttCallback` 实现 Paho 的 `MqttCallbackExtended`。
 
 ### connectComplete
 
-连接完成后订阅客户端的 `acceptTopic`：
-
-```java
-client.subscribe(client.acceptTopic);
-```
-
-订阅失败时会指数退避重试，最多 5 次。超过次数后调用：
-
-```java
-SysClientMananger.remove(client);
-```
-
-移除当前客户端，后续交由 Manager 的 watchdog 重新拉起。
+连接完成后订阅当前 client 的 `acceptTopic`。订阅失败会指数退避重试，最多 5 次。失败后移除当前 client，后续交给 `SysClientManager` watchdog 重建。
 
 ### connectionLost
 
-连接丢失后不会阻塞 MQTT 回调线程，而是异步执行重连：
-
-```java
-CompletableFuture.runAsync(this::reconnectWithBackoff);
-```
-
-重连最多 5 次，失败后从 `SysClientMananger` 移除当前 client。
+连接丢失后异步重连。重连期间使用 `AtomicBoolean reconnecting` 防止重复重连任务。超过重试次数后移除 client，让 watchdog 重新拉起。
 
 ### messageArrived
 
-消息到达时，将 MQTT payload 包装为普通 `Task`，然后交给当前 client：
+收到 MQTT 消息后执行两件事：
+
+1. 调用 `client.receive(new Task(client.gatewayId, payload))`，尝试匹配当前请求并完成 future。
+2. 根据当前请求的 `CheckType` 校验响应，通过后异步调用 `MessageHandlerManager.persist(task, payload)`。
+
+这里要注意：消息到达不等于请求一定匹配。匹配逻辑仍然在 `AbstractSysClient.receive()` 中完成。
+
+## 设备状态解析、缓存和落库
+
+消息处理由 `MessageHandler<R extends BaseRecord>` 抽象：
 
 ```java
-client.recevive(new Task(client.gatewayId, mqttMessage.getPayload()));
+protected abstract R decode(byte[] payload);
+public void persist(String deviceId, byte[] payload)
 ```
 
-注意：`onMessage()` 只表示消息到达，不表示消息一定匹配当前请求。真正完成请求的是 `AbstractSysClient.recevive()` 中的：
+处理流程：
 
-```java
-if (pending != null && match(pending.getRequest(), resp)){
-    pending.getFuture().complete(resp);
-}
+1. 对应设备 handler 解码 payload 为 record。
+2. 设置 `deviceId`。
+3. 调用 `onChange(record)`，目前用于日志提示，后续可以演进为前端推送。
+4. 使用 `ObjectMapUtil.toStringMap(record)` 转为字段级 map。
+5. 写入 Redis hash，并设置短 TTL，给规则表达式提供字段级读取能力。
+6. 通过 `MessagePersistent` 落库。
+
+当前支持的 handler：
+
+- `AccessMessageHandler`
+- `AirConditionMessageHandler`
+- `CircuitBreakMessageHandler`
+- `LightMessageHandler`
+- `SensorMessageHandler`
+
+`MessagePersistent<R>` 继承 MyBatis-Plus `BaseMapper<R>`，默认 `persist()` 调用 `insert(record)`。这样 record 主键生成由 MyBatis-Plus 和项目级 `IdentifierGenerator` 负责，不在 XML 中手写 id。
+
+## 配置
+
+`MqttOptions` 使用前缀：
+
+```yaml
+mqtt:
+  connect:
+    url: tcp://localhost:1883
+    username:
+    password:
+    qos: at_least_once
+  poll:
+    interval-millis: 2000
+    timeout-millis: 5000
+    watchdog-interval-millis: 60000
+  gateway:
+    watchdog-interval-millis: 60000
 ```
 
-## SysClientMananger
+配置被拆成三组：
 
-`SysClientMananger` 是客户端注册和同步发送入口。
+- `connect`：broker 地址、账号密码、QoS。
+- `poll`：轮询间隔、轮询请求超时、轮询 watchdog 周期。
+- `gateway`：网关 client watchdog 周期。
 
-当前客户端表：
+## 测试与 mock
 
-```java
-private final static Map<String, AbstractSysClient<? extends Task>> clients = new ConcurrentHashMap<>();
+`mqtt` 模块测试分三类：
+
+- `MqttTaskTest`：验证命令模板到 payload 的转换。
+- `MqttClientMatchTests`：验证请求和响应序列匹配逻辑。
+- `DeviceProtocolContractTests`：验证 `MqttTask.convert -> mock response -> MessageHandler.decode` 的端到端协议契约。
+- `MqttClientSendIntegrationTests`：依赖真实 broker 和真实 client 的发送链路集成测试。
+- `UidGeneratorDataSourceIsolationTests`：验证 uid-generator 主键生成和数据源隔离。
+
+`tools/mqtt-mock` 是 Node.js + TypeScript 设备 mock。它订阅类似：
+
+```text
+test/accept/*
 ```
 
-其中 key 是 `gatewayId`。
+并根据 `*` 中的网关 id 回复到：
 
-### 注册和移除
-
-客户端创建后应调用：
-
-```java
-SysClientMananger.register(client);
+```text
+test/send/*
 ```
 
-连接失败、订阅失败或重连失败时，回调会调用：
+mock 按指令 payload 识别设备类型，生成符合 Java handler decode 逻辑的响应 payload。
 
-```java
-SysClientMananger.remove(client);
-```
+## 当前设计边界
 
-### 同步发送
+当前 MQTT 模块已经形成了比较清晰的边界：
 
-同步发送入口：
+- Dubbo 入参和返回值放在 `api`。
+- 设备、网关、命令、校验、字节工具放在 `common`。
+- MQTT client runtime、轮询、消息处理和 mapper 放在 `mqtt`。
+- Redis 能力放在独立 `redis` 模块。
+- 设备 mock 放在 `tools/mqtt-mock`。
 
-```java
-public Object syncSend(MqttTask.Dto dto)
-```
+仍可继续演进的方向：
 
-流程：
-
-1. 通过 `TaskHelper` 把 DTO 转为 `MqttTask`。
-2. 根据 `gatewayId` 从 `clients` 中查找 client。
-3. 将 `MqttTask` 转换为底层 payload。
-4. 调用 `decorat()` 生成 `PendingRequest.Type.USER`。
-5. offer 到 client 的 `userQueue`。
-6. 等待 `PendingRequest.future` 完成。
-
-代码中当前存在一次强制转换：
-
-```java
-var client = (AbstractSysClient<MqttTask>) clients.get(userTask.getGatewayId());
-```
-
-这是因为 `clients` 的 value 类型是 `AbstractSysClient<? extends Task>`。该类型只能安全读取为某种 `Task`，不能直接写入 `PendingRequest<MqttTask>`。当前业务实际使用 MQTT client，因此这里通过强转恢复为 `AbstractSysClient<MqttTask>`。
-
-如果后续只管理 MQTT 客户端，可以把 map 收紧为：
-
-```java
-Map<String, AbstractSysClient<MqttTask>>
-```
-
-或：
-
-```java
-Map<String, MqttClient>
-```
-
-这样可以移除 unchecked cast。
-
-## 请求执行链路
-
-### USER 请求
-
-```mermaid
-flowchart TD
-    A["HTTP/Service DTO"] --> B["TaskHelper.help(dto)"]
-    B --> C["MqttTask"]
-    C --> D["convert() 生成 payload"]
-    D --> E["decorat() -> PendingRequest(USER)"]
-    E --> F["SysClientMananger offer 到 userQueue"]
-    F --> G["AbstractSysClient worker"]
-    G --> H["send(request) publish 到 sendTopic"]
-    H --> I["MqttCallback.messageArrived"]
-    I --> J["client.recevive(resp)"]
-    J --> K{"match(current.request, resp)?"}
-    K -->|yes| L["current.future.complete(resp)"]
-    K -->|no| M["仅 onMessage(resp)"]
-    L --> N["execute() onResponse(resp)"]
-```
-
-### POLL 请求
-
-```mermaid
-flowchart TD
-    A["创建 Poll<MqttTask>"] --> B["offer 到 SetQueue<Poll<MqttTask>>"]
-    B --> C["SetQueue set 记录 active poll"]
-    C --> D["DelayQueue 到期"]
-    D --> E["worker pollQueue.poll()"]
-    E --> F["Poll.poll() -> PendingRequest(POLL)"]
-    F --> G["send(request) publish 到 sendTopic"]
-    G --> H["等待响应或 timeout"]
-    H --> I["finally: request.toPoll()"]
-    I --> J["pollQueue.returnToQueue(nextPoll)"]
-    J --> K["下一轮 interval 后继续"]
-```
-
-## 串行性和优先级
-
-同一个 `AbstractSysClient` 只有一个 worker 线程，因此同一网关内发送是串行的。
-
-优先级规则：
-
-1. 先检查 `userQueue`。
-2. 没有用户请求时才检查 `pollQueue`。
-
-所以当用户请求和轮询请求同时存在时，用户请求优先执行。
-
-但注意：一旦某个请求已经开始执行，worker 会等待该请求响应或 timeout。正在执行的 poll 不会被新的 user 请求中断；user 请求会在当前请求结束后优先于下一轮 poll 执行。
-
-## 当前限制和注意事项
-
-- `recevive` 方法名存在拼写问题，但当前代码按此名称调用。
-- `SysClientMananger` 当前 `clients` 使用 `? extends Task`，同步发送 MQTT 请求时需要强转。
-- `watchdog()` 只有设计注释，尚未真正实现。
-- `MqttClient.onMessage/onResponse/onTimeout/onError` 当前为空，具体业务处理还未落地。
-- `Poll` 的重复判断依赖 `MqttTask.equals()`，当前是同网关、同设备类型、同设备 id 去重。
-- `SetQueue.poll()` 不释放 active set；取消轮询必须调用 `remove(Poll)`。
+- 将 `Poll.of(Device, TaskHelper)` 中的设备类型分发抽到更显式的策略表。
+- 将 `MessageHandlerManager` 从静态注册进一步改成 Spring bean map。
+- 将 `onChange()` 从日志扩展为 WebSocket、Redis Pub/Sub 或领域事件。
+- 将 `MqttClient.onMessage/onResponse/onTimeout/onError` 补齐可观测日志和指标。
+- 对 `MqttCallback.messageArrived()` 中 `client.current()` 的空值和并发窗口做更防御式处理。

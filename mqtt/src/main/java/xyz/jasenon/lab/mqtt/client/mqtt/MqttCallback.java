@@ -68,7 +68,9 @@ public class MqttCallback implements MqttCallbackExtended {
         var task = client.current();
         if (MqttTask.Explainer.verifier(task.getRequest()
                 .getCommandLine().getCommand().getCheckType(), payload)){
-            MessageHandlerManager.persist(task, payload);
+            AsyncExecutor.runAsyncIO(() -> {
+                MessageHandlerManager.persist(task, payload);
+            });
         }
     }
 

@@ -47,6 +47,14 @@ public class AccessMessageHandler extends MessageHandler<AccessRecord> {
 
     @Override
     protected void onChange(AccessRecord accessRecord) {
-        log.info("access record changed!");
+        log.info(
+                "[AccessMessageHandler] record changed, device-id:{}, address:{}, open:{}, lock:{}, lock-status:{}, delay-time:{}",
+                accessRecord.getDeviceId(),
+                accessRecord.getAddress(),
+                accessRecord.isOpen(),
+                accessRecord.isLock(),
+                accessRecord.getLockStatus(),
+                accessRecord.getDelayTime()
+        );
     }
 }

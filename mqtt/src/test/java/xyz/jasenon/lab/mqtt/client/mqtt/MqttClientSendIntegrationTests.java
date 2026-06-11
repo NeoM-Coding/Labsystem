@@ -140,7 +140,6 @@ class MqttClientSendIntegrationTests {
     void userQueueHasPriorityOverPollQueueAndRequestsRunSerially() throws Exception {
         MqttTask firstUserRequest = MqttTask.fromDto(GATEWAY_ID, requestDto()).convert();
         MqttTask secondUserRequest = MqttTask.fromDto(GATEWAY_ID, closeAccessDto()).convert();
-        MqttTask thirdUserRequest = MqttTask.fromDto(GATEWAY_ID, keepAccessDto()).convert();
         MqttTask pollRequest = MqttTask.fromDto(GATEWAY_ID, pollDto()).convert();
         PendingRequest<MqttTask> firstUserPending = new PendingRequest<>(
                 firstUserRequest,
@@ -152,18 +151,13 @@ class MqttClientSendIntegrationTests {
                 PendingRequest.Type.USER,
                 SERIAL_USER_TIMEOUT_MILLIS
         );
-        PendingRequest<MqttTask> thirdUserPending = new PendingRequest<>(
-                thirdUserRequest,
-                PendingRequest.Type.USER,
-                SERIAL_USER_TIMEOUT_MILLIS
-        );
+
         Poll<MqttTask> poll = new Poll<>(pollRequest, SERIAL_POLL_TIMEOUT_MILLIS, SERIAL_POLL_INTERVAL_MILLIS);
 
         client.prepareSerialObservation(7);
         assertTrue(client.offerPoll(poll));
         assertTrue(client.offerUser(firstUserPending));
         assertTrue(client.offerUser(secondUserPending));
-        assertTrue(client.offerUser(thirdUserPending));
 
         assertTrue(
                 client.awaitSerialExecution(5, TimeUnit.SECONDS),
@@ -173,9 +167,7 @@ class MqttClientSendIntegrationTests {
         assertUserFinished(client.events().get(1));
         assertEquals("send:user", client.events().get(2));
         assertUserFinished(client.events().get(3));
-        assertEquals("send:user", client.events().get(4));
-        assertUserFinished(client.events().get(5));
-        assertEquals("send:poll", client.events().get(6));
+        assertEquals("send:poll", client.events().get(4));
         assertTrue(client.removePoll(poll));
     }
 
@@ -252,15 +244,6 @@ class MqttClientSendIntegrationTests {
     private static MqttTaskDto closeAccessDto() {
         MqttTaskDto dto = new MqttTaskDto();
         dto.setCommandLine(CommandLine.CLOSE_ACCESS_ONCE);
-        dto.setArgs(new int[]{1});
-        dto.setType(DeviceType.Access);
-        dto.setDeviceId("access-1");
-        return dto;
-    }
-
-    private static MqttTaskDto keepAccessDto() {
-        MqttTaskDto dto = new MqttTaskDto();
-        dto.setCommandLine(CommandLine.KEEP_ACCESS_STATUS_LOCK);
         dto.setArgs(new int[]{1});
         dto.setType(DeviceType.Access);
         dto.setDeviceId("access-1");

@@ -1,10 +1,14 @@
 package xyz.jasenon.lab.api.mqtt.dto;
 
+import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
 import xyz.jasenon.lab.common.model.device.DeviceType;
 import xyz.jasenon.lab.common.command.CommandLine;
 
 import java.io.Serializable;
 
+@AllArgsConstructor
+@NoArgsConstructor
 public class MqttTaskDto implements Serializable {
 
     private CommandLine commandLine;
@@ -42,5 +46,9 @@ public class MqttTaskDto implements Serializable {
 
     public void setDeviceId(String deviceId) {
         this.deviceId = deviceId;
+    }
+
+    public static MqttTaskDto of(CommandLine commandLine, int[] args, DeviceType deviceType, String deviceId){
+        return new MqttTaskDto(commandLine,args,deviceType,deviceId);
     }
 }

@@ -56,4 +56,20 @@ public class AirConditionMessageHandler extends MessageHandler<AirConditionRecor
                 .errorCode(errorCode)
                 .build();
     }
+
+    @Override
+    protected void onChange(AirConditionRecord airConditionRecord){
+        log.info(
+                "[AirConditionMessageHandler] record changed, device-id:{}, address:{}, self-id:{}, open:{}, mode:{}, speed:{}, temperature:{}, room-temperature:{}, error-code:{}",
+                airConditionRecord.getDeviceId(),
+                airConditionRecord.getAddress(),
+                airConditionRecord.getSelfId(),
+                airConditionRecord.isOpen(),
+                airConditionRecord.getMode(),
+                airConditionRecord.getSpeed(),
+                airConditionRecord.getTemperature(),
+                airConditionRecord.getRoomTemperature(),
+                airConditionRecord.getErrorCode()
+        );
+    }
 }

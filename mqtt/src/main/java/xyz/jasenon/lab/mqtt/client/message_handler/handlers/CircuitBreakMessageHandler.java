@@ -51,4 +51,22 @@ public class CircuitBreakMessageHandler extends MessageHandler<CircuitBreakRecor
                 .voltage(voltage)
                 .build();
     }
+
+    @Override
+    protected void onChange(CircuitBreakRecord circuitBreakRecord) {
+        log.info(
+                "[CircuitBreakMessageHandler] record changed, device-id:{}, address:{}, open:{}, fix:{}, lock:{}, voltage:{}, current:{}, power:{}, energy:{}, leakage:{}, temperature:{}",
+                circuitBreakRecord.getDeviceId(),
+                circuitBreakRecord.getAddress(),
+                circuitBreakRecord.isOpen(),
+                circuitBreakRecord.isFix(),
+                circuitBreakRecord.isLock(),
+                circuitBreakRecord.getVoltage(),
+                circuitBreakRecord.getCurrent(),
+                circuitBreakRecord.getPower(),
+                circuitBreakRecord.getEnergy(),
+                circuitBreakRecord.getLeakage(),
+                circuitBreakRecord.getTemperature()
+        );
+    }
 }

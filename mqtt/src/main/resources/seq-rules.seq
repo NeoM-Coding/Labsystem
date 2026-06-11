@@ -7,3 +7,47 @@ seq AccessResp {
   address = 0
   function_code = 1,2
 }
+
+seq AirConditionReq {
+  address = 0
+  self_id = 1
+}
+
+seq AirConditionResp {
+  address = 0
+  self_id = 1
+}
+
+seq CircuitBreakReq {
+  address = 0
+  function_code = 1
+}
+
+seq CircuitBreakResp {
+  address = 0
+  function_code = 1
+}
+
+seq LightReq {
+  address = 0
+  function_code = 1
+  self_id = 2
+}
+
+seq LightResp {
+  address = 0
+  function_code = 1
+  self_id = 2
+}
+
+seq SensorReq {
+  address = 0
+  function_code = 1
+  self_id = 2
+}
+
+seq SensorResp {
+  address = 0
+  function_code = 1
+  self_id = 2
+}

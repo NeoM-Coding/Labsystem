@@ -207,26 +207,11 @@ public class SysPollingManager implements MqttPollCo {
         if (device == null || device.getGatewayId() == null || device.getGatewayId().isBlank()) {
             return null;
         }
-        if (device.getDeviceType() != DeviceType.Access) {
-            log.warn(
-                    "[PollingWatchDog] device-id:{} type:{} has no polling command mapping, skip",
-                    device.getId(),
-                    device.getDeviceType()
-            );
-            return null;
-        }
-
-        MqttTaskDto dto = new MqttTaskDto();
-        dto.setDeviceId(device.getId());
-        dto.setType(device.getDeviceType());
-        dto.setCommandLine(CommandLine.REQUEST_ACCESS_DATA);
-        dto.setArgs(new int[0]);
-
-        MqttTask task = thelper.help(dto);
-        if (task == null) {
-            return null;
-        }
-        return new Poll<>(task, options.getPoll().getTimeoutMillis(), options.getPoll().getIntervalMillis());
+        Poll<MqttTask> poll = Poll.of(device, thelper);
+        if (poll == null) return null;
+        poll.changeInterval(options.getPoll().getIntervalMillis());
+        poll.changeTimeout(options.getPoll().getTimeoutMillis());
+        return poll;
     }
 
     @SuppressWarnings("unchecked")

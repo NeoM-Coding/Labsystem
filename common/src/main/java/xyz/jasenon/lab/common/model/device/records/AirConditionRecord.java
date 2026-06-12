@@ -1,5 +1,6 @@
 package xyz.jasenon.lab.common.model.device.records;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Builder;
 import lombok.Getter;
@@ -23,7 +24,8 @@ public class AirConditionRecord extends BaseRecord {
     /**
      * 是否开启
      */
-    private boolean isOpen;
+    @TableField(value = "is_open")
+    private boolean opened;
     /**
      * 模式
      */

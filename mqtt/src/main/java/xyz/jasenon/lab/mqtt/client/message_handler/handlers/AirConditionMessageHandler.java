@@ -48,7 +48,7 @@ public class AirConditionMessageHandler extends MessageHandler<AirConditionRecor
         return AirConditionRecord.builder()
                 .address(address)
                 .selfId(selfId)
-                .isOpen(isOpen)
+                .opened(isOpen)
                 .mode(mode)
                 .temperature(temperature)
                 .speed(speed)
@@ -64,7 +64,7 @@ public class AirConditionMessageHandler extends MessageHandler<AirConditionRecor
                 airConditionRecord.getDeviceId(),
                 airConditionRecord.getAddress(),
                 airConditionRecord.getSelfId(),
-                airConditionRecord.isOpen(),
+                airConditionRecord.isOpened(),
                 airConditionRecord.getMode(),
                 airConditionRecord.getSpeed(),
                 airConditionRecord.getTemperature(),

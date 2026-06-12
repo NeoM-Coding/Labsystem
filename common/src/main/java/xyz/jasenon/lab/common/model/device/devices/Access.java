@@ -1,8 +1,8 @@
 package xyz.jasenon.lab.common.model.device.devices;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.AllArgsConstructor;
-import lombok.NoArgsConstructor;
 import xyz.jasenon.lab.common.model.device.Address;
 import xyz.jasenon.lab.common.model.device.DeviceType;
 import xyz.jasenon.lab.common.model.device.Device;
@@ -22,7 +22,8 @@ public class Access extends Device implements Address {
     /**
      * 设备当前状态
      */
-    private boolean isLock;
+    @TableField(value = "is_lock")
+    private boolean locked;
 
 
     public int getAddress() {
@@ -33,12 +34,12 @@ public class Access extends Device implements Address {
         this.address = address;
     }
 
-    public boolean isLock() {
-        return isLock;
+    public boolean isLocked() {
+        return locked;
     }
 
-    public void setLock(boolean lock) {
-        isLock = lock;
+    public void setLocked(boolean locked) {
+        this.locked = locked;
     }
 
     @Override

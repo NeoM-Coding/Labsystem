@@ -1,5 +1,6 @@
 package xyz.jasenon.lab.common.model.device.records;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Builder;
 import lombok.Getter;
@@ -19,11 +20,13 @@ public class AccessRecord extends BaseRecord {
     /**
      * 是否关门
      */
-    private boolean isOpen;
+    @TableField(value = "is_open")
+    private boolean opened;
     /**
      * 是否锁定门锁开关
      */
-    private boolean isLock;
+    @TableField(value = "is_lock")
+    private boolean locked;
     /**
      * 门锁锁定状态
      */

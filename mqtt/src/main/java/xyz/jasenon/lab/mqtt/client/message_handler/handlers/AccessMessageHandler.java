@@ -38,8 +38,8 @@ public class AccessMessageHandler extends MessageHandler<AccessRecord> {
 
         return AccessRecord.builder()
                 .address(address)
-                .isOpen(isOpen)
-                .isLock(isLock)
+                .opened(isOpen)
+                .locked(isLock)
                 .lockStatus(lockStatus)
                 .delayTime(delayTime)
                 .build();
@@ -51,8 +51,8 @@ public class AccessMessageHandler extends MessageHandler<AccessRecord> {
                 "[AccessMessageHandler] record changed, device-id:{}, address:{}, open:{}, lock:{}, lock-status:{}, delay-time:{}",
                 accessRecord.getDeviceId(),
                 accessRecord.getAddress(),
-                accessRecord.isOpen(),
-                accessRecord.isLock(),
+                accessRecord.isOpened(),
+                accessRecord.isLocked(),
                 accessRecord.getLockStatus(),
                 accessRecord.getDelayTime()
         );

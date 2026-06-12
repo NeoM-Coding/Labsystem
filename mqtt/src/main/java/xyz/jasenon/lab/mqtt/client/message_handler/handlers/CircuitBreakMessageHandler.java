@@ -42,9 +42,9 @@ public class CircuitBreakMessageHandler extends MessageHandler<CircuitBreakRecor
                 .address(address)
                 .current(current)
                 .energy(energy)
-                .isFix(isFix)
-                .isLock(isLock)
-                .isOpen(isOpen)
+                .fixed(isFix)
+                .locked(isLock)
+                .opened(isOpen)
                 .leakage(leakage)
                 .power(power)
                 .temperature(temperature)
@@ -58,9 +58,9 @@ public class CircuitBreakMessageHandler extends MessageHandler<CircuitBreakRecor
                 "[CircuitBreakMessageHandler] record changed, device-id:{}, address:{}, open:{}, fix:{}, lock:{}, voltage:{}, current:{}, power:{}, energy:{}, leakage:{}, temperature:{}",
                 circuitBreakRecord.getDeviceId(),
                 circuitBreakRecord.getAddress(),
-                circuitBreakRecord.isOpen(),
-                circuitBreakRecord.isFix(),
-                circuitBreakRecord.isLock(),
+                circuitBreakRecord.isOpened(),
+                circuitBreakRecord.isFixed(),
+                circuitBreakRecord.isLocked(),
                 circuitBreakRecord.getVoltage(),
                 circuitBreakRecord.getCurrent(),
                 circuitBreakRecord.getPower(),

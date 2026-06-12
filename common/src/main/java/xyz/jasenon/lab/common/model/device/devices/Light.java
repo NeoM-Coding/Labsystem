@@ -1,6 +1,7 @@
 package xyz.jasenon.lab.common.model.device.devices;
 
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Getter;
 import lombok.Setter;
@@ -30,7 +31,8 @@ public class Light extends Device implements Address, SelfId {
     /**
      * 是否锁定
      */
-    private boolean isLock;
+    @TableField(value = "is_lock")
+    private boolean locked;
 
     @Override
     public int address() {

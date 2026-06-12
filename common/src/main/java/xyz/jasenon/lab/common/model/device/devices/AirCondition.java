@@ -1,6 +1,7 @@
 package xyz.jasenon.lab.common.model.device.devices;
 
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -44,7 +45,8 @@ public class AirCondition extends Device implements Address, SelfId {
     /**
      * 设备当前状态
      */
-    private boolean isLock;
+    @TableField(value = "is_lock")
+    private boolean locked;
 
     @Override
     public int address() {

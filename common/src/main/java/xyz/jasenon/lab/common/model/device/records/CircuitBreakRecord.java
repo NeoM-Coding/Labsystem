@@ -1,5 +1,6 @@
 package xyz.jasenon.lab.common.model.device.records;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Builder;
 import lombok.Getter;
@@ -18,15 +19,18 @@ public class CircuitBreakRecord extends BaseRecord {
     /**
      * 合闸
      */
-    private boolean isOpen;
+    @TableField(value = "is_open")
+    private boolean opened;
     /**
      * 是否正在维修
      */
-    private boolean isFix;
+    @TableField(value = "is_fix")
+    private boolean fixed;
     /**
      * 是否锁定
      */
-    private boolean isLock;
+    @TableField(value = "is_lock")
+    private boolean locked;
     /**
      * 电压
      */

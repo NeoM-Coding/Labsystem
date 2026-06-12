@@ -62,8 +62,8 @@ class DeviceProtocolContractTests {
 
         assertEquals(deviceId, record.getDeviceId());
         assertEquals(1, record.getAddress());
-        assertTrue(record.isOpen());
-        assertTrue(record.isLock());
+        assertTrue(record.isOpened());
+        assertTrue(record.isLocked());
         assertEquals(1, record.getLockStatus());
         assertEquals(5, record.getDelayTime());
     }
@@ -98,7 +98,7 @@ class DeviceProtocolContractTests {
         assertEquals(dto.getDeviceId(), record.getDeviceId());
         assertEquals(31, record.getAddress());
         assertEquals(6, record.getSelfId());
-        assertTrue(record.isOpen());
+        assertTrue(record.isOpened());
         assertEquals(AirConditionRecord.Mode.Cooling, record.getMode());
         assertEquals(25, record.getTemperature());
         assertEquals(AirConditionRecord.Speed.High, record.getSpeed());
@@ -135,9 +135,9 @@ class DeviceProtocolContractTests {
 
         assertEquals(dto.getDeviceId(), record.getDeviceId());
         assertEquals(11, record.getAddress());
-        assertTrue(record.isFix());
-        assertTrue(record.isOpen());
-        assertFalse(record.isLock());
+        assertTrue(record.isFixed());
+        assertTrue(record.isOpened());
+        assertFalse(record.isLocked());
         assertEquals(0.131f, record.getLeakage(), 0.0001f);
         assertEquals(28.5f, record.getTemperature(), 0.0001f);
         assertEquals(221.0f, record.getVoltage(), 0.0001f);
@@ -176,8 +176,8 @@ class DeviceProtocolContractTests {
         assertEquals(dto.getDeviceId(), record.getDeviceId());
         assertEquals(41, record.getAddress());
         assertEquals(2, record.getSelfId());
-        assertTrue(record.isOpen());
-        assertTrue(record.isLock());
+        assertTrue(record.isOpened());
+        assertTrue(record.isLocked());
     }
 
     /**

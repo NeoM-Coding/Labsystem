@@ -32,8 +32,8 @@ public class LightMessageHandler extends MessageHandler<LightRecord> {
         return LightRecord.builder()
                 .address(address)
                 .selfId(selfId)
-                .isOpen(isOpen)
-                .isLock(isLock)
+                .opened(isOpen)
+                .locked(isLock)
                 .build();
     }
 
@@ -44,8 +44,8 @@ public class LightMessageHandler extends MessageHandler<LightRecord> {
                 lightRecord.getDeviceId(),
                 lightRecord.getAddress(),
                 lightRecord.getSelfId(),
-                lightRecord.isOpen(),
-                lightRecord.isLock()
+                lightRecord.isOpened(),
+                lightRecord.isLocked()
         );
     }
 }

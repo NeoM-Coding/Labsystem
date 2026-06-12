@@ -1,6 +1,6 @@
 # lab-system-cloud
 
-实验室综合管理系统后端工程。当前项目是 Spring Boot 3 / Dubbo 3 的多模块 Maven 工程，核心方向是将设备、网关、MQTT 通信、接口契约和 Web 入口拆分开，并使用独立 uid-generator 数据源生成全局主键。
+实验室综合管理系统后端工程。当前项目是 Spring Boot 3 / Dubbo 3 的多模块 Maven 工程，核心方向是将设备、网关、MQTT 通信、接口契约、规则引擎和 Web 入口拆分开，并使用独立 uid-generator 数据源生成全局主键。
 
 ## 模块结构
 
@@ -10,12 +10,13 @@ lab-system-cloud
 ├── common                  # 公共模型、命令协议、校验器、序列匹配、SetQueue、MyBatis-Plus ID 配置
 ├── api                     # 分布式接口契约和 DTO
 ├── mqtt                    # MQTT 网关客户端、轮询调度、任务队列、设备/网关 Mapper
+├── redis                   # Jedis 自动配置、RedisBus、Pub/Sub 和 hash 能力
+├── rule-engine             # 事件驱动规则引擎，基于设备字段事件增量推演 runtime/action group
 ├── web                     # Web 服务入口
 ├── edu                     # 教学业务服务占位模块
-├── quartz                  # 定时任务服务占位模块
 ├── tools/mqtt-mock         # Node.js + TypeScript MQTT 下位机 mock
 ├── sql                     # MySQL schema
-└── docs                    # MQTT 设计和设备请求/响应协议文档
+└── docs                    # 架构、MQTT、规则引擎和设备请求/响应协议文档
 ```
 
 ## 技术栈
@@ -88,6 +89,39 @@ MQTT 模块围绕 `AbstractSysClient`、`MqttClient`、`MqttCallback`、`SysClie
 
 更完整的说明见 [docs/mqtt部分设计.md](docs/mqtt部分设计.md)。
 
+### 规则引擎
+
+`rule-engine` 模块实现事件驱动规则推演。它的核心目标是：设备状态变化后，只驱动受影响的表达式叶子节点，并把命中的 runtime 放入就绪队列进行异步推演。
+
+当前链路：
+
+1. MQTT 模块解码设备 record 后，将最新状态写入 Redis hash。
+2. MQTT 模块发布完整设备快照到 Redis Pub/Sub。
+3. rule-engine listener 缓存上一条快照。
+4. 首次看到设备时，为快照内所有字段生成事件。
+5. 后续只为新增字段或值变化字段生成事件。
+6. `Engine` 根据 `DeviceEventKey` 找到对应 runtime，并刷新命中的 `EvalTreeNode` 叶子。
+7. 命中的 `runtimeId` 进入 `SetQueue<String>`，避免同一 runtime 重复排队。
+8. `Engine` 内部 dispatcher 线程消费 readyQueue，并把 runtime 推演任务提交到 executor pool。
+9. runtime 推演任务遍历所有 `ActionGroup`，当 action group 的 tree root 为 `true` 时调用 `RuntimeExecutor`。
+10. 当前 `LoggingRuntimeExecutor` 会打印被触发的 `runtime-id` 和 `action-group-id`。
+
+当前表达式模型：
+
+- `EvalNode` 是链式原始条件。
+- `EvalTreeNode` 是可增量刷新的二叉表达式树。
+- `fromChain()` 严格按链表顺序左结合计算，不使用 `AND` / `OR` 运算符优先级。
+- 例如 `A OR B AND C` 会被计算为 `(A OR B) AND C`。
+- 表达式右值仍以字符串保存，但求值时会根据 `DeviceType + field` 还原为 boolean、数字、enum 或 string。
+
+当前边界：
+
+- `ActionGroup` 已有条件树和触发日志。
+- 真实 `List<Action>`、告警动作、设备控制动作、动作重试、冷却时间等还未实现。
+- 时间事件 `TimeEvent` 仍是占位。
+
+更完整的说明见 [docs/engine设计.md](docs/engine设计.md)。
+
 ### 设备协议
 
 设备请求和响应协议见 [docs/设备请求及响应.md](docs/设备请求及响应.md)。
@@ -133,6 +167,7 @@ mqtt/src/test/resources/db/uid-generator-schema.sql
 ```text
 common/src/main/resources/application-local.yml
 mqtt/src/main/resources/application.yaml
+rule-engine/src/main/resources/application.yaml
 web/src/main/resources/application.yaml
 ```
 
@@ -214,6 +249,12 @@ MQTT_REPLY_TOPIC_TEMPLATE=gateway/${gatewayId}/send
 ./mvnw -pl mqtt -am test
 ```
 
+运行 rule-engine 模块测试：
+
+```bash
+./mvnw -pl rule-engine -am test
+```
+
 运行 uid-generator 数据源隔离测试：
 
 ```bash
@@ -242,11 +283,16 @@ MQTT_REPLY_TOPIC_TEMPLATE=gateway/${gatewayId}/send
 ./mvnw spring-boot:run -pl web -am
 ```
 
-启动 edu / quartz 占位模块：
+启动 rule-engine 模块：
+
+```bash
+./mvnw spring-boot:run -pl rule-engine -am
+```
+
+启动 edu 占位模块：
 
 ```bash
 ./mvnw spring-boot:run -pl edu -am
-./mvnw spring-boot:run -pl quartz -am
 ```
 
 ## Git 忽略约定

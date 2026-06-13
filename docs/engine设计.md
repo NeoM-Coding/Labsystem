@@ -210,10 +210,10 @@ class EvalTreeNode {
 - `leaf(EvalNode source)`：构造叶子节点。
 - `logic(LogicType logicType, EvalTreeNode left, EvalTreeNode right)`：构造逻辑节点。
 - `fromChain(EvalNode head)`：从链式表达式构造左结合表达式树。
-- `refreshLeaf(String eventValue)`：刷新叶子结果，并向父节点冒泡。
+- `refreshLeaf(String eventValue)`：刷新叶子结果，并向父节点冒泡；如果叶子结果不变，或某个父节点重算后结果不变，则停止继续向上刷新。
 - `root()`：获取当前节点所在表达式树根节点。
 
-`refreshLeaf()` 会返回根结果是否发生变化，便于测试和调试观察表达式状态。但 `Engine` 入队以“事件命中 runtime”为准：runtime 被调度后再统一遍历 action group，判断哪些 action group 的根条件当前为 true。
+`refreshLeaf()` 会返回根结果是否发生变化，便于测试和调试观察表达式状态。当前表达式树由链式条件左结合构造，可能形成倾斜树；因此刷新时会做新旧值比较短路，避免每次叶子变化都无条件 bubble 到整棵树根。但 `Engine` 入队以“事件命中 runtime”为准：runtime 被调度后再统一遍历 action group，判断哪些 action group 的根条件当前为 true。
 
 `fromChain()` 的构造规则可以理解为：
 

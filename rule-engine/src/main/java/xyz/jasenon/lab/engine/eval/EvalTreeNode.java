@@ -74,12 +74,17 @@ public class EvalTreeNode {
         if (nodeType != NodeType.LEAF) {
             throw new IllegalStateException("only leaf node can refresh by event value");
         }
-        boolean oldRootResult = root().isResult();
         boolean newResult = evaluate(eventValue);
+        if (result == newResult) {
+            return false;
+        }
+
         result = newResult;
         source.setResult(newResult);
-        bubble();
-        return oldRootResult != root().isResult();
+        if (parent == null) {
+            return true;
+        }
+        return bubble();
     }
 
     public EvalTreeNode root() {
@@ -90,12 +95,22 @@ public class EvalTreeNode {
         return node;
     }
 
-    private void bubble() {
+    private boolean bubble() {
         EvalTreeNode node = parent;
         while (node != null) {
-            node.result = node.calculate();
+            boolean oldResult = node.result;
+            boolean newResult = node.calculate();
+            if (oldResult == newResult) {
+                return false;
+            }
+
+            node.result = newResult;
+            if (node.parent == null) {
+                return true;
+            }
             node = node.parent;
         }
+        return false;
     }
 
     private boolean calculate() {

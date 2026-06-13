@@ -48,6 +48,24 @@ class EvalTreeNodeTests {
         assertFalse(root.isResult());
     }
 
+    @Test
+    void refreshStopsWhenParentResultDoesNotChange() {
+        EvalNode dummy = dummy();
+        EvalNode opened = node("1", "opened", Operator.EQ, "true", LogicType.OR, false);
+        dummy.setNext(opened);
+        EvalTreeNode root = EvalTreeNode.fromChain(dummy);
+        EvalTreeNode leaf = root.getRight();
+
+        assertTrue(root.isResult());
+        assertFalse(leaf.isResult());
+
+        assertFalse(leaf.refreshLeaf("true"));
+
+        assertTrue(leaf.isResult());
+        assertTrue(opened.isResult());
+        assertTrue(root.isResult());
+    }
+
     private static EvalNode dummy() {
         EvalNode node = new EvalNode();
         node.setResult(true);

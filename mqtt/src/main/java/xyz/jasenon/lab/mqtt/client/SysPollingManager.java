@@ -29,7 +29,7 @@ import java.util.stream.Collectors;
  * 这个class 的功能就是管理所有device的轮询情况
  * 通过distinct gateway_id 来分组device 然后通过
  * gateway_id 在 {@link SysClientManager} 中拿到
- * 对应的client 检查 {@link xyz.jasenon.lab.common.SetQueue} 中是否有对应的
+ * 对应的client 检查 {@link xyz.jasenon.lab.common.ActiveQueue} 中是否有对应的
  * {@link xyz.jasenon.lab.mqtt.client.common.Poll}
  */
 @DubboService

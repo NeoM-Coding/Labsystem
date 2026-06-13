@@ -97,7 +97,7 @@ GatewayClientReadyEvent
 
 ```java
 private final BlockingQueue<PendingRequest<REQ>> userQueue;
-private final SetQueue<Poll<REQ>> pollQueue;
+private final ActiveQueue<Poll<REQ>> pollQueue;
 private volatile PendingRequest<REQ> current;
 ```
 
@@ -201,28 +201,31 @@ private volatile PendingRequest<REQ> current;
 5. 执行结束后 `refresh()`，按 `interval` 计算下一次执行时间。
 6. 如果轮询仍然 active，则回填队列。
 
-## SetQueue 轮询语义
+## ActiveQueue 轮询语义
 
 `pollQueue` 的类型是：
 
 ```java
-SetQueue<Poll<MqttTask>>
+ActiveQueue<Poll<MqttTask>>
 ```
 
 它由两部分组成：
 
 - `queue`：真实调度队列，这里是 `DelayQueue`。
-- `set`：活跃轮询集合，用来记录当前正在工作的轮询任务。
+- `activeIndex`：活跃轮询集合，用来记录当前正在工作的轮询任务。
+- `queuedIndex`：当前仍在真实队列里的元素集合，用来高效判断是否已经排队。
 
 关键语义：
 
-- `offer()` 同时写入 set 和 queue，set 已存在时拒绝重复 offer。
-- `poll()` 只从 queue 取出元素，不从 set 移除。
-- `returnToQueue()` 只有在 set 仍然包含该元素时才回填 queue。
-- `remove()` 同时移除 queue 和 set，表示彻底停止轮询。
-- `activeSnapshot()` 返回 set 快照，用于外部感知当前 active 轮询任务。
+- `offer()` 同时写入 `activeIndex`、`queuedIndex` 和 queue，`activeIndex` 已存在时拒绝重复 offer。
+- `poll()` 从 queue 取出元素，并从 `queuedIndex` 移除，但不从 `activeIndex` 移除。
+- `returnToQueue()` 只有在 `activeIndex` 仍然包含该元素，且 `queuedIndex` 不包含该元素时才回填 queue。
+- `remove()` 同时移除 queue、`queuedIndex` 和 `activeIndex`，表示彻底停止轮询。
+- `activeSnapshot()` 返回 `activeIndex` 快照，用于外部感知当前 active 轮询任务。
 
-这正好贴合当前业务语义：set 不是“队列里还有哪些元素”，而是“系统认为哪些轮询任务正在工作”。即使某个 `Poll` 已经被 worker 取出执行，它仍在 set 中，所以同一设备不会在执行窗口内被重复注册。
+这正好贴合当前业务语义：`activeIndex` 不是“队列里还有哪些元素”，而是“系统认为哪些轮询任务正在工作”。即使某个 `Poll` 已经被 worker 取出执行，它仍在 `activeIndex` 中，所以同一设备不会在执行窗口内被重复注册。
+
+重复判断不直接使用 `queue.contains()`，因为大多数 JDK 队列的 `contains()` 是线性扫描。`ActiveQueue` 使用 set 索引提供 O(1) 判断：`activeIndex` 判断是否 active，`queuedIndex` 判断是否已经排队。
 
 ## 用户请求链路
 

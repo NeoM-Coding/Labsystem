@@ -3,7 +3,7 @@ package xyz.jasenon.lab.mqtt.client;
 import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
-import xyz.jasenon.lab.common.SetQueue;
+import xyz.jasenon.lab.common.ActiveQueue;
 import xyz.jasenon.lab.common.command.Task;
 import xyz.jasenon.lab.mqtt.client.common.PendingRequest;
 import xyz.jasenon.lab.mqtt.client.common.Poll;
@@ -15,7 +15,11 @@ public abstract class AbstractSysClient<REQ extends Task> extends MqttClient {
     public final String gatewayId;
 
     private final BlockingQueue<PendingRequest<REQ>> userQueue = new LinkedBlockingQueue<>();
-    private final SetQueue<Poll<REQ>> pollQueue = new SetQueue<>(ConcurrentHashMap.newKeySet(), new DelayQueue<>());
+    private final ActiveQueue<Poll<REQ>> pollQueue = new ActiveQueue<>(
+            ConcurrentHashMap.newKeySet(),
+            ConcurrentHashMap.newKeySet(),
+            new DelayQueue<>()
+    );
     private final Thread worker;
     private volatile PendingRequest<REQ> current;
 

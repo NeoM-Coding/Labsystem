@@ -15,7 +15,7 @@ flowchart LR
     Engine["Engine.accept(DeviceEvent)"]
     Runtime["Runtime"]
     Eval["EvalTreeNode 增量求值"]
-    Queue["SetQueue readyQueue"]
+    Queue["UniqueQueue readyQueue"]
     Executor["RuntimeExecutor"]
 
     MQTT --> Hash
@@ -36,8 +36,9 @@ flowchart LR
 4. `rule-engine` 订阅该 channel，由 `DeviceRecordChangeListener` 维护上一条设备快照。
 5. listener 将快照变化拆成字段级 `DeviceEvent`。
 6. `Engine` 根据 `DeviceEventKey` 找到相关 runtime，只刷新命中的表达式叶子。
-7. 表达式树根结果发生变化时，runtime id 进入 `readyQueue`。
-8. 后续由 `RuntimeExecutor` 消费就绪 runtime；当前默认实现是日志记录。
+7. 只要事件命中 runtime，runtime id 就进入 `readyQueue`，等待一次 runtime 级推演。
+8. dispatcher 线程消费就绪 runtime，并把推演任务提交到 executor pool。
+9. 推演任务遍历该 runtime 下的 action group；条件树根为 true 的 action group 交给 `RuntimeExecutor` 执行，当前默认实现是日志记录。
 
 ## 跨模块事件契约
 
@@ -99,7 +100,7 @@ ConcurrentHashMap<RecordIdentity, Map<String, String>> snapshots;
 class Engine {
     private final EventTable<Set<String>> eventHelper;
     private final RuntimeTable runtimeHelper;
-    private final SetQueue<String> readyQueue;
+    private final UniqueQueue<String> readyQueue;
 }
 ```
 
@@ -107,14 +108,14 @@ class Engine {
 
 - `eventHelper`：`EventKey -> runtimeId set`，用于从事件快速定位 runtime。
 - `runtimeHelper`：`runtimeId -> Runtime`，保存运行时实例。
-- `readyQueue`：就绪 runtime 队列，使用 `SetQueue` 避免同一 runtime 重复入队。
+- `readyQueue`：就绪 runtime 队列，使用 `UniqueQueue` 避免同一 runtime 重复排队；runtime 被 poll 出队后会从索引中释放，执行中再次收到事件可以重新入队。
 
 `Engine.accept(DeviceEvent)` 的语义：
 
 1. 根据 `DeviceEvent.eventKey()` 查询受影响 runtime。
 2. 对每个 runtime，查找该事件对应的叶子节点集合。
 3. 调用叶子节点 `refreshLeaf(eventValue)`。
-4. 如果任一叶子导致根结果变化，则将 `runtimeId` 放入 `readyQueue`。
+4. 将事件命中的 `runtimeId` 放入 `readyQueue`，等待 runtime 级推演；`UniqueQueue` 只对尚未 poll 的 runtime id 做 O(1) 去重。
 
 `DeviceEventKey` 当前格式为：
 
@@ -212,7 +213,7 @@ class EvalTreeNode {
 - `refreshLeaf(String eventValue)`：刷新叶子结果，并向父节点冒泡。
 - `root()`：获取当前节点所在表达式树根节点。
 
-`refreshLeaf()` 会返回根结果是否发生变化。只有根结果变化时，runtime 才会进入 `readyQueue`。
+`refreshLeaf()` 会返回根结果是否发生变化，便于测试和调试观察表达式状态。但 `Engine` 入队以“事件命中 runtime”为准：runtime 被调度后再统一遍历 action group，判断哪些 action group 的根条件当前为 true。
 
 `fromChain()` 的构造规则可以理解为：
 

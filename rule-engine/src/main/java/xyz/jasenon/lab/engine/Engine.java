@@ -4,7 +4,7 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-import xyz.jasenon.lab.common.SetQueue;
+import xyz.jasenon.lab.common.UniqueQueue;
 import xyz.jasenon.lab.engine.action.ActionGroup;
 import xyz.jasenon.lab.engine.event.DeviceEvent;
 import xyz.jasenon.lab.engine.event.EventKey;
@@ -30,7 +30,7 @@ public class Engine {
 
     private final EventTable<Set<String>> eventHelper = new EventTable<>();
     private final RuntimeTable runtimeHelper = new RuntimeTable();
-    private final SetQueue<String> readyQueue = new SetQueue<>(ConcurrentHashMap.newKeySet(), new LinkedBlockingQueue<>());
+    private final UniqueQueue<String> readyQueue = new UniqueQueue<>(ConcurrentHashMap.newKeySet(), new LinkedBlockingQueue<>());
     private final RuntimeExecutor runtimeExecutor;
     private final ExecutorService runtimeTaskExecutor;
     private final Semaphore readySignal = new Semaphore(0);
@@ -116,8 +116,8 @@ public class Engine {
         return readyQueue.size();
     }
 
-    public int activeReadySize() {
-        return readyQueue.activeSize();
+    public int indexedReadySize() {
+        return readyQueue.indexedSize();
     }
 
     public void drainReady() {

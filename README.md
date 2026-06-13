@@ -7,7 +7,7 @@
 ```text
 lab-system-cloud
 ├── uid-springboot-starter  # 本地 uid-generator starter，支持独立数据源分配 workerId
-├── common                  # 公共模型、命令协议、校验器、序列匹配、SetQueue、MyBatis-Plus ID 配置
+├── common                  # 公共模型、命令协议、校验器、序列匹配、IndexedQueue、MyBatis-Plus ID 配置
 ├── api                     # 分布式接口契约和 DTO
 ├── mqtt                    # MQTT 网关客户端、轮询调度、任务队列、设备/网关 Mapper
 ├── redis                   # Jedis 自动配置、RedisBus、Pub/Sub 和 hash 能力
@@ -83,7 +83,7 @@ MQTT 模块围绕 `AbstractSysClient`、`MqttClient`、`MqttCallback`、`SysClie
 - `userQueue` 处理用户主动请求。
 - `pollQueue` 处理后台轮询请求。
 - `userQueue` 优先级高于 `pollQueue`。
-- `pollQueue` 使用 `SetQueue<Poll<MqttTask>>`，防止同一设备重复轮询。
+- `pollQueue` 使用 `ActiveQueue<Poll<MqttTask>>`，防止同一设备重复轮询，并保留 poll 任务 active 状态。
 - `PendingRequest` 代表当前正在等待响应的请求。
 - `MqttCallback.messageArrived` 收到响应后交给 client 匹配当前请求并完成 future。
 
@@ -101,7 +101,7 @@ MQTT 模块围绕 `AbstractSysClient`、`MqttClient`、`MqttCallback`、`SysClie
 4. 首次看到设备时，为快照内所有字段生成事件。
 5. 后续只为新增字段或值变化字段生成事件。
 6. `Engine` 根据 `DeviceEventKey` 找到对应 runtime，并刷新命中的 `EvalTreeNode` 叶子。
-7. 命中的 `runtimeId` 进入 `SetQueue<String>`，避免同一 runtime 重复排队。
+7. 命中的 `runtimeId` 进入 `UniqueQueue<String>`，避免同一 runtime 重复排队。
 8. `Engine` 内部 dispatcher 线程消费 readyQueue，并把 runtime 推演任务提交到 executor pool。
 9. runtime 推演任务遍历所有 `ActionGroup`，当 action group 的 tree root 为 `true` 时调用 `RuntimeExecutor`。
 10. 当前 `LoggingRuntimeExecutor` 会打印被触发的 `runtime-id` 和 `action-group-id`。

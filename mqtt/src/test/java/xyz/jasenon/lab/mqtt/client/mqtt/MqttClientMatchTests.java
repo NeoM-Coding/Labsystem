@@ -5,7 +5,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import xyz.jasenon.lab.api.mqtt.dto.MqttTaskDto;
 import xyz.jasenon.lab.common.model.device.DeviceType;
-import xyz.jasenon.lab.common.SetQueue;
+import xyz.jasenon.lab.common.ActiveQueue;
 import xyz.jasenon.lab.common.command.CommandLine;
 import xyz.jasenon.lab.common.command.Task;
 import xyz.jasenon.lab.common.command.seq.SeqGeneratorManager;
@@ -88,7 +88,7 @@ class MqttClientMatchTests {
 
     @Test
     void rejectsDuplicatePollForSameMqttTaskWhileActive() {
-        SetQueue<Poll<MqttTask>> queue = new SetQueue<>(new HashSet<>(), new ArrayDeque<>());
+        ActiveQueue<Poll<MqttTask>> queue = new ActiveQueue<>(new HashSet<>(), new HashSet<>(), new ArrayDeque<>());
         Poll<MqttTask> accessPoll = new Poll<>(pollTask("gateway-1", "access-1"), 1000L);
         Poll<MqttTask> sameAccessPoll = new Poll<>(pollTask("gateway-1", "access-1"), 1000L);
         Poll<MqttTask> sameAccessPollWithOtherArgs = new Poll<>(pollTask("gateway-1", "access-1", 2), 1000L);

@@ -61,11 +61,14 @@ public class MqttCallback implements MqttCallbackExtended {
 
     @Override
     public void messageArrived(String topic, MqttMessage mqttMessage) throws Exception {
+        // 注意receive 对 client.current的消解问题
+        var task = client.current().clone();
+
         byte[] payload = mqttMessage.getPayload();
         client.receive(new Task(client.gatewayId, payload));
 
         // 后置处理消息持久化
-        var task = client.current();
+
         if (MqttTask.Explainer.verifier(task.getRequest()
                 .getCommandLine().getCommand().getCheckType(), payload)){
             AsyncExecutor.runAsyncIO(() -> {

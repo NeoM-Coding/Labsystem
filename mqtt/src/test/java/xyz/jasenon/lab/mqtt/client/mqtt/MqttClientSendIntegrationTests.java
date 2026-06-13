@@ -176,7 +176,7 @@ class MqttClientSendIntegrationTests {
      * multiple virtual Access devices can each register a distinct
      * {@code Poll<MqttTask>} because equality is based on gateway, type, and
      * device id, while a duplicate poll for the same device is rejected by
-     * {@code SetQueue}. The worker then sends poll requests for each device
+     * {@code ActiveQueue}. The worker then sends poll requests for each device
      * serially through the real MQTT client.
      */
     @Test

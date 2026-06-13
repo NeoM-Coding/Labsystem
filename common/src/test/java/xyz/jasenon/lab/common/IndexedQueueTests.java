@@ -10,11 +10,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class SetQueueTests {
+class IndexedQueueTests {
 
     @Test
-    void rejectsDuplicateWhilePolledElementIsReserved() {
-        SetQueue<String> queue = new SetQueue<>(new HashSet<>(), new ArrayDeque<>());
+    void activeQueueRejectsDuplicateWhilePolledElementIsActive() {
+        ActiveQueue<String> queue = new ActiveQueue<>(new HashSet<>(), new HashSet<>(), new ArrayDeque<>());
 
         assertTrue(queue.offer("task-1"));
         assertEquals("task-1", queue.poll());
@@ -31,8 +31,8 @@ class SetQueueTests {
     }
 
     @Test
-    void removeReleasesQueuedElementForRefresh() {
-        SetQueue<String> queue = new SetQueue<>(new HashSet<>(), new ArrayDeque<>());
+    void activeQueueRemoveReleasesQueuedElementForRefresh() {
+        ActiveQueue<String> queue = new ActiveQueue<>(new HashSet<>(), new HashSet<>(), new ArrayDeque<>());
 
         assertTrue(queue.offer("task-1"));
         assertTrue(queue.remove("task-1"));
@@ -42,8 +42,8 @@ class SetQueueTests {
     }
 
     @Test
-    void removeReleasesPolledElementReservationAndPreventsReturn() {
-        SetQueue<String> queue = new SetQueue<>(new HashSet<>(), new ArrayDeque<>());
+    void activeQueueRemoveReleasesPolledElementAndPreventsReturn() {
+        ActiveQueue<String> queue = new ActiveQueue<>(new HashSet<>(), new HashSet<>(), new ArrayDeque<>());
 
         assertTrue(queue.offer("task-1"));
         assertEquals("task-1", queue.poll());
@@ -54,5 +54,20 @@ class SetQueueTests {
         assertFalse(queue.returnToQueue("task-1"));
         assertTrue(queue.offer("task-1"));
         assertEquals("task-1", queue.poll());
+    }
+
+    @Test
+    void uniqueQueueReleasesIndexWhenElementIsPolled() {
+        UniqueQueue<String> queue = new UniqueQueue<>(new HashSet<>(), new ArrayDeque<>());
+
+        assertTrue(queue.offer("runtime-1"));
+        assertFalse(queue.offer("runtime-1"));
+        assertTrue(queue.contains("runtime-1"));
+
+        assertEquals("runtime-1", queue.poll());
+        assertFalse(queue.contains("runtime-1"));
+        assertEquals(0, queue.indexedSize());
+
+        assertTrue(queue.offer("runtime-1"));
     }
 }

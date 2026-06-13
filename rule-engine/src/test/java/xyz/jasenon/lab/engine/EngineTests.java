@@ -61,7 +61,7 @@ class EngineTests {
 
         assertTrue(executor.await());
         assertEquals(List.of("runtime-1:high-temperature", "runtime-1:normal-temperature"), executor.executed);
-        assertEquals(0, engine.activeReadySize());
+        assertEquals(0, engine.indexedReadySize());
         engine.stop();
     }
 

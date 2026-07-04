@@ -27,6 +27,12 @@
 
         <dependency>
             <groupId>xyz.jasenon.lab</groupId>
+            <artifactId>api</artifactId>
+            <version>0.0.1</version>
+        </dependency>
+
+        <dependency>
+            <groupId>xyz.jasenon.lab</groupId>
             <artifactId>redis</artifactId>
             <version>0.0.1</version>
         </dependency>

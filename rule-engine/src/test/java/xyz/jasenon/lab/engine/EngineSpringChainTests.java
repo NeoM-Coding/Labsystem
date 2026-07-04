@@ -21,9 +21,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest(
         classes = RuleEngineApplication.class,
+        webEnvironment = SpringBootTest.WebEnvironment.NONE,
         properties = {
                 "lab.redis.enabled=false",
-                "server.port=0"
+                "dubbo.registry.address=N/A",
+                "dubbo.config-center.address=N/A",
+                "spring.profiles.active=test",
+                "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration",
+                "fun.uid.assigner-mode=none"
         }
 )
 @ExtendWith(OutputCaptureExtension.class)
@@ -33,7 +38,7 @@ class EngineSpringChainTests {
     private Engine engine;
 
     @Test
-    void springManagedEngineConsumesReadyQueueAndLogsTriggeredActionGroup(CapturedOutput output) throws Exception {
+    void springManagedSchedulerLogsTriggeredActionGroup(CapturedOutput output) throws Exception {
         Runtime runtime = new Runtime("spring-runtime-1");
         runtime.registerActionGroup(new ActionGroup(
                 "spring-high-temperature",

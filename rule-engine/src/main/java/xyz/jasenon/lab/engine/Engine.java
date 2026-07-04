@@ -19,7 +19,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -152,25 +151,16 @@ public class Engine {
     }
 
     private void submitRuntimeTask(String runtimeId) {
-        try {
-            runtimeTaskExecutor.submit(() -> runRuntimeInference(runtimeId));
-        } catch (RejectedExecutionException e) {
-            readyQueue.remove(runtimeId);
-            throw e;
-        }
+        runtimeTaskExecutor.submit(() -> runRuntimeInference(runtimeId));
     }
 
     private void runRuntimeInference(String runtimeId) {
-        try {
-            runtimeHelper.get(runtimeId).ifPresent(this::executeSatisfiedActionGroups);
-        } finally {
-            readyQueue.remove(runtimeId);
-        }
+        runtimeHelper.get(runtimeId).ifPresent(this::executeSatisfiedActionGroups);
     }
 
     private void executeSatisfiedActionGroups(Runtime runtime) {
         for (ActionGroup actionGroup : runtime.getActionGroups()) {
-            if (actionGroup.getRoot().isResult()) {
+            if (actionGroup.getRoot().isOk()) {
                 runtimeExecutor.execute(runtime, actionGroup);
             }
         }

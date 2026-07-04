@@ -11,24 +11,19 @@ class EvalTreeNodeTests {
 
     @Test
     void buildsTreeByChainOrderWithoutOperatorPrecedence() {
-        EvalNode dummy = dummy();
-        EvalNode a = node("1", "opened", Operator.EQ, "true", LogicType.OR, false);
-        EvalNode b = node("2", "roomTemperature", Operator.GT, "26", LogicType.AND, false);
-        dummy.setNext(a);
+        EvalNode a = node("1", "opened", Operator.EQ, "true", null, true);
+        EvalNode b = node("2", "opened", Operator.EQ, "true", LogicType.OR, false);
+        EvalNode c = node("3", "roomTemperature", Operator.GT, "26", LogicType.AND, false);
         a.setNext(b);
+        b.setNext(c);
 
-        EvalTreeNode root = EvalTreeNode.fromChain(dummy);
+        EvalTreeNode root = EvalTreeNode.fromChain(a);
 
-        assertEquals(LogicType.AND, root.getLogicType());
-        assertEquals(LogicType.OR, root.getLeft().getLogicType());
-        assertFalse(root.isResult());
-        assertTrue(root.getLeft().isResult());
+        // Strict chain order: A || B && C is evaluated as (A || B) && C.
+        assertFalse(root.isOk());
 
-        aLeaf(root).refreshLeaf("true");
-        assertTrue(root.getLeft().isResult());
-        assertFalse(root.isResult());
-        root.getRight().refreshLeaf("27");
-        assertTrue(root.isResult());
+        findLeaf(root, "3").refreshLeaf("27");
+        assertTrue(root.isOk());
     }
 
     @Test
@@ -39,13 +34,13 @@ class EvalTreeNodeTests {
         EvalTreeNode root = EvalTreeNode.fromChain(dummy);
         EvalTreeNode leaf = root.getRight();
 
-        assertFalse(root.isResult());
+        assertFalse(root.isOk());
         assertTrue(leaf.refreshLeaf("27"));
-        assertTrue(root.isResult());
+        assertTrue(root.isOk());
         assertTrue(temperature.isResult());
         assertFalse(leaf.refreshLeaf("28"));
         assertTrue(leaf.refreshLeaf("25"));
-        assertFalse(root.isResult());
+        assertFalse(root.isOk());
     }
 
     @Test
@@ -56,14 +51,30 @@ class EvalTreeNodeTests {
         EvalTreeNode root = EvalTreeNode.fromChain(dummy);
         EvalTreeNode leaf = root.getRight();
 
-        assertTrue(root.isResult());
-        assertFalse(leaf.isResult());
+        assertTrue(root.isOk());
+        assertFalse(leaf.isOk());
 
         assertFalse(leaf.refreshLeaf("true"));
 
-        assertTrue(leaf.isResult());
+        assertTrue(leaf.isOk());
         assertTrue(opened.isResult());
-        assertTrue(root.isResult());
+        assertTrue(root.isOk());
+    }
+
+    @Test
+    void fromChainBuildsBalancedSegmentTree() {
+        EvalNode head = dummy();
+        EvalNode tail = head;
+        for (int i = 1; i <= 16; i++) {
+            EvalNode next = node(String.valueOf(i), "roomTemperature", Operator.GT, "26", LogicType.AND, true);
+            tail.setNext(next);
+            tail = next;
+        }
+
+        EvalTreeNode root = EvalTreeNode.fromChain(head);
+
+        assertEquals(17, countLeaves(root));
+        assertTrue(height(root) <= 6);
     }
 
     private static EvalNode dummy() {
@@ -85,7 +96,39 @@ class EvalTreeNodeTests {
         return node;
     }
 
-    private static EvalTreeNode aLeaf(EvalTreeNode root) {
-        return root.getLeft().getRight();
+    private static EvalTreeNode findLeaf(EvalTreeNode node, String nodeId) {
+        if (node == null) {
+            throw new IllegalArgumentException("leaf not found: " + nodeId);
+        }
+        if (node.getNodeType() == NodeType.LEAF) {
+            EvalNode source = node.getSource();
+            if (source != null && nodeId.equals(source.getNodeId())) {
+                return node;
+            }
+            throw new IllegalArgumentException("leaf not found: " + nodeId);
+        }
+
+        try {
+            return findLeaf(node.getLeft(), nodeId);
+        } catch (IllegalArgumentException ignored) {
+            return findLeaf(node.getRight(), nodeId);
+        }
+    }
+
+    private static int height(EvalTreeNode node) {
+        if (node == null) {
+            return 0;
+        }
+        return 1 + Math.max(height(node.getLeft()), height(node.getRight()));
+    }
+
+    private static int countLeaves(EvalTreeNode node) {
+        if (node == null) {
+            return 0;
+        }
+        if (node.getNodeType() == NodeType.LEAF) {
+            return 1;
+        }
+        return countLeaves(node.getLeft()) + countLeaves(node.getRight());
     }
 }

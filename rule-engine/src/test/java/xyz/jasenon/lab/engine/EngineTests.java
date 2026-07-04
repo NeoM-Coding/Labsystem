@@ -65,6 +65,30 @@ class EngineTests {
         engine.stop();
     }
 
+    @Test
+    void completedTaskDoesNotRemoveRuntimeRequeuedWhileItWasRunning() throws InterruptedException {
+        BlockingRuntimeExecutor executor = new BlockingRuntimeExecutor();
+        Engine engine = new Engine(executor, false);
+        Runtime runtime = new Runtime("runtime-1");
+        runtime.registerActionGroup(new ActionGroup(
+                "high-temperature",
+                chain("ac-1", "roomTemperature", Operator.GT, "26")
+        ));
+        engine.register(runtime);
+
+        engine.accept(new DeviceEvent(DeviceType.AirCondition, "ac-1", "roomTemperature", "27", Instant.now()));
+        engine.drainReady();
+        assertTrue(executor.awaitStarted());
+
+        engine.accept(new DeviceEvent(DeviceType.AirCondition, "ac-1", "roomTemperature", "28", Instant.now()));
+        assertEquals(1, engine.readySize());
+
+        executor.release();
+        assertTrue(executor.awaitCompleted());
+        assertEquals("runtime-1", engine.pollReady());
+        assertNull(engine.pollReady());
+    }
+
     private static EvalNode chain(String deviceId, String field, Operator operator, String value) {
         EvalNode dummy = new EvalNode();
         dummy.setResult(true);
@@ -99,6 +123,37 @@ class EngineTests {
 
         boolean await() throws InterruptedException {
             return latch.await(2, TimeUnit.SECONDS);
+        }
+    }
+
+    private static class BlockingRuntimeExecutor implements RuntimeExecutor {
+
+        private final CountDownLatch started = new CountDownLatch(1);
+        private final CountDownLatch release = new CountDownLatch(1);
+        private final CountDownLatch completed = new CountDownLatch(1);
+
+        @Override
+        public void execute(Runtime runtime, ActionGroup actionGroup) {
+            started.countDown();
+            try {
+                release.await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } finally {
+                completed.countDown();
+            }
+        }
+
+        boolean awaitStarted() throws InterruptedException {
+            return started.await(2, TimeUnit.SECONDS);
+        }
+
+        void release() {
+            release.countDown();
+        }
+
+        boolean awaitCompleted() throws InterruptedException {
+            return completed.await(2, TimeUnit.SECONDS);
         }
     }
 }

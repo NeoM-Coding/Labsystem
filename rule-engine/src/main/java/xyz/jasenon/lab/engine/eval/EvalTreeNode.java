@@ -3,10 +3,12 @@ package xyz.jasenon.lab.engine.eval;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 /**
- * BST快速迭代 根结果
+ * Balanced segment tree for left-fold boolean expression evaluation.
  */
 @Getter
 @Setter
@@ -27,7 +29,22 @@ public class EvalTreeNode {
     /**
      * 节点的局部结果
      */
-    private volatile boolean result;
+    private volatile boolean ok;
+
+    /**
+     * 当前节点表示的表达式片段，对输入累计值 false 的输出。
+     */
+    private volatile boolean onFalse;
+
+    /**
+     * 当前节点表示的表达式片段，对输入累计值 true 的输出。
+     */
+    private volatile boolean onTrue;
+
+    /**
+     * 链式表达式的首节点没有前置累计值，语义上等价于 const(result)。
+     */
+    private boolean chainHead;
 
     // 树状结构支持
     private EvalTreeNode parent;
@@ -35,22 +52,34 @@ public class EvalTreeNode {
     private EvalTreeNode right;
 
     public static EvalTreeNode leaf(EvalNode source) {
+        return leaf(source, true);
+    }
+
+    private static EvalTreeNode leaf(EvalNode source, boolean chainHead) {
         EvalTreeNode node = new EvalTreeNode();
         node.source = Objects.requireNonNull(source, "source");
         node.nodeType = NodeType.LEAF;
-        node.result = source.isResult();
+        node.chainHead = chainHead;
+        node.ok = source.isResult();
+        node.refreshLeafTransform();
         return node;
     }
 
     public static EvalTreeNode logic(LogicType logicType, EvalTreeNode left, EvalTreeNode right) {
+        Objects.requireNonNull(logicType, "logicType");
+        EvalTreeNode node = segment(left, right);
+        node.logicType = logicType;
+        return node;
+    }
+
+    private static EvalTreeNode segment(EvalTreeNode left, EvalTreeNode right) {
         EvalTreeNode node = new EvalTreeNode();
         node.nodeType = NodeType.LOGIC;
-        node.logicType = Objects.requireNonNull(logicType, "logicType");
         node.left = Objects.requireNonNull(left, "left");
         node.right = Objects.requireNonNull(right, "right");
         left.parent = node;
         right.parent = node;
-        node.result = node.calculate();
+        node.refreshSegmentTransform();
         return node;
     }
 
@@ -59,32 +88,43 @@ public class EvalTreeNode {
             throw new IllegalArgumentException("head must not be null");
         }
 
-        EvalTreeNode root = leaf(head);
+        List<EvalTreeNode> leaves = new ArrayList<>();
+        leaves.add(leaf(head, true));
         EvalNode current = head.getNext();
         while (current != null) {
-            EvalTreeNode nextLeaf = leaf(current);
-            LogicType logicToPrev = current.getLogicToPrev() == null ? LogicType.AND : current.getLogicToPrev();
-            root = logic(logicToPrev, root, nextLeaf);
+            leaves.add(leaf(current, false));
             current = current.getNext();
         }
-        return root;
+        return buildBalanced(leaves, 0, leaves.size());
+    }
+
+    private static EvalTreeNode buildBalanced(List<EvalTreeNode> leaves, int start, int end) {
+        if (end - start == 1) {
+            return leaves.get(start);
+        }
+
+        int mid = start + (end - start) / 2;
+        return segment(buildBalanced(leaves, start, mid), buildBalanced(leaves, mid, end));
     }
 
     public boolean refreshLeaf(String eventValue) {
         if (nodeType != NodeType.LEAF) {
             throw new IllegalStateException("only leaf node can refresh by event value");
         }
+        boolean oldRootResult = root().isOk();
         boolean newResult = evaluate(eventValue);
-        if (result == newResult) {
+        if (ok == newResult) {
             return false;
         }
 
-        result = newResult;
+        ok = newResult;
         source.setResult(newResult);
+        refreshLeafTransform();
         if (parent == null) {
             return true;
         }
-        return bubble();
+        bubble();
+        return oldRootResult != root().isOk();
     }
 
     public EvalTreeNode root() {
@@ -95,37 +135,53 @@ public class EvalTreeNode {
         return node;
     }
 
-    private boolean bubble() {
+    private void bubble() {
         EvalTreeNode node = parent;
         while (node != null) {
-            boolean oldResult = node.result;
-            boolean newResult = node.calculate();
-            if (oldResult == newResult) {
-                return false;
-            }
-
-            node.result = newResult;
-            if (node.parent == null) {
-                return true;
+            if (!node.refreshSegmentTransform()) {
+                return;
             }
             node = node.parent;
         }
-        return false;
     }
 
-    private boolean calculate() {
-        if (nodeType == NodeType.LEAF) {
-            return result;
+    private void refreshLeafTransform() {
+        if (chainHead) {
+            onFalse = ok;
+            onTrue = ok;
+            return;
         }
-        if (logicType == LogicType.AND) {
-            return left.isResult() && right.isResult();
+
+        LogicType logicToPrev = source.getLogicToPrev() == null ? LogicType.AND : source.getLogicToPrev();
+        logicType = logicToPrev;
+        if (logicToPrev == LogicType.AND) {
+            onFalse = false;
+            onTrue = ok;
+        } else {
+            onFalse = ok;
+            onTrue = true;
         }
-        return left.isResult() || right.isResult();
+    }
+
+    private boolean refreshSegmentTransform() {
+        boolean oldOnFalse = onFalse;
+        boolean oldOnTrue = onTrue;
+        boolean oldResult = ok;
+
+        onFalse = right.apply(left.apply(false));
+        onTrue = right.apply(left.apply(true));
+        ok = onFalse;
+
+        return oldOnFalse != onFalse || oldOnTrue != onTrue || oldResult != ok;
+    }
+
+    private boolean apply(boolean input) {
+        return input ? onTrue : onFalse;
     }
 
     private boolean evaluate(String eventValue) {
         if (source == null) {
-            return result;
+            return ok;
         }
         try {
             return TypedValueParser.compare(source.getDeviceType(), source.getField(), source.getOperator(), eventValue, source.getValue());

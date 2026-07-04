@@ -109,8 +109,8 @@ MQTT 模块围绕 `AbstractSysClient`、`MqttClient`、`MqttCallback`、`SysClie
 当前表达式模型：
 
 - `EvalNode` 是链式原始条件。
-- `EvalTreeNode` 是可增量刷新的二叉表达式树。
-- `fromChain()` 严格按链表顺序左结合计算，不使用 `AND` / `OR` 运算符优先级。
+- `EvalTreeNode` 是可增量刷新的平衡 transformer 表达式树。
+- `fromChain()` 严格按链表顺序左结合计算，不使用 `AND` / `OR` 运算符优先级；内部用 segment tree 压缩高度，避免链式规则形成左倾树。
 - 例如 `A OR B AND C` 会被计算为 `(A OR B) AND C`。
 - 表达式右值仍以字符串保存，但求值时会根据 `DeviceType + field` 还原为 boolean、数字、enum 或 string。
 

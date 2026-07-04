@@ -191,7 +191,7 @@ class EvalNode {
 
 ### EvalTreeNode
 
-`EvalTreeNode` 是可增量刷新的二叉表达式树：
+`EvalTreeNode` 是可增量刷新的二叉表达式树。它保留链式表达式的左结合语义，但内部不再构造左倾树，而是构造平衡的 transformer segment tree：
 
 ```java
 class EvalTreeNode {
@@ -199,29 +199,67 @@ class EvalTreeNode {
     private NodeType nodeType;
     private LogicType logicType;
     private volatile boolean result;
+    private volatile boolean onFalse;
+    private volatile boolean onTrue;
     private EvalTreeNode parent;
     private EvalTreeNode left;
     private EvalTreeNode right;
 }
 ```
 
+每个叶子不只保存自身条件结果，还保存一个布尔转换函数：
+
+```text
+transform(acc) -> nextAcc
+```
+
+因为输入只有 boolean，所以函数可以用两个值表达：
+
+```text
+onFalse = transform(false)
+onTrue  = transform(true)
+```
+
+首节点没有前置累计值，等价于：
+
+```text
+const(A) = [A, A]
+```
+
+后续节点根据 `logicToPrev` 生成 transformer：
+
+```text
+acc AND B = [false, B]
+acc OR  B = [B, true]
+```
+
+内部节点不再表示普通的 `left AND right` 或 `left OR right`，而是表示左右两段 transformer 的函数复合：
+
+```text
+combined(false) = right(left(false))
+combined(true)  = right(left(true))
+```
+
 当前提供的核心能力：
 
 - `leaf(EvalNode source)`：构造叶子节点。
-- `logic(LogicType logicType, EvalTreeNode left, EvalTreeNode right)`：构造逻辑节点。
-- `fromChain(EvalNode head)`：从链式表达式构造左结合表达式树。
+- `logic(LogicType logicType, EvalTreeNode left, EvalTreeNode right)`：兼容逻辑节点构造入口，内部按 transformer 复合刷新。
+- `fromChain(EvalNode head)`：从链式表达式构造平衡 transformer 树，同时保持链式左结合求值语义。
 - `refreshLeaf(String eventValue)`：刷新叶子结果，并向父节点冒泡；如果叶子结果不变，或某个父节点重算后结果不变，则停止继续向上刷新。
 - `root()`：获取当前节点所在表达式树根节点。
 
-`refreshLeaf()` 会返回根结果是否发生变化，便于测试和调试观察表达式状态。当前表达式树由链式条件左结合构造，可能形成倾斜树；因此刷新时会做新旧值比较短路，避免每次叶子变化都无条件 bubble 到整棵树根。但 `Engine` 入队以“事件命中 runtime”为准：runtime 被调度后再统一遍历 action group，判断哪些 action group 的根条件当前为 true。
+`refreshLeaf()` 会返回根结果是否发生变化，便于测试和调试观察表达式状态。由于树高被压缩到接近 `log(n)`，单个字段事件只需要沿平衡树路径刷新 transformer；同时刷新过程仍会做新旧 transformer 比较短路，某个父节点复合结果不变时就停止继续向上 bubble。但 `Engine` 入队以“事件命中 runtime”为准：runtime 被调度后再统一遍历 action group，判断哪些 action group 的根条件当前为 true。
 
 `fromChain()` 的构造规则可以理解为：
 
-```java
-EvalTreeNode root = leaf(head);
-for (EvalNode current = head.next; current != null; current = current.next) {
-    root = logic(current.logicToPrev, root, leaf(current));
-}
+```text
+A || B && C
+
+T0 = const(A)
+T1 = acc -> acc || B
+T2 = acc -> acc && C
+
+root = compose(T0, T1, T2)
 ```
 
 因此所有逻辑关系都按链表顺序左结合。例如：

@@ -7,8 +7,17 @@ import xyz.jasenon.lab.engine.action.ActionGroup;
 import xyz.jasenon.lab.engine.eval.EvalNode;
 import xyz.jasenon.lab.engine.eval.LogicType;
 import xyz.jasenon.lab.engine.eval.Operator;
+import xyz.jasenon.lab.engine.event.TimeEvent;
+import xyz.jasenon.lab.engine.event.TimeSignal;
+import xyz.jasenon.lab.engine.time.CalendarConstraint;
+import xyz.jasenon.lab.engine.time.TimeConditionGroup;
+import xyz.jasenon.lab.engine.time.TimePointCondition;
 
+import java.time.Instant;
+import java.time.LocalTime;
+import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
@@ -72,6 +81,32 @@ class AsyncRuntimeSchedulerTests {
     }
 
     @Test
+    void unionsCandidateActionGroupsWhileRuntimeIsRunning() throws InterruptedException {
+        BlockingRuntimeExecutor runtimeExecutor = new BlockingRuntimeExecutor(3);
+        ExecutorService executorService = Executors.newFixedThreadPool(2);
+        AsyncRuntimeScheduler scheduler = new AsyncRuntimeScheduler(runtimeExecutor, executorService);
+        Runtime runtime = new Runtime("runtime-candidates");
+        runtime.registerActionGroup(actionGroup("group-a", true));
+        runtime.registerActionGroup(actionGroup("group-b", true));
+        runtime.registerActionGroup(actionGroup("group-c", true));
+
+        try {
+            scheduler.schedule(runtime, RuntimeSignal.stateChanged(Set.of("group-a")));
+            assertTrue(runtimeExecutor.awaitFirstStarted());
+
+            scheduler.schedule(runtime, RuntimeSignal.stateChanged(Set.of("group-b")));
+            scheduler.schedule(runtime, RuntimeSignal.stateChanged(Set.of("group-c")));
+
+            runtimeExecutor.releaseFirst();
+            assertTrue(runtimeExecutor.awaitExecutions());
+            assertEquals(3, runtimeExecutor.executionCount.get());
+            assertEquals(1, runtimeExecutor.maxConcurrent.get());
+        } finally {
+            scheduler.shutdown();
+        }
+    }
+
+    @Test
     void cancelPreventsDirtyRerun() throws InterruptedException {
         BlockingRuntimeExecutor runtimeExecutor = new BlockingRuntimeExecutor(1);
         ExecutorService executorService = Executors.newFixedThreadPool(2);
@@ -89,6 +124,94 @@ class AsyncRuntimeSchedulerTests {
             Thread.sleep(100);
 
             assertEquals(1, runtimeExecutor.executionCount.get());
+        } finally {
+            scheduler.shutdown();
+        }
+    }
+
+    @Test
+    void preservesDistinctTimePointsAndDeduplicatesOccurrenceId() throws InterruptedException {
+        RecordingRuntimeExecutor runtimeExecutor = new RecordingRuntimeExecutor(2);
+        ExecutorService executorService = Executors.newFixedThreadPool(2);
+        AsyncRuntimeScheduler scheduler = new AsyncRuntimeScheduler(runtimeExecutor, executorService);
+        Runtime runtime = new Runtime("runtime-time");
+        ActionGroup actionGroup = pointActionGroup("point-group", "point-1");
+        runtime.registerActionGroup(actionGroup);
+        Instant firstAt = Instant.parse("2026-07-05T00:00:00Z");
+        Instant secondAt = firstAt.plusSeconds(60);
+        TimeEvent first = new TimeEvent(
+                runtime.getRuntimeId(),
+                actionGroup.getTimeConditionGroupId(),
+                "point-1",
+                TimeSignal.TIME_POINT,
+                firstAt,
+                firstAt
+        );
+        TimeEvent second = new TimeEvent(
+                runtime.getRuntimeId(),
+                actionGroup.getTimeConditionGroupId(),
+                "point-1",
+                TimeSignal.TIME_POINT,
+                secondAt,
+                secondAt
+        );
+
+        try {
+            scheduler.schedule(runtime, RuntimeSignal.timePoint(first));
+            scheduler.schedule(runtime, RuntimeSignal.timePoint(first));
+            scheduler.schedule(runtime, RuntimeSignal.timePoint(second));
+
+            assertTrue(runtimeExecutor.await());
+            Thread.sleep(100);
+            assertEquals(2, runtimeExecutor.executed.size());
+        } finally {
+            scheduler.shutdown();
+        }
+    }
+
+    @Test
+    void executesEveryActionGroupReferencingTheSameTimeConditionGroup() throws InterruptedException {
+        RecordingRuntimeExecutor runtimeExecutor = new RecordingRuntimeExecutor(2);
+        ExecutorService executorService = Executors.newFixedThreadPool(2);
+        AsyncRuntimeScheduler scheduler = new AsyncRuntimeScheduler(runtimeExecutor, executorService);
+        EvalNode dummy = new EvalNode();
+        dummy.setResult(true);
+        TimeConditionGroup sharedTimeGroup = new TimeConditionGroup(
+                "shared-noon",
+                List.of(new TimePointCondition(
+                        "point-1",
+                        CalendarConstraint.everyDay(ZoneOffset.UTC),
+                        LocalTime.NOON
+                ))
+        );
+        Runtime runtime = new Runtime("runtime-shared-time");
+        ActionGroup firstGroup = new ActionGroup("notify-user", dummy, sharedTimeGroup);
+        ActionGroup secondGroup = new ActionGroup("control-device", dummy, sharedTimeGroup);
+        firstGroup.addAction(() -> Action.ActionType.Report);
+        secondGroup.addAction(() -> Action.ActionType.Control);
+        runtime.registerActionGroup(firstGroup);
+        runtime.registerActionGroup(secondGroup);
+        Instant scheduledAt = Instant.parse("2026-07-05T12:00:00Z");
+        TimeEvent event = new TimeEvent(
+                runtime.getRuntimeId(),
+                sharedTimeGroup.getGroupId(),
+                "point-1",
+                TimeSignal.TIME_POINT,
+                scheduledAt,
+                scheduledAt
+        );
+
+        try {
+            scheduler.schedule(runtime, RuntimeSignal.timePoint(event));
+
+            assertTrue(runtimeExecutor.await());
+            assertEquals(
+                    List.of(
+                            "runtime-shared-time:notify-user",
+                            "runtime-shared-time:control-device"
+                    ),
+                    runtimeExecutor.executed
+            );
         } finally {
             scheduler.shutdown();
         }
@@ -115,6 +238,21 @@ class AsyncRuntimeSchedulerTests {
         node.setResult(result);
         dummy.setNext(node);
         ActionGroup actionGroup = new ActionGroup(actionGroupId, dummy);
+        actionGroup.addAction(() -> Action.ActionType.Control);
+        return actionGroup;
+    }
+
+    private static ActionGroup pointActionGroup(String actionGroupId, String conditionId) {
+        EvalNode dummy = new EvalNode();
+        dummy.setResult(true);
+        TimeConditionGroup timeGroup = new TimeConditionGroup(List.of(
+                new TimePointCondition(
+                        conditionId,
+                        CalendarConstraint.everyDay(ZoneOffset.UTC),
+                        LocalTime.NOON
+                )
+        ));
+        ActionGroup actionGroup = new ActionGroup(actionGroupId, dummy, timeGroup);
         actionGroup.addAction(() -> Action.ActionType.Control);
         return actionGroup;
     }

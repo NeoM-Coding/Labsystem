@@ -331,7 +331,7 @@ public void persist(String deviceId, byte[] payload)
 
 1. 对应设备 handler 解码 payload 为 record。
 2. 设置 `deviceId`。
-3. 调用 `onChange(record)`，目前用于日志提示，后续可以演进为前端推送。
+3. 调用 `onChange(record)`，作为 WebSocket 等应用端状态推送的扩展点；该方法会随每条 record 调用，默认实现保持静默。
 4. 使用 `ObjectMapUtil.toStringMap(record)` 转为字段级 map。
 5. 写入 Redis hash，并设置短 TTL，给规则表达式提供字段级读取能力。
 6. 通过 `MessagePersistent` 落库。
@@ -409,6 +409,6 @@ mock 按指令 payload 识别设备类型，生成符合 Java handler decode 逻
 
 - 将 `Poll.of(Device, TaskHelper)` 中的设备类型分发抽到更显式的策略表。
 - 将 `MessageHandlerManager` 从静态注册进一步改成 Spring bean map。
-- 将 `onChange()` 从日志扩展为 WebSocket、Redis Pub/Sub 或领域事件。
+- 为 `onChange()` 接入 WebSocket 或领域事件推送，同时避免在这条高频链路中恢复逐条 `info` 日志。
 - 将 `MqttClient.onMessage/onResponse/onTimeout/onError` 补齐可观测日志和指标。
 - 对 `MqttCallback.messageArrived()` 中 `client.current()` 的空值和并发窗口做更防御式处理。

@@ -215,3 +215,49 @@ CREATE TABLE IF NOT EXISTS `sensor_record` (
             AND `smoke` >= 0
         )
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='传感器状态记录表';
+
+CREATE TABLE IF NOT EXISTS `rule_runtime` (
+    `id` VARCHAR(64) NOT NULL COMMENT 'Runtime业务ID',
+    `runtime_name` VARCHAR(128) NOT NULL COMMENT '规则名称',
+    `owner_id` VARCHAR(64) NOT NULL COMMENT '配置规则的用户/租户ID',
+    `status` VARCHAR(32) NOT NULL DEFAULT 'DRAFT'
+        COMMENT 'DRAFT, PUBLISHED, DISABLED',
+    `published_revision_no` INT NULL COMMENT '当前发布版本号',
+    `active_from` DATETIME(3) NULL COMMENT 'Runtime生效时间，包含',
+    `active_until` DATETIME(3) NULL COMMENT 'Runtime失效时间，不包含',
+    `create_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `update_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    `delete_at` DATETIME(3) NULL,
+    PRIMARY KEY (`id`),
+    KEY `idx_rule_runtime_owner_status` (`owner_id`, `status`, `delete_at`),
+    KEY `idx_rule_runtime_lifetime` (`status`, `active_from`, `active_until`, `delete_at`),
+    CONSTRAINT `chk_rule_runtime_status`
+        CHECK (`status` IN ('DRAFT', 'PUBLISHED', 'DISABLED')),
+    CONSTRAINT `chk_rule_runtime_lifetime`
+        CHECK (
+            `active_from` IS NULL
+            OR `active_until` IS NULL
+            OR `active_from` < `active_until`
+        )
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='规则Runtime元数据';
+
+CREATE TABLE IF NOT EXISTS `rule_runtime_revision` (
+    `id` VARCHAR(64) NOT NULL COMMENT 'Revision ID',
+    `runtime_id` VARCHAR(64) NOT NULL COMMENT '所属Runtime',
+    `revision_no` INT NOT NULL COMMENT 'Runtime内单调递增版本号',
+    `schema_version` INT NOT NULL DEFAULT 1 COMMENT 'JSON结构版本',
+    `definition` JSON NOT NULL COMMENT '条件组、动作组和引用关系的完整快照',
+    `checksum` CHAR(64) NULL COMMENT '规范化JSON的SHA-256',
+    `created_by` VARCHAR(64) NOT NULL COMMENT '创建版本的用户ID',
+    `create_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_rule_runtime_revision_no` (`runtime_id`, `revision_no`),
+    KEY `idx_rule_runtime_revision_time` (`runtime_id`, `create_at`),
+    CONSTRAINT `fk_rule_runtime_revision_runtime`
+        FOREIGN KEY (`runtime_id`) REFERENCES `rule_runtime` (`id`)
+        ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT `chk_rule_runtime_revision_no`
+        CHECK (`revision_no` > 0),
+    CONSTRAINT `chk_rule_runtime_schema_version`
+        CHECK (`schema_version` > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='规则Runtime不可变JSON版本';

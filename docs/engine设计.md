@@ -12,20 +12,39 @@ flowchart LR
     Hash["Redis hash 最新设备状态"]
     PubSub["Redis Pub/Sub 快照事件"]
     Listener["DeviceRecordChangeListener"]
-    Engine["Engine.accept(DeviceEvent)"]
+    Revision["MySQL JSON revision"]
+    Compiler["RuntimeRevisionCompiler"]
+    TimeService["TimeScheduleService"]
+    Lifecycle["RuntimeLifecycleManager"]
+    Engine["Engine.accept(EngineEvent)"]
+    Router["RuntimeEventRouter"]
     Runtime["Runtime"]
     Eval["EvalTreeNode 增量求值"]
-    Queue["UniqueQueue readyQueue"]
+    TimeGroup["TimeConditionGroup"]
+    Scheduler["AsyncRuntimeScheduler"]
+    Pool["ExecutorService"]
     Executor["RuntimeExecutor"]
+    Control["ControlAction -> MqttIo.asyncSend"]
+    Report["ReportAction 通知骨架"]
 
     MQTT --> Hash
     MQTT --> PubSub
     PubSub --> Listener
     Listener --> Engine
+    Revision --> Compiler
+    Compiler -->|"register(Runtime)"| Engine
+    TimeService -->|"TimeEvent"| Engine
+    Lifecycle -->|"激活 / 注销"| Engine
+    Engine --> Router
     Engine --> Runtime
-    Runtime --> Eval
-    Eval --> Queue
-    Queue --> Executor
+    Router --> Eval
+    Router --> TimeGroup
+    Eval --> Scheduler
+    TimeGroup --> Scheduler
+    Scheduler --> Pool
+    Pool --> Executor
+    Executor --> Control
+    Executor --> Report
 ```
 
 处理过程：
@@ -35,10 +54,13 @@ flowchart LR
 3. 同一个 record 快照会发布到 Redis Pub/Sub channel：`rule-engine:device-record-change`。
 4. `rule-engine` 订阅该 channel，由 `DeviceRecordChangeListener` 维护上一条设备快照。
 5. listener 将快照变化拆成字段级 `DeviceEvent`。
-6. `Engine` 根据 `DeviceEventKey` 找到相关 runtime，只刷新命中的表达式叶子。
-7. 只要事件命中 runtime，runtime id 就进入 `readyQueue`，等待一次 runtime 级推演。
-8. dispatcher 线程消费就绪 runtime，并把推演任务提交到 executor pool。
-9. 推演任务遍历该 runtime 下的 action group；条件树根为 true 的 action group 交给 `RuntimeExecutor` 执行，当前默认实现是日志记录。
+6. `Engine` 只为 `ACTIVE` runtime 路由事件；`PENDING` runtime 尚未挂入设备事件索引。
+7. `DeviceEventHandler` 刷新命中的表达式叶子；共享条件组根结果变化后，生成带候选 ActionGroup ID 的 `StateChanged`。
+8. `TimeScheduleService` 按唯一时间条件组调度下一边界，生成携带 `timeConditionGroupId` 的窗口或 TimePoint 事件。
+9. `TimeEventHandler` 更新窗口状态；TimePoint 会保留 `occurrenceId` 并进入不可丢失队列。
+10. `AsyncRuntimeScheduler` 保证同一 runtime 单飞；状态信号合并，TimePoint 按 occurrence 去重并顺序消费。
+11. `ActionGroupEvaluator` 同时检查 Runtime 生命周期、设备条件树和时间条件组。
+12. 条件满足后逐个调用 `RuntimeExecutor`；`ControlAction` 通过 `MqttIo.asyncSend()` 执行控制并记录结果。
 
 ## 跨模块事件契约
 
@@ -94,13 +116,16 @@ ConcurrentHashMap<RecordIdentity, Map<String, String>> snapshots;
 
 ## Engine 核心结构
 
-`Engine` 是调度入口，当前包含三部分：
+`Engine` 是事件入口和 runtime 管理器，时间计算和推演执行均委托给独立组件：
 
 ```java
 class Engine {
     private final EventTable<Set<String>> eventHelper;
     private final RuntimeTable runtimeHelper;
-    private final UniqueQueue<String> readyQueue;
+    private final RuntimeScheduler runtimeScheduler;
+    private final RuntimeLifecycleManager lifecycleManager;
+    private final TimeScheduleService timeScheduleService;
+    private final RuntimeEventRouter eventRouter;
 }
 ```
 
@@ -108,14 +133,82 @@ class Engine {
 
 - `eventHelper`：`EventKey -> runtimeId set`，用于从事件快速定位 runtime。
 - `runtimeHelper`：`runtimeId -> Runtime`，保存运行时实例。
-- `readyQueue`：就绪 runtime 队列，使用 `UniqueQueue` 避免同一 runtime 重复排队；runtime 被 poll 出队后会从索引中释放，执行中再次收到事件可以重新入队。
+- `runtimeScheduler`：异步执行 runtime；状态合并和 TimePoint FIFO 由调度器负责。
+- `lifecycleManager`：按 `activeFrom/activeUntil` 主动激活或注销 runtime。
+- `timeScheduleService`：计算并投递时间条件的下一次边界。
+- `eventRouter`：把设备事件和时间事件交给对应 handler。
 
-`Engine.accept(DeviceEvent)` 的语义：
+`Engine.accept(EngineEvent)` 的语义：
 
-1. 根据 `DeviceEvent.eventKey()` 查询受影响 runtime。
-2. 对每个 runtime，查找该事件对应的叶子节点集合。
-3. 调用叶子节点 `refreshLeaf(eventValue)`。
-4. 将事件命中的 `runtimeId` 放入 `readyQueue`，等待 runtime 级推演；`UniqueQueue` 只对尚未 poll 的 runtime id 做 O(1) 去重。
+1. `DeviceEvent` 根据反向索引查询受影响 runtime；`TimeEvent` 根据自身 key 定向找到 runtime。
+2. 被动检查 runtime 是否到期，到期则立即执行幂等注销。
+3. Router 更新设备表达式叶子或时间窗口状态。
+4. 将 `StateChanged` 或 `TimePointOccurred` 交给 RuntimeScheduler。
+
+## 调度职责重构
+
+### 修改前
+
+```mermaid
+flowchart LR
+    Event["DeviceEvent"] --> Engine["Engine"]
+    Engine --> Queue["UniqueQueue"]
+    Queue --> Signal["Semaphore"]
+    Signal --> Dispatcher["dispatcher thread"]
+    Dispatcher --> Pool["ExecutorService"]
+    Pool --> Inference["Engine.runRuntimeInference"]
+    Inference --> RuntimeExecutor
+```
+
+修改前的亮点是 readyQueue 状态直观、能够对等待中的 runtimeId 去重；但 Engine 同时管理队列、信号量、dispatcher、线程池和 ActionGroup 推演，职责较重。runtimeId 被 poll 后立即释放去重索引，还可能让同一 runtime 出现并发推演。
+
+### 修改后
+
+```mermaid
+flowchart LR
+    Event["DeviceEvent / TimeEvent"] --> Engine["Engine<br/>事件与 Runtime 管理"]
+    Engine --> Router["RuntimeEventRouter"]
+    Router -->|"schedule(runtime, signal)"| Scheduler["AsyncRuntimeScheduler<br/>单飞 + mailbox"]
+    Scheduler --> Pool["ExecutorService"]
+    Pool --> Inference["ActionGroupEvaluator"]
+    Inference --> RuntimeExecutor["RuntimeExecutor"]
+```
+
+修改后的能力：
+
+- Engine 只负责 `accept/register/remove` 和事件索引。
+- 不再需要 readyQueue、Semaphore 和独立 dispatcher 线程。
+- 同一个 runtime 同时最多有一个推演任务，并且单飞状态会保持到本轮所有 Action future 完成。
+- runtime 执行期间的多个状态 event 会合并成一次后续推演。
+- TimePoint 使用 FIFO 保存，并以 `occurrenceId` 有界去重，不会被 dirty 合并吞掉。
+- 不同 runtime 仍可以在线程池中并行执行。
+- `RuntimeExecutor` 负责单个 Action 的异步执行，并返回结构化执行结果。
+
+`RuntimeScheduler` 对 Engine 暴露的接口只有：
+
+```java
+interface RuntimeScheduler {
+    void schedule(Runtime runtime, RuntimeSignal signal);
+    void cancel(String runtimeId);
+}
+```
+
+`AsyncRuntimeScheduler` 内部为每个 runtime 维护一个 `RuntimeSlot`：
+
+```mermaid
+flowchart LR
+    Signal["RuntimeSignal"] --> Mailbox["RuntimeSlot mailbox"]
+    Mailbox --> Dirty["stateDirty + candidate IDs<br/>可合并取并集"]
+    Mailbox --> Points["timePoints FIFO<br/>不可合并"]
+    Dirty --> Drain["单飞 drain"]
+    Points --> Drain
+    Drain --> Await["等待 Action futures"]
+    Await --> Pending{"仍有信号？"}
+    Pending -->|"是"| Drain
+    Pending -->|"否"| Idle["running=false"]
+```
+
+`running` 保证单飞；`stateDirty` 保存最新状态推演需求并合并候选 ActionGroup ID；`timePoints` 保存每个瞬时 occurrence。
 
 `DeviceEventKey` 当前格式为：
 
@@ -129,6 +222,12 @@ DEVICE:{deviceType}:{deviceId}:{field}
 DEVICE:AirCondition:ac-1:roomTemperature
 ```
 
+`TimeEventKey` 当前格式为：
+
+```text
+TIME:{runtimeId}:{timeConditionGroupId}:{conditionId}
+```
+
 ## Runtime 与 ActionGroup
 
 `Runtime` 表示一组规则动作运行上下文：
@@ -136,8 +235,14 @@ DEVICE:AirCondition:ac-1:roomTemperature
 ```java
 class Runtime {
     private final String runtimeId;
+    private final RuntimeLifetime lifetime;
+    private final AtomicReference<RuntimeState> lifecycleState;
     private final List<ActionGroup> actionGroups;
-    private final EventTable<Set<EvalTreeNode>> roots;
+    private final Map<String, DeviceConditionGroup> deviceConditionGroups;
+    private final Map<String, TimeConditionGroup> timeConditionGroups;
+    private final Map<String, Set<String>> deviceGroupActionGroups;
+    private final Map<String, Set<String>> timeGroupActionGroups;
+    private final EventTable<Set<DeviceConditionLeaf>> roots;
     private final Map<String, EvalTreeNode> treeRootMap;
     private final Map<String, EvalNode> dummyNodeMap;
 }
@@ -146,21 +251,82 @@ class Runtime {
 含义：
 
 - `actionGroups`：runtime 内可被触发的动作组。
-- `roots`：`EventKey -> EvalTreeNode leaf set`，用于字段事件命中叶子。
-- `treeRootMap`：`actionGroupId -> EvalTreeNode root`，用于获得条件组当前结果。
-- `dummyNodeMap`：`actionGroupId -> EvalNode dummyHead`，保留原始链表表达式。
+- `lifetime`：start-inclusive、end-exclusive 的运行有效期。
+- `lifecycleState`：`PENDING / ACTIVE / EXPIRED / CANCELLED`。
+- `deviceConditionGroups/timeConditionGroups`：按 groupId 保存可复用条件组。
+- `deviceGroupActionGroups/timeGroupActionGroups`：条件组到 ActionGroup ID 的反向引用。
+- `roots`：`EventKey -> DeviceConditionLeaf set`，叶子同时携带所属设备条件组 ID。
+- `treeRootMap/dummyNodeMap`：按设备条件组 ID 保存运行树和原始链。
 
 `ActionGroup` 当前是最小实现：
 
 ```java
 class ActionGroup {
     private final String actionGroupId;
-    private final EvalNode dummyHead;
-    private final EvalTreeNode root;
+    private final DeviceConditionGroup deviceConditionGroup;
+    private final TimeConditionGroup timeConditionGroup;
+    private final List<Action> actions;
 }
 ```
 
-当前版本只完成规则求值和 runtime 就绪调度。真实动作执行、告警发送、设备控制等仍通过 `RuntimeExecutor` 扩展。
+多个 ActionGroup 可以引用同一个 `DeviceConditionGroup` 或 `TimeConditionGroup`。`actions` 使用线程安全列表，可以在规则装配阶段加入 `ControlAction` 或 `ReportAction`。
+`timeConditionGroup` 内多个完整时间条件为 OR；单个条件内部日期范围、星期和时段为 AND。
+
+## Action 执行
+
+### 修改前
+
+```mermaid
+flowchart LR
+    Scheduler["AsyncRuntimeScheduler"] --> Group["满足条件的 ActionGroup"]
+    Group --> Logging["LoggingRuntimeExecutor"]
+    Logging --> Log["只打印 runtimeId / actionGroupId"]
+```
+
+修改前能够确认哪个 ActionGroup 被触发，但没有 Action 级执行契约、异步结果、成功失败统计或失败明细。
+
+### 修改后
+
+```mermaid
+flowchart LR
+    Scheduler["AsyncRuntimeScheduler"] --> Group["满足条件的 ActionGroup"]
+    Group --> Actions{"遍历 List<Action>"}
+    Actions -->|"ControlAction"| Executor["DefaultRuntimeExecutor"]
+    Executor --> Mqtt["MqttIo.asyncSend"]
+    Mqtt --> Result["ActionExecutionResult"]
+    Result --> Tracker["ActionExecutionTracker<br/>成功数 / 失败数 / 最近失败"]
+    Actions -->|"ReportAction"| Skeleton["通知用户 + 通知形式 + 内容<br/>NOT_IMPLEMENTED"]
+```
+
+`RuntimeExecutor` 现在是单 Action 异步执行接口：
+
+```java
+@FunctionalInterface
+interface RuntimeExecutor {
+    CompletableFuture<ActionExecutionResult> execute(
+        Runtime runtime,
+        ActionGroup actionGroup,
+        Action action
+    );
+}
+```
+
+`ControlAction` 保存一个 `MqttTaskDto`。执行过程：
+
+1. 调用 Dubbo `MqttIo.asyncSend(task)`。
+2. future 正常完成时增加成功计数并返回 `SUCCESS`。
+3. future 异常完成或同步调用抛错时增加失败计数并返回 `FAILED`。
+4. 最近保留 100 条失败摘要，包括 runtime、action group、action 类型、目标设备、异常类型、错误信息和时间。
+
+`ReportAction` 当前保存：
+
+- `userIds`：通知用户集合。
+- `types`：通知形式，目前是 `SMS`、`SMTP`。
+- `content`：通知内容。
+
+由于通知服务尚未接入，执行时返回 `NOT_IMPLEMENTED`，不会误计为成功或失败。
+
+`AsyncRuntimeScheduler` 会等待一个 ActionGroup 内所有 Action future 完成。执行期间到达的新 event 只设置 dirty，本轮动作结束后再合并补跑，避免同一个 runtime 的控制动作并发重入。
 
 ## 表达式模型
 
@@ -248,7 +414,7 @@ combined(true)  = right(left(true))
 - `refreshLeaf(String eventValue)`：刷新叶子结果，并向父节点冒泡；如果叶子结果不变，或某个父节点重算后结果不变，则停止继续向上刷新。
 - `root()`：获取当前节点所在表达式树根节点。
 
-`refreshLeaf()` 会返回根结果是否发生变化，便于测试和调试观察表达式状态。由于树高被压缩到接近 `log(n)`，单个字段事件只需要沿平衡树路径刷新 transformer；同时刷新过程仍会做新旧 transformer 比较短路，某个父节点复合结果不变时就停止继续向上 bubble。但 `Engine` 入队以“事件命中 runtime”为准：runtime 被调度后再统一遍历 action group，判断哪些 action group 的根条件当前为 true。
+`refreshLeaf()` 会返回根结果是否发生变化。由于树高被压缩到接近 `log(n)`，单个字段事件只需要沿平衡树路径刷新 transformer；刷新过程会比较新旧 transformer，父节点复合结果不变时立即停止 bubble。只有共享设备条件组的根结果变化，handler 才通过反向引用产生候选 ActionGroup 集合并唤醒 Runtime。
 
 `fromChain()` 的构造规则可以理解为：
 
@@ -387,14 +553,23 @@ engine 只会刷新监听 `roomTemperature` 的叶子节点，然后向上冒泡
 - `EventKey -> Runtime -> EvalTreeNode leaf` 增量调度。
 - 表达式树按链式顺序进行 AND/OR 求值和根结果变化判断。
 - 基于 record 字段类型的表达式值还原和比较。
-- runtime ready 队列去重。
+- Runtime 生命周期主动激活、主动到期注销和事件到达时的被动到期检查。
+- 时间窗口、跨午夜窗口、星期和日期范围约束。
+- TimePoint 精确边界投递和 occurrence 有界去重。
+- 可复用设备/时间条件组及条件组到 ActionGroup 的反向引用。
+- runtime 单飞调度、状态 dirty 候选集合并集和 TimePoint FIFO。
+- MySQL metadata + JSON revision 表结构、`RuntimeRevision` DTO 和编译器。
+- `ControlAction -> MqttIo.asyncSend` 异步控制。
+- Action 成功/失败计数和有界失败历史。
+- `ReportAction` 用户、通知形式和内容骨架。
 
 暂未实现：
 
-- 规则/ActionGroup 的持久化加载。
-- 可视化规则配置 DSL。
-- 告警动作、设备控制动作等真实执行器。
-- 时间事件 `TimeEvent` 的调度。
+- Web Controller、Repository、发布事务和 RuntimeReload 消息。
+- 前端可视化规则表单。
+- ReportAction 对应的短信、邮件通知服务。
+- Action 重试、冷却时间和失败持久化。
+- 时间调度的持久化恢复、misfire 策略和集群选主。
 - 分布式 runtime ownership 或多实例消费协调。
 
 ## 测试覆盖
@@ -405,6 +580,11 @@ engine 只会刷新监听 `roomTemperature` 的叶子节点，然后向上冒泡
 - `EvalTreeNodeTests`
 - `DeviceRecordChangeListenerTests`
 - `EngineTests`
+- `AsyncRuntimeSchedulerTests`
+- `TimeConditionGroupTests`
+- `TimeScheduleServiceTests`
+- `RuntimeRevisionCompilerTests`
+- `DefaultRuntimeExecutorTests`
 - `MessageHandlerSnapshotPublishTests`
 
 推荐验证命令：

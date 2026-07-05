@@ -20,10 +20,10 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 
 /**
- * Default action dispatcher.
+ * 默认 Action 分发器。
  *
- * <p>Control actions call the MQTT Dubbo service. Report actions currently return
- * a structured NOT_IMPLEMENTED result so notification delivery can be added later.</p>
+ * <p>ControlAction 调用 MQTT Dubbo 服务；ReportAction 当前返回结构化的
+ * NOT_IMPLEMENTED，等待后续接入通知通道。</p>
  */
 @Component
 public class DefaultRuntimeExecutor implements RuntimeExecutor {
@@ -32,7 +32,7 @@ public class DefaultRuntimeExecutor implements RuntimeExecutor {
 
     private final ActionExecutionTracker tracker;
 
-    // Delay the remote reference until the first control action; rule-only startup needs no MQTT provider.
+    // 延迟到首次控制动作再初始化远程引用，纯规则启动不要求 MQTT provider 在线。
     @DubboReference(check = false, init = false, lazy = true)
     private MqttIo mqttIo;
 
@@ -103,7 +103,7 @@ public class DefaultRuntimeExecutor implements RuntimeExecutor {
             ));
         }
 
-        // Convert both normal and exceptional MQTT completion into a non-exceptional result.
+        // 将正常和异常完成都转换为结构化结果，避免异常 Future 打断 Runtime mailbox。
         return future.handle((response, throwable) -> {
             if (throwable != null) {
                 return failure(
@@ -131,7 +131,7 @@ public class DefaultRuntimeExecutor implements RuntimeExecutor {
             ActionGroup actionGroup,
             ReportAction action
     ) {
-        // Notification transport is intentionally deferred; retain the full targeting model meanwhile.
+        // 通知通道暂未实现，但完整保留用户、通知类型和内容模型。
         log.info(
                 "[RuleEngine] report action pending implementation, runtime-id:{}, action-group-id:{}, users:{}, types:{}",
                 runtime.getRuntimeId(),

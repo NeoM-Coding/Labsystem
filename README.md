@@ -91,7 +91,7 @@ MQTT 模块围绕 `AbstractSysClient`、`MqttClient`、`MqttCallback`、`SysClie
 
 ### 规则引擎
 
-`rule-engine` 模块实现事件驱动规则推演。它的核心目标是：设备状态变化后，只驱动受影响的表达式叶子节点，并把命中的 runtime 放入就绪队列进行异步推演。
+`rule-engine` 模块实现事件驱动规则推演。它的核心目标是：设备状态变化后，只驱动受影响的表达式叶子节点，并通过独立调度器异步推演命中的 runtime。
 
 当前链路：
 
@@ -100,11 +100,13 @@ MQTT 模块围绕 `AbstractSysClient`、`MqttClient`、`MqttCallback`、`SysClie
 3. rule-engine listener 缓存上一条快照。
 4. 首次看到设备时，为快照内所有字段生成事件。
 5. 后续只为新增字段或值变化字段生成事件。
-6. `Engine` 根据 `DeviceEventKey` 找到对应 runtime，并刷新命中的 `EvalTreeNode` 叶子。
-7. 命中的 `runtimeId` 进入 `UniqueQueue<String>`，避免同一 runtime 重复排队。
-8. `Engine` 内部 dispatcher 线程消费 readyQueue，并把 runtime 推演任务提交到 executor pool。
-9. runtime 推演任务遍历所有 `ActionGroup`，当 action group 的 tree root 为 `true` 时调用 `RuntimeExecutor`。
-10. 当前 `LoggingRuntimeExecutor` 会打印被触发的 `runtime-id` 和 `action-group-id`。
+6. `Engine` 只为 ACTIVE runtime 路由设备事件，并刷新命中的 `EvalTreeNode` 叶子。
+7. `RuntimeLifecycleManager` 按用户配置的有效期主动激活或注销 runtime。
+8. `TimeScheduleService` 计算时间窗口边界和 TimePoint，并投递定向 `TimeEvent`。
+9. 设备条件组和时间条件组可被多个 ActionGroup 复用；根结果变化后按反向引用生成候选动作组。
+10. 调度器保证同一 runtime 单飞；状态事件的候选集合取并集，TimePoint 按 occurrence 保序且不会丢失。
+11. `ActionGroupEvaluator` 综合设备条件、时间条件和生命周期，再执行组内 `List<Action>`。
+12. `ControlAction` 调用 `MqttIo.asyncSend()`，记录成功/失败数量和最近失败摘要；`ReportAction` 当前保留通知骨架。
 
 当前表达式模型：
 
@@ -116,11 +118,15 @@ MQTT 模块围绕 `AbstractSysClient`、`MqttClient`、`MqttCallback`、`SysClie
 
 当前边界：
 
-- `ActionGroup` 已有条件树和触发日志。
-- 真实 `List<Action>`、告警动作、设备控制动作、动作重试、冷却时间等还未实现。
-- 时间事件 `TimeEvent` 仍是占位。
+- `ActionGroup` 通过 ID 引用 Runtime 内可复用的设备条件组和时间条件组。
+- `Runtime` 支持 `PENDING / ACTIVE / EXPIRED / CANCELLED` 生命周期。
+- `RuntimeRevisionCompiler` 可将 Web JSON revision 校验并编译为共享条件组对象图。
+- TimeConditionGroup 支持日期范围、星期、普通/跨午夜窗口以及 TimePoint。
+- `ControlAction` 已接入 MQTT 异步控制；`ReportAction` 保存用户、通知形式和内容，通知服务暂未实现。
+- Action 重试、冷却时间和失败持久化还未实现。
+- 时间任务的持久化恢复、misfire 策略和多实例选主尚未实现。
 
-更完整的说明见 [docs/engine设计.md](docs/engine设计.md)。
+更完整的说明见 [docs/engine设计.md](docs/engine设计.md)、[docs/engine_condition_group改造.md](docs/engine_condition_group改造.md) 和 [docs/runtime持久化与Web配置.md](docs/runtime持久化与Web配置.md)。
 
 ### 设备协议
 
@@ -153,6 +159,8 @@ sql/schema.sql
 
 - `gateway`：网关表，支持 RS485 / Socket 类型。
 - `device`：设备表，按 `device_type` 区分 Access、AirCondition、Sensor、CircuitBreak、Light。
+- `rule_runtime`：规则元数据、发布状态和生命周期索引。
+- `rule_runtime_revision`：不可变的完整 JSON revision，条件组与 ActionGroup 通过 ID 关联。
 
 注意：uid-generator 的 worker 表属于独立 uid 数据源，不属于业务库。H2 测试使用：
 

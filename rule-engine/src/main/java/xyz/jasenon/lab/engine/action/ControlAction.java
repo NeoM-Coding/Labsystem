@@ -7,7 +7,7 @@ import lombok.Setter;
 import xyz.jasenon.lab.api.mqtt.dto.MqttTaskDto;
 
 /**
- * Sends one device-control task through MqttIo.asyncSend.
+ * 通过 MqttIo.asyncSend 异步发送一次设备控制任务。
  */
 @Getter
 @Setter

@@ -1,17 +1,24 @@
 package xyz.jasenon.lab.engine.runtime;
 
 /**
- * Accepts runtimes that need inference without exposing scheduling details to Engine.
+ * 接收需要推演的 Runtime，向 Engine 隐藏线程池和 mailbox 细节。
  */
 public interface RuntimeScheduler {
 
     /**
-     * Coalesces repeated requests for the same runtime and schedules asynchronous inference.
+     * 以普通状态变化信号调度 Runtime，重复请求可以合并。
      */
-    void schedule(Runtime runtime);
+    default void schedule(Runtime runtime) {
+        schedule(runtime, RuntimeSignal.stateChanged());
+    }
 
     /**
-     * Prevents queued or dirty reruns after a runtime is removed from Engine.
+     * 调度带具体语义的信号，TimePoint 等瞬时事件不可合并。
+     */
+    void schedule(Runtime runtime, RuntimeSignal signal);
+
+    /**
+     * Runtime 注销后取消排队信号，并阻止后续补跑。
      */
     void cancel(String runtimeId);
 }

@@ -8,7 +8,10 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Balanced segment tree for left-fold boolean expression evaluation.
+ * 用平衡线段树表达严格左结合的布尔链式计算。
+ *
+ * <p>节点保存表达式片段对 true/false 输入的变换结果，因此既能压缩树高，
+ * 又能保持 {@code A OR B AND C == (A OR B) AND C} 的链式语义。</p>
  */
 @Getter
 @Setter

@@ -9,10 +9,17 @@ import xyz.jasenon.lab.engine.action.Action;
 import xyz.jasenon.lab.engine.action.ActionGroup;
 
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Queue;
+import java.util.Set;
+import java.time.Clock;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
@@ -21,10 +28,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Runs different runtimes concurrently while keeping each individual runtime single-flight.
+ * 不同 Runtime 可以并行执行，同一个 Runtime 始终保持单飞。
  *
- * <p>Events received during execution only mark the slot dirty. After the current
- * action futures complete, all dirty requests are coalesced into one rerun.</p>
+ * <p>执行期间到达的状态变化合并成一次补跑；TimePoint 保存在每个 Runtime
+ * 独立的 FIFO 中，并按 occurrenceId 去重。</p>
  */
 @Component
 public class AsyncRuntimeScheduler implements RuntimeScheduler {
@@ -33,6 +40,7 @@ public class AsyncRuntimeScheduler implements RuntimeScheduler {
 
     private final RuntimeExecutor runtimeExecutor;
     private final ExecutorService executorService;
+    private final ActionGroupEvaluator actionGroupEvaluator;
     private final ConcurrentHashMap<String, RuntimeSlot> slots = new ConcurrentHashMap<>();
     private final AtomicBoolean closed = new AtomicBoolean(false);
 
@@ -43,18 +51,29 @@ public class AsyncRuntimeScheduler implements RuntimeScheduler {
                 Executors.newFixedThreadPool(
                         Math.max(2, java.lang.Runtime.getRuntime().availableProcessors() / 2),
                         namedThreadFactory("rule-engine-runtime")
-                )
+                ),
+                new ActionGroupEvaluator(Clock.systemUTC())
         );
     }
 
     AsyncRuntimeScheduler(RuntimeExecutor runtimeExecutor, ExecutorService executorService) {
+        this(runtimeExecutor, executorService, new ActionGroupEvaluator(Clock.systemUTC()));
+    }
+
+    AsyncRuntimeScheduler(
+            RuntimeExecutor runtimeExecutor,
+            ExecutorService executorService,
+            ActionGroupEvaluator actionGroupEvaluator
+    ) {
         this.runtimeExecutor = Objects.requireNonNull(runtimeExecutor, "runtimeExecutor");
         this.executorService = Objects.requireNonNull(executorService, "executorService");
+        this.actionGroupEvaluator = Objects.requireNonNull(actionGroupEvaluator, "actionGroupEvaluator");
     }
 
     @Override
-    public void schedule(Runtime runtime) {
+    public void schedule(Runtime runtime, RuntimeSignal signal) {
         Objects.requireNonNull(runtime, "runtime");
+        Objects.requireNonNull(signal, "signal");
         if (closed.get()) {
             throw new RejectedExecutionException("runtime scheduler is closed");
         }
@@ -66,7 +85,7 @@ public class AsyncRuntimeScheduler implements RuntimeScheduler {
             current.runtime = runtime;
             return current;
         });
-        slot.request();
+        slot.request(signal);
     }
 
     @Override
@@ -103,31 +122,38 @@ public class AsyncRuntimeScheduler implements RuntimeScheduler {
     }
 
     private void drain(RuntimeSlot slot) {
-        if (slot.cancelled.get() || !slot.dirty.getAndSet(false)) {
+        RuntimeSignal signal = slot.nextSignal();
+        if (slot.cancelled.get() || signal == null) {
             release(slot);
             return;
         }
 
         CompletableFuture<Void> execution;
         try {
-            execution = executeSatisfiedActionGroups(slot.runtime);
+            execution = executeSatisfiedActionGroups(slot.runtime, signal);
         } catch (RuntimeException e) {
             execution = CompletableFuture.failedFuture(e);
         }
-        // Keep running=true until every asynchronous action in this inference has completed.
+        // 必须等待本轮所有异步 Action 完成，期间 running 始终为 true，避免控制动作重入。
         execution.whenComplete((ignored, throwable) -> continueOrRelease(slot, throwable));
     }
 
-    private CompletableFuture<Void> executeSatisfiedActionGroups(Runtime runtime) {
+    private CompletableFuture<Void> executeSatisfiedActionGroups(
+            Runtime runtime,
+            RuntimeSignal signal
+    ) {
         List<CompletableFuture<ActionExecutionResult>> executions = new ArrayList<>();
         for (ActionGroup actionGroup : runtime.getActionGroups()) {
-            if (actionGroup.getRoot().isOk()) {
+            if (actionGroupEvaluator.shouldExecute(runtime, actionGroup, signal)) {
                 log.info(
                         "[RuleEngine] action group triggered, runtime-id:{}, action-group-id:{}",
                         runtime.getRuntimeId(),
                         actionGroup.getActionGroupId()
                 );
                 for (Action action : actionGroup.getActions()) {
+                    if (!actionGroupEvaluator.isRuntimeActive(runtime)) {
+                        break;
+                    }
                     try {
                         executions.add(runtimeExecutor.execute(runtime, actionGroup, action));
                     } catch (RuntimeException e) {
@@ -136,7 +162,7 @@ public class AsyncRuntimeScheduler implements RuntimeScheduler {
                 }
             }
         }
-        // An empty action group completes immediately but still emits the trigger log above.
+        // 空 ActionGroup 立即完成，但仍保留触发日志，便于确认规则条件确实命中。
         return CompletableFuture.allOf(executions.toArray(CompletableFuture[]::new));
     }
 
@@ -149,7 +175,7 @@ public class AsyncRuntimeScheduler implements RuntimeScheduler {
             slot.running.set(false);
             return;
         }
-        if (slot.dirty.get()) {
+        if (slot.hasPendingSignals()) {
             try {
                 submitDrain(slot);
             } catch (RejectedExecutionException e) {
@@ -164,8 +190,8 @@ public class AsyncRuntimeScheduler implements RuntimeScheduler {
 
     private void release(RuntimeSlot slot) {
         slot.running.set(false);
-        // Close the race where schedule() sets dirty just before running becomes false.
-        if (!slot.cancelled.get() && slot.dirty.get()) {
+        // 关闭 schedule() 在 running 释放前刚写入信号的竞态窗口。
+        if (!slot.cancelled.get() && slot.hasPendingSignals()) {
             start(slot);
         }
     }
@@ -186,27 +212,111 @@ public class AsyncRuntimeScheduler implements RuntimeScheduler {
     private final class RuntimeSlot {
 
         private volatile Runtime runtime;
-        // Covers inference and all asynchronous action futures for this runtime.
+        // running 覆盖条件推演以及本轮全部异步 Action Future 的完整生命周期。
         private final AtomicBoolean running = new AtomicBoolean(false);
-        // Boolean by design: any number of events during one run produce one latest-state rerun.
-        private final AtomicBoolean dirty = new AtomicBoolean(false);
+        private final Object stateLock = new Object();
+        // 状态事件仍只补跑一次，同时保留这批事件涉及的 ActionGroup 并集。
+        private boolean stateDirty;
+        private boolean allStateCandidates;
+        private final Set<String> stateCandidateActionGroupIds = new HashSet<>();
+        private final Queue<RuntimeSignal.TimePointOccurred> timePoints = new ConcurrentLinkedQueue<>();
+        private final OccurrenceLedger occurrenceLedger = new OccurrenceLedger(1024);
         private final AtomicBoolean cancelled = new AtomicBoolean(false);
 
         private RuntimeSlot(Runtime runtime) {
             this.runtime = runtime;
         }
 
-        private void request() {
+        private void request(RuntimeSignal signal) {
             if (cancelled.get()) {
                 return;
             }
-            dirty.set(true);
-            start(this);
+            boolean accepted;
+            if (signal instanceof RuntimeSignal.TimePointOccurred point) {
+                accepted = occurrenceLedger.markIfNew(point.event().occurrenceId());
+                if (accepted) {
+                    timePoints.add(point);
+                }
+            } else {
+                mergeStateChanged((RuntimeSignal.StateChanged) signal);
+                accepted = true;
+            }
+            if (accepted) {
+                start(this);
+            }
+        }
+
+        private RuntimeSignal nextSignal() {
+            RuntimeSignal stateSignal = takeStateChanged();
+            if (stateSignal != null) {
+                return stateSignal;
+            }
+            return timePoints.poll();
+        }
+
+        private boolean hasPendingSignals() {
+            synchronized (stateLock) {
+                return stateDirty || !timePoints.isEmpty();
+            }
         }
 
         private void cancel() {
             cancelled.set(true);
-            dirty.set(false);
+            synchronized (stateLock) {
+                stateDirty = false;
+                allStateCandidates = false;
+                stateCandidateActionGroupIds.clear();
+            }
+            timePoints.clear();
+        }
+
+        private void mergeStateChanged(RuntimeSignal.StateChanged stateChanged) {
+            synchronized (stateLock) {
+                stateDirty = true;
+                if (stateChanged.targetsAll()) {
+                    allStateCandidates = true;
+                    stateCandidateActionGroupIds.clear();
+                } else if (!allStateCandidates) {
+                    stateCandidateActionGroupIds.addAll(stateChanged.candidateActionGroupIds());
+                }
+            }
+        }
+
+        private RuntimeSignal takeStateChanged() {
+            synchronized (stateLock) {
+                if (!stateDirty) {
+                    return null;
+                }
+                RuntimeSignal signal = allStateCandidates
+                        ? RuntimeSignal.stateChanged()
+                        : RuntimeSignal.stateChanged(Set.copyOf(stateCandidateActionGroupIds));
+                stateDirty = false;
+                allStateCandidates = false;
+                stateCandidateActionGroupIds.clear();
+                return signal;
+            }
+        }
+    }
+
+    private static final class OccurrenceLedger {
+
+        private final int limit;
+        private final Map<String, Boolean> ids = new LinkedHashMap<>();
+
+        private OccurrenceLedger(int limit) {
+            this.limit = limit;
+        }
+
+        private synchronized boolean markIfNew(String occurrenceId) {
+            if (ids.containsKey(occurrenceId)) {
+                return false;
+            }
+            ids.put(occurrenceId, Boolean.TRUE);
+            while (ids.size() > limit) {
+                String oldest = ids.keySet().iterator().next();
+                ids.remove(oldest);
+            }
+            return true;
         }
     }
 }

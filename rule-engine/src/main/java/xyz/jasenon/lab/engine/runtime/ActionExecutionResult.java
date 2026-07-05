@@ -5,7 +5,7 @@ import xyz.jasenon.lab.engine.action.Action;
 import java.time.Instant;
 
 /**
- * Structured terminal result for one Action invocation.
+ * 单次 Action 调用的结构化最终结果。
  */
 public record ActionExecutionResult(
         Status status,

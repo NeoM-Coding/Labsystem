@@ -20,6 +20,10 @@ public class RuntimeTable {
         return table.remove(runtimeId);
     }
 
+    public boolean remove(String runtimeId, Runtime runtime) {
+        return table.remove(runtimeId, runtime);
+    }
+
     public Collection<Runtime> values() {
         return table.values();
     }

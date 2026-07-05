@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Notification target model. Delivery transport is intentionally not implemented yet.
+ * 通知动作模型；通道尚未接入，但完整保留用户、通知类型和内容。
  */
 @Getter
 @Setter

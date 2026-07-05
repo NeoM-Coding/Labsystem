@@ -7,7 +7,7 @@ import java.time.Instant;
 import java.util.Objects;
 
 @Getter
-public class DeviceEvent {
+public class DeviceEvent implements EngineEvent {
 
     private final DeviceEventKey key;
     private final String value;
@@ -33,6 +33,11 @@ public class DeviceEvent {
 
     public EventKey eventKey() {
         return key;
+    }
+
+    @Override
+    public Instant occurredAt() {
+        return occurredAt;
     }
 
     @Override

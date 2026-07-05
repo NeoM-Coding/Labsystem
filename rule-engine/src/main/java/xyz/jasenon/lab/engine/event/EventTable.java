@@ -4,6 +4,7 @@ import java.util.Collection;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 
 public class EventTable<V> {
@@ -28,6 +29,10 @@ public class EventTable<V> {
 
     public V computeIfAbsent(EventKey key, Function<EventKey, V> mappingFunction) {
         return table.computeIfAbsent(key, mappingFunction);
+    }
+
+    public V computeIfPresent(EventKey key, BiFunction<EventKey, V, V> remappingFunction) {
+        return table.computeIfPresent(key, remappingFunction);
     }
 
     public boolean containsKey(EventKey key) {

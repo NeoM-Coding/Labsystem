@@ -5,7 +5,7 @@ import xyz.jasenon.lab.engine.action.Action;
 import java.time.Instant;
 
 /**
- * Compact failure snapshot retained by ActionExecutionTracker.
+ * ActionExecutionTracker 保留的精简失败快照。
  */
 public record ActionFailure(
         String runtimeId,

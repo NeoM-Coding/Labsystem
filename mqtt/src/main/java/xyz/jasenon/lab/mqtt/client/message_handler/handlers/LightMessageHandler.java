@@ -36,16 +36,4 @@ public class LightMessageHandler extends MessageHandler<LightRecord> {
                 .locked(isLock)
                 .build();
     }
-
-    @Override
-    protected void onChange(LightRecord lightRecord) {
-        log.info(
-                "[LightMessageHandler] record changed, device-id:{}, address:{}, self-id:{}, open:{}, lock:{}",
-                lightRecord.getDeviceId(),
-                lightRecord.getAddress(),
-                lightRecord.getSelfId(),
-                lightRecord.isOpened(),
-                lightRecord.isLocked()
-        );
-    }
 }

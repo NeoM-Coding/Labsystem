@@ -44,17 +44,4 @@ public class AccessMessageHandler extends MessageHandler<AccessRecord> {
                 .delayTime(delayTime)
                 .build();
     }
-
-    @Override
-    protected void onChange(AccessRecord accessRecord) {
-        log.info(
-                "[AccessMessageHandler] record changed, device-id:{}, address:{}, open:{}, lock:{}, lock-status:{}, delay-time:{}",
-                accessRecord.getDeviceId(),
-                accessRecord.getAddress(),
-                accessRecord.isOpened(),
-                accessRecord.isLocked(),
-                accessRecord.getLockStatus(),
-                accessRecord.getDelayTime()
-        );
-    }
 }

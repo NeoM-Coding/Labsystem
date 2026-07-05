@@ -42,18 +42,4 @@ public class SensorMessageHandler extends MessageHandler<SensorRecord> {
                 .smoke(smoke)
                 .build();
     }
-
-    @Override
-    protected void onChange(SensorRecord sensorRecord) {
-        log.info(
-                "[SensorMessageHandler] record changed, device-id:{}, address:{}, self-id:{}, temperature:{}, humidity:{}, light:{}, smoke:{}",
-                sensorRecord.getDeviceId(),
-                sensorRecord.getAddress(),
-                sensorRecord.getSelfId(),
-                sensorRecord.getTemperature(),
-                sensorRecord.getHumidity(),
-                sensorRecord.getLight(),
-                sensorRecord.getSmoke()
-        );
-    }
 }

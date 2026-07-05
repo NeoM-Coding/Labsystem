@@ -44,9 +44,8 @@ public abstract class MessageHandler<R extends BaseRecord> implements Const.Key 
         r.setDeviceId(deviceId);
         onChange(r);
 
-        // 刷redis hmap 为 sqel提供驱动数据
-        // 形如 #{root.deviceId.field operator(>,<,==,!=,ext...) any}
-        // hget 可以直接提供字段级访问
+        // 刷 redis hash 用于快速获取对应字段 统计用
+        // 同时 redis 数据 expire 也可以作为设备在线判断
         Map<String, String> rmap = ObjectMapUtil.toStringMap(r);
         jedis.hsetex(RECORD_KEY(deviceType, deviceId), rmap, Duration.ofSeconds(15));
         publishSnapshot(deviceId, rmap);
@@ -55,8 +54,13 @@ public abstract class MessageHandler<R extends BaseRecord> implements Const.Key 
         persistent.persist(r);
     }
 
-    // 后端主动通知前端的钩子方法
-    protected void onChange(R r){};
+    /**
+     * Hook for pushing the latest record to application clients, such as WebSocket subscribers.
+     * This method runs for every decoded record, so the default implementation intentionally
+     * performs no logging.
+     */
+    protected void onChange(R record) {
+    }
 
     private void publishSnapshot(String deviceId, Map<String, String> recordFields) {
         DeviceRecordSnapshotEvent event = new DeviceRecordSnapshotEvent(

@@ -1,6 +1,7 @@
-package xyz.jasenon.lab.engine.runtime;
+package xyz.jasenon.lab.engine.action;
 
-import xyz.jasenon.lab.engine.action.ActionGroup;
+import xyz.jasenon.lab.engine.runtime.Runtime;
+import xyz.jasenon.lab.engine.runtime.RuntimeSignal;
 
 import java.time.Clock;
 import java.util.Objects;
@@ -17,7 +18,7 @@ public final class ActionGroupEvaluator {
     }
 
     public boolean shouldExecute(
-            Runtime runtime,
+            xyz.jasenon.lab.engine.runtime.Runtime runtime,
             ActionGroup actionGroup,
             RuntimeSignal signal
     ) {

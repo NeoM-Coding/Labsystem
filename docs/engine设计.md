@@ -595,3 +595,67 @@ engine 只会刷新监听 `roomTemperature` 的叶子节点，然后向上冒泡
 ```
 
 注意：`mqtt` 全量测试中包含真实 MQTT 集成测试，可能受 broker 状态和既有 `MqttCallback` 并发窗口影响，不应作为 rule-engine 本次实现的唯一判断依据。
+
+## SimpleTest 真实链路
+
+`engine.test.SimpleTest` 是由配置开关控制的真实集成演示，不使用 mock。当前
+`application.yaml` 已开启，生产环境不需要时应覆盖为 `false`。
+
+```mermaid
+flowchart LR
+    Device["真实设备 / mqtt-mock"] --> MQTT["mqtt 模块"]
+    MQTT --> Redis["Redis 完整设备快照"]
+    Redis --> Listener["DeviceRecordChangeListener"]
+    Redis -->|"晚注册时读取 record hash"| Replay["replay 当前完整状态"]
+    Replay --> Listener
+    Listener --> Engine["Engine.accept(DeviceEvent)"]
+    Engine --> Shared["共享 roomTemperature 设备条件"]
+
+    Shared --> Normal["普通全天窗口"]
+    Shared --> Cross["当前有效的跨午夜窗口"]
+    Shared --> Point["启动后延迟 TimePoint"]
+
+    Normal --> Control["ControlAction"]
+    Control --> Executor["DefaultRuntimeExecutor"]
+    Executor --> MqttIo["真实 Dubbo MqttIo.asyncSend"]
+
+    Normal --> Report1["Report 日志"]
+    Cross --> Report2["Report 日志"]
+    Point --> Report3["Report 日志"]
+```
+
+启动前需要确认：
+
+- Redis、Nacos、MQTT 模块和 MQTT broker 可用。
+- `source-device-id` 能收到 MQTT 模块发布的 `AirConditionRecord` 快照。
+- 快照中的 `roomTemperature` 大于 `temperature-threshold`。
+- `control-device-id/address/self-id` 指向允许执行测试控制的真实空调。
+
+若其他环境关闭了该开关，可以通过以下命令开启：
+
+```shell
+LAB_RULE_ENGINE_SIMPLE_TEST_ENABLED=true \
+./mvnw -pl rule-engine -am spring-boot:run
+```
+
+也可以通过命令行覆盖设备参数：
+
+```shell
+./mvnw -pl rule-engine -am spring-boot:run \
+  -Dspring-boot.run.arguments="\
+--lab.rule-engine.simple-test.enabled=true \
+--lab.rule-engine.simple-test.source-device-id=air-condition-31-6 \
+--lab.rule-engine.simple-test.control-device-id=air-condition-31-6 \
+--lab.rule-engine.simple-test.control-address=31 \
+--lab.rule-engine.simple-test.control-self-id=6 \
+--lab.rule-engine.simple-test.time-point-delay-seconds=30"
+```
+
+关键日志：
+
+- `[SimpleRuleTest] runtime registered`：演示 Runtime 已注册，正在等待真实 Redis 快照。
+- `current-state-replayed:true`：Runtime 注册后已从 listener 缓存或 Redis hash 恢复当前设备状态。
+- `action group triggered`：设备条件和对应时间条件同时成立。
+- `control action succeeded`：真实 `MqttIo.asyncSend` 已成功完成。
+- `action execution failed`：真实控制发送失败，并已写入 `ActionExecutionTracker`。
+- `report action logged`：ReportAction 当前以日志完成演示。

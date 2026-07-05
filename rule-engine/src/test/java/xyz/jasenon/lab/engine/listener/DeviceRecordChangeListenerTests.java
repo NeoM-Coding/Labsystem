@@ -16,8 +16,10 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 
 class DeviceRecordChangeListenerTests {
 
@@ -48,6 +50,44 @@ class DeviceRecordChangeListenerTests {
         List<String> fields = captor.getAllValues().stream().map(DeviceEvent::getField).sorted().toList();
         assertEquals(List.of("errorCode", "roomTemperature"), fields);
         verifyNoMoreInteractions(engine);
+    }
+
+    @Test
+    void replaysCachedSnapshotForLateRuntimeRegistration() {
+        Engine engine = mock(Engine.class);
+        DeviceRecordChangeListener listener = new DeviceRecordChangeListener(
+                engine,
+                mock(RedisBus.class),
+                new ObjectMapper()
+        );
+        listener.accept(snapshot(ordered("opened", "true", "roomTemperature", "27")));
+        clearInvocations(engine);
+
+        listener.replay(DeviceType.AirCondition, "ac-1");
+
+        verify(engine, org.mockito.Mockito.times(2)).accept(
+                org.mockito.ArgumentMatchers.any(DeviceEvent.class)
+        );
+    }
+
+    @Test
+    void restoresReplayStateFromMqttRedisHash() {
+        Engine engine = mock(Engine.class);
+        RedisBus redisBus = mock(RedisBus.class);
+        when(redisBus.hgetAll("record:AirCondition:ac-1"))
+                .thenReturn(ordered("opened", "true", "roomTemperature", "27"));
+        DeviceRecordChangeListener listener = new DeviceRecordChangeListener(
+                engine,
+                redisBus,
+                new ObjectMapper()
+        );
+
+        listener.replay(DeviceType.AirCondition, "ac-1");
+
+        verify(redisBus).hgetAll("record:AirCondition:ac-1");
+        verify(engine, org.mockito.Mockito.times(2)).accept(
+                org.mockito.ArgumentMatchers.any(DeviceEvent.class)
+        );
     }
 
     private static DeviceRecordSnapshotEvent snapshot(Map<String, String> fields) {

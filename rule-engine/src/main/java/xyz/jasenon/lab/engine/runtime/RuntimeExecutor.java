@@ -1,6 +1,7 @@
 package xyz.jasenon.lab.engine.runtime;
 
 import xyz.jasenon.lab.engine.action.Action;
+import xyz.jasenon.lab.engine.action.ActionExecutionResult;
 import xyz.jasenon.lab.engine.action.ActionGroup;
 
 import java.util.concurrent.CompletableFuture;

@@ -1,4 +1,4 @@
-package xyz.jasenon.lab.engine.runtime;
+package xyz.jasenon.lab.engine.action;
 
 import org.springframework.stereotype.Component;
 

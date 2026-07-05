@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.lang.Nullable;
+import xyz.jasenon.lab.common.Const;
 import xyz.jasenon.lab.common.event.DeviceRecordSnapshotEvent;
 import xyz.jasenon.lab.common.event.RuleEngineChannels;
 import xyz.jasenon.lab.common.model.device.DeviceType;
@@ -23,7 +24,7 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
-public class DeviceRecordChangeListener {
+public class DeviceRecordChangeListener implements Const.Key {
 
     private static final Logger log = LoggerFactory.getLogger(DeviceRecordChangeListener.class);
 
@@ -71,6 +72,44 @@ public class DeviceRecordChangeListener {
                 publishFieldEvent(snapshot, field, value);
             }
         });
+    }
+
+    /**
+     * 为晚于设备首条快照注册的 Runtime 重放当前完整状态。
+     *
+     * <p>优先使用 listener 内存快照；进程刚启动尚未收到 Pub/Sub 时，从 MQTT
+     * 持续维护的 Redis record hash 恢复。重放不会伪造字段值。</p>
+     *
+     * @return 找到并投递当前设备状态时返回 true
+     */
+    public boolean replay(DeviceType deviceType, String deviceId) {
+        Objects.requireNonNull(deviceType, "deviceType");
+        if (deviceId == null || deviceId.isBlank()) {
+            throw new IllegalArgumentException("deviceId must not be blank");
+        }
+
+        RecordIdentity identity = new RecordIdentity(deviceType, deviceId);
+        Map<String, String> fields = snapshots.get(identity);
+        if ((fields == null || fields.isEmpty()) && redisBus != null) {
+            fields = redisBus.hgetAll(RECORD_KEY(deviceType, deviceId));
+            if (fields != null && !fields.isEmpty()) {
+                snapshots.put(identity, new LinkedHashMap<>(fields));
+            }
+        }
+        if (fields == null || fields.isEmpty()) {
+            return false;
+        }
+
+        DeviceRecordSnapshotEvent snapshot = new DeviceRecordSnapshotEvent(
+                deviceType,
+                deviceId,
+                new LinkedHashMap<>(fields),
+                Instant.now()
+        );
+        snapshot.getRecordFields().forEach(
+                (field, value) -> publishFieldEvent(snapshot, field, value)
+        );
+        return true;
     }
 
     int cachedDeviceCount() {

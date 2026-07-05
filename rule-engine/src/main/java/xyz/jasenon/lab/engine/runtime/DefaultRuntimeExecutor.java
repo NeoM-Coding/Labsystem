@@ -8,10 +8,7 @@ import org.springframework.stereotype.Component;
 import xyz.jasenon.lab.api.mqtt.MqttIo;
 import xyz.jasenon.lab.api.mqtt.dto.MqttResponseDto;
 import xyz.jasenon.lab.api.mqtt.dto.MqttTaskDto;
-import xyz.jasenon.lab.engine.action.Action;
-import xyz.jasenon.lab.engine.action.ActionGroup;
-import xyz.jasenon.lab.engine.action.ControlAction;
-import xyz.jasenon.lab.engine.action.ReportAction;
+import xyz.jasenon.lab.engine.action.*;
 
 import java.time.Instant;
 import java.util.Objects;
@@ -117,12 +114,22 @@ public class DefaultRuntimeExecutor implements RuntimeExecutor {
 
             tracker.recordSuccess();
             String gatewayId = response == null ? null : response.getGatewayId();
-            return ActionExecutionResult.success(
+            ActionExecutionResult result = ActionExecutionResult.success(
                     runtime.getRuntimeId(),
                     actionGroup.getActionGroupId(),
                     action.is(),
                     "mqtt control completed, device-id:" + task.getDeviceId() + ", gateway-id:" + gatewayId
             );
+            log.info(
+                    "[RuleEngine] control action succeeded, runtime-id:{}, action-group-id:{}, "
+                            + "device-id:{}, gateway-id:{}, command:{}",
+                    runtime.getRuntimeId(),
+                    actionGroup.getActionGroupId(),
+                    task.getDeviceId(),
+                    gatewayId,
+                    task.getCommandLine()
+            );
+            return result;
         });
     }
 
@@ -131,13 +138,15 @@ public class DefaultRuntimeExecutor implements RuntimeExecutor {
             ActionGroup actionGroup,
             ReportAction action
     ) {
-        // 通知通道暂未实现，但完整保留用户、通知类型和内容模型。
+        // 通知通道暂未实现；当前用完整日志代替实际投递，便于验证 ActionGroup 链路。
         log.info(
-                "[RuleEngine] report action pending implementation, runtime-id:{}, action-group-id:{}, users:{}, types:{}",
+                "[RuleEngine] report action logged, runtime-id:{}, action-group-id:{}, "
+                        + "users:{}, types:{}, content:{}",
                 runtime.getRuntimeId(),
                 actionGroup.getActionGroupId(),
                 action.getUserIds(),
-                action.getTypes()
+                action.getTypes(),
+                action.getContent()
         );
         return CompletableFuture.completedFuture(ActionExecutionResult.notImplemented(
                 runtime.getRuntimeId(),

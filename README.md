@@ -122,11 +122,16 @@ MQTT 模块围绕 `AbstractSysClient`、`MqttClient`、`MqttCallback`、`SysClie
 - `Runtime` 支持 `PENDING / ACTIVE / EXPIRED / CANCELLED` 生命周期。
 - `RuntimeRevisionCompiler` 可将 Web JSON revision 校验并编译为共享条件组对象图。
 - TimeConditionGroup 支持日期范围、星期、普通/跨午夜窗口以及 TimePoint。
-- `ControlAction` 已接入 MQTT 异步控制；`ReportAction` 保存用户、通知形式和内容，通知服务暂未实现。
+- `ControlAction` 已接入 MQTT 异步控制；`ReportAction` 保存用户、通知形式和内容，通知服务接入前使用完整日志展示。
 - Action 重试、冷却时间和失败持久化还未实现。
 - 时间任务的持久化恢复、misfire 策略和多实例选主尚未实现。
 
 更完整的说明见 [docs/engine设计.md](docs/engine设计.md)、[docs/engine_condition_group改造.md](docs/engine_condition_group改造.md) 和 [docs/runtime持久化与Web配置.md](docs/runtime持久化与Web配置.md)。
+
+`rule-engine` 内置一个配置开关控制的真实链路演示，当前配置已开启。设置
+`lab.rule-engine.simple-test.enabled=true` 后，它会等待 MQTT 模块发布的真实 Redis
+设备快照，并通过真实 Dubbo `MqttIo.asyncSend()` 执行控制动作。具体设备参数和
+链路 Mermaid 见 [docs/engine设计.md](docs/engine设计.md#simpletest-真实链路)。
 
 ### 设备协议
 

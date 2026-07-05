@@ -13,7 +13,31 @@ server:
 dubbo:
   application:
     name: ${spring.application.name}
-    qos-port: 4444
+    qos-port: 4445
   provider:
     timeout: 5_000
 
+lab:
+  rule-engine:
+    simple-test:
+      # 当前开启真实链路演示；生产环境不需要时应覆盖为 false。
+      enabled: false
+      runtime-id: simple-real-chain-runtime
+      source-device-id: 5
+      temperature-threshold: 23
+      control-device-id: 5
+      time-point-delay-seconds: 30
+      zone-id: Asia/Shanghai
+
+  redis:
+    enabled: true
+    host: localhost
+    port: 6379
+    database: 0
+    timeout-millis: 15_000
+    pool:
+      max-total: 16
+      max-idle: 8
+      min-idle: 0
+      max-wait-millis: 2_000
+      test-on-borrow: true

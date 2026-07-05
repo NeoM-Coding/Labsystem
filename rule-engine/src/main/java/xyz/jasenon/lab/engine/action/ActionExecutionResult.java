@@ -1,6 +1,4 @@
-package xyz.jasenon.lab.engine.runtime;
-
-import xyz.jasenon.lab.engine.action.Action;
+package xyz.jasenon.lab.engine.action;
 
 import java.time.Instant;
 

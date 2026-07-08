@@ -559,13 +559,15 @@ engine 只会刷新监听 `roomTemperature` 的叶子节点，然后向上冒泡
 - 可复用设备/时间条件组及条件组到 ActionGroup 的反向引用。
 - runtime 单飞调度、状态 dirty 候选集合并集和 TimePoint FIFO。
 - MySQL metadata + JSON revision 表结构、`RuntimeRevision` DTO 和编译器。
+- `RuntimePersistHelper` 编排不可变版本持久化、启停控制和服务启动自动恢复；数据库访问由 MyBatis/MyBatis-Plus Mapper 承担。
+- Runtime metadata/revision 实体继承 `BaseEntity`，分布式数据库主键与 Engine 的 `runtimeId` 业务标识相互独立。
 - `ControlAction -> MqttIo.asyncSend` 异步控制。
 - Action 成功/失败计数和有界失败历史。
 - `ReportAction` 用户、通知形式和内容骨架。
 
 暂未实现：
 
-- Web Controller、Repository、发布事务和 RuntimeReload 消息。
+- Web Controller 和跨服务 RuntimeReload 消息。
 - 前端可视化规则表单。
 - ReportAction 对应的短信、邮件通知服务。
 - Action 重试、冷却时间和失败持久化。

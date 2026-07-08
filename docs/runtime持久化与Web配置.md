@@ -48,6 +48,7 @@ flowchart LR
 ```json
 {
   "runtimeId": "runtime-lab-101",
+  "enabled": true,
   "activeFrom": "2026-07-01T00:00:00Z",
   "activeUntil": "2026-12-31T16:00:00Z",
   "deviceConditionGroups": [
@@ -143,16 +144,27 @@ sequenceDiagram
 - 将动作 DTO 编译成 `ControlAction` 或 `ReportAction`。
 - 保证同一个条件组对象被所有引用它的 ActionGroup 共享。
 
+`enabled` 控制整个 Runtime 是否进入 Engine：
+
+- `enabled=true`：当前 revision 会被编译并注册。
+- `enabled=false`：revision 仍然持久化，但对应 Runtime 会从 Engine 注销。
+- `enable/disable` 不修改旧 JSON，而是复制当前定义并追加一版新 revision。
+- 旧 JSON 没有 `enabled` 字段时按 `true` 兼容读取。
+
 ## 数据表
 
 `rule_runtime` 保存可检索元数据：
 
+- `id` 继承 `BaseEntity`，由 uid-springboot-starter 生成分布式主键。
+- `runtime_id` 是 Engine 和 Web API 使用的稳定业务标识，并建立唯一索引。
 - 规则名称、所有者和发布状态。
 - 当前发布版本号。
+- 当前 revision 的 `enabled` 镜像，便于启动查询和后台列表过滤。
 - `active_from/active_until`，用于启动恢复和后台扫描。
 
 `rule_runtime_revision` 保存不可变版本：
 
+- 每个 revision 同样继承 `BaseEntity`，使用独立分布式主键。
 - `(runtime_id, revision_no)` 唯一。
 - `definition` 保存完整 JSON。
 - `schema_version` 用于未来 JSON 迁移。
@@ -166,7 +178,46 @@ sequenceDiagram
 4. 更新 `rule_runtime.published_revision_no`、生命周期和状态。
 5. 事务提交后发布 RuntimeReload 消息；rule-engine 加载 revision、编译并原子替换旧 Runtime。
 
-当前仓库已经落地表结构、revision DTO、编译器和内存替换能力。Web Controller、Repository、发布事务和跨服务 RuntimeReload 契约仍需在后续接入。
+当前仓库已经落地 `RuntimePersistHelper`：
+
+- `RuleRuntimeMapper`：通过 MyBatis-Plus `BaseMapper` 写入 metadata，并提供行锁、发布指针更新和软删除 SQL。
+- `RuleRuntimeRevisionMapper`：通过 MyBatis-Plus `BaseMapper` 追加不可变 revision，并联表读取当前发布版本。
+- `register(revision)`：写入 metadata 和第 1 版 revision。
+- `update(runtimeId, revision)`：在行锁下追加版本并切换当前版本。
+- `enable/disable(runtimeId)`：追加仅改变 enabled 的新版本，并同步 Engine。
+- `remove(runtimeId)`：软删除 metadata、保留 revision 审计记录并注销 Runtime。
+- `fetch()`：读取每个 Runtime 的当前发布 revision。
+- ApplicationReady 时自动恢复 enabled 且未过期的 Runtime。
+
+Web Controller 和跨服务发布契约仍需在后续接入。
+
+## 服务重启恢复
+
+```mermaid
+sequenceDiagram
+    participant Spring as "ApplicationReady"
+    participant Persist as "RuntimePersistHelper"
+    participant Mapper as "MyBatis Mapper"
+    participant DB as "MySQL"
+    participant Compiler as "RuntimeRevisionCompiler"
+    participant Engine as "Engine"
+    participant State as "DeviceRecordChangeListener"
+
+    Spring->>Persist: restoreEnabledRuntimes()
+    Persist->>Mapper: selectAllCurrent()
+    Mapper->>DB: 查询当前 published revision
+    DB-->>Mapper: metadata + definition
+    Mapper-->>Persist: definition JSON + enabled
+    loop enabled 且未过期
+        Persist->>Compiler: compile(revision)
+        Compiler-->>Persist: Runtime
+        Persist->>Engine: register(runtime)
+    end
+    Persist->>State: replay(deviceType, deviceId)
+    State->>Engine: 当前字段 DeviceEvent
+```
+
+恢复失败采用单 Runtime 隔离：某条 JSON 损坏或编译失败时记录错误并跳过，不阻止其他规则恢复。
 
 ## 运行时扇出
 
@@ -195,3 +246,8 @@ flowchart LR
 ```
 
 状态事件可合并，但合并时必须保留候选 ActionGroup ID 的并集；TimePoint 仍按 `occurrenceId` 去重并进入 FIFO，不能被状态合并吞掉。
+
+已存在旧表的数据库需要执行
+`sql/migrations/20260705_add_rule_runtime_enabled.sql` 和
+`sql/migrations/20260706_separate_runtime_primary_key.sql`；全新数据库直接使用
+`sql/schema.sql`。

@@ -121,6 +121,7 @@ MQTT 模块围绕 `AbstractSysClient`、`MqttClient`、`MqttCallback`、`SysClie
 - `ActionGroup` 通过 ID 引用 Runtime 内可复用的设备条件组和时间条件组。
 - `Runtime` 支持 `PENDING / ACTIVE / EXPIRED / CANCELLED` 生命周期。
 - `RuntimeRevisionCompiler` 可将 Web JSON revision 校验并编译为共享条件组对象图。
+- `RuntimePersistHelper` 通过 MyBatis/MyBatis-Plus Mapper 持久化不可变 revision，并在 rule-engine 重启后自动恢复 enabled Runtime。
 - TimeConditionGroup 支持日期范围、星期、普通/跨午夜窗口以及 TimePoint。
 - `ControlAction` 已接入 MQTT 异步控制；`ReportAction` 保存用户、通知形式和内容，通知服务接入前使用完整日志展示。
 - Action 重试、冷却时间和失败持久化还未实现。
@@ -165,7 +166,11 @@ sql/schema.sql
 - `gateway`：网关表，支持 RS485 / Socket 类型。
 - `device`：设备表，按 `device_type` 区分 Access、AirCondition、Sensor、CircuitBreak、Light。
 - `rule_runtime`：规则元数据、发布状态和生命周期索引。
-- `rule_runtime_revision`：不可变的完整 JSON revision，条件组与 ActionGroup 通过 ID 关联。
+- `rule_runtime_revision`：带 `enabled` 的不可变完整 JSON revision，条件组与 ActionGroup 通过 ID 关联。
+
+两张规则表的实体均继承 `BaseEntity`：数据库 `id` 由
+uid-springboot-starter 和 MyBatis-Plus `ASSIGN_ID` 自动生成，`runtime_id`
+单独作为 Engine/Web 使用的业务标识。
 
 注意：uid-generator 的 worker 表属于独立 uid 数据源，不属于业务库。H2 测试使用：
 

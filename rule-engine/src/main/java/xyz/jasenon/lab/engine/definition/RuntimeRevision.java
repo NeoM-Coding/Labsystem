@@ -22,6 +22,7 @@ import java.util.Set;
  */
 public record RuntimeRevision(
         String runtimeId,
+        Boolean enabled,
         Instant activeFrom,
         Instant activeUntil,
         List<DeviceConditionGroupDefinition> deviceConditionGroups,
@@ -30,9 +31,48 @@ public record RuntimeRevision(
 ) {
 
     public RuntimeRevision {
+        enabled = enabled == null ? Boolean.TRUE : enabled;
         deviceConditionGroups = immutableList(deviceConditionGroups);
         timeConditionGroups = immutableList(timeConditionGroups);
         actionGroups = immutableList(actionGroups);
+    }
+
+    /**
+     * 兼容尚未显式提供 enabled 的调用方和旧 JSON，默认启用。
+     */
+    public RuntimeRevision(
+            String runtimeId,
+            Instant activeFrom,
+            Instant activeUntil,
+            List<DeviceConditionGroupDefinition> deviceConditionGroups,
+            List<TimeConditionGroupDefinition> timeConditionGroups,
+            List<ActionGroupDefinition> actionGroups
+    ) {
+        this(
+                runtimeId,
+                Boolean.TRUE,
+                activeFrom,
+                activeUntil,
+                deviceConditionGroups,
+                timeConditionGroups,
+                actionGroups
+        );
+    }
+
+    public boolean isEnabled() {
+        return Boolean.TRUE.equals(enabled);
+    }
+
+    public RuntimeRevision withEnabled(boolean value) {
+        return new RuntimeRevision(
+                runtimeId,
+                value,
+                activeFrom,
+                activeUntil,
+                deviceConditionGroups,
+                timeConditionGroups,
+                actionGroups
+        );
     }
 
     public record DeviceConditionGroupDefinition(

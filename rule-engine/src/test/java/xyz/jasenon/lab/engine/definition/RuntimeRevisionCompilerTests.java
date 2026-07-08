@@ -106,6 +106,23 @@ class RuntimeRevisionCompilerTests {
         assertEquals("always", runtime.getActionGroups().get(0).getTimeConditionGroupId());
     }
 
+    @Test
+    void treatsLegacyJsonWithoutEnabledAsEnabled() throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
+        RuntimeRevision original = revision(new ActionGroupDefinition(
+                "notify-user",
+                "hot-room",
+                "always",
+                List.of(reportAction())
+        ));
+        var json = objectMapper.valueToTree(original);
+        ((com.fasterxml.jackson.databind.node.ObjectNode) json).remove("enabled");
+
+        RuntimeRevision restored = objectMapper.treeToValue(json, RuntimeRevision.class);
+
+        assertTrue(restored.isEnabled());
+    }
+
     private static RuntimeRevision revision(ActionGroupDefinition... actionGroups) {
         return new RuntimeRevision(
                 "web-runtime",

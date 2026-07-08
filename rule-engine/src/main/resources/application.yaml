@@ -19,6 +19,8 @@ dubbo:
 
 lab:
   rule-engine:
+    persistence:
+      enabled: true
     simple-test:
       # 当前开启真实链路演示；生产环境不需要时应覆盖为 false。
       enabled: false

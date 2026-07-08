@@ -25,6 +25,10 @@ class SimpleTestTests {
         Engine engine = mock(Engine.class);
         DeviceRecordChangeListener listener = mock(DeviceRecordChangeListener.class);
         MockEnvironment environment = new MockEnvironment()
+                .withProperty(
+                        "lab.rule-engine.simple-test.source-device-id",
+                        "air-condition-31-6"
+                )
                 .withProperty("lab.rule-engine.simple-test.time-point-delay-seconds", "60");
         SimpleTest simpleTest = new SimpleTest(engine, listener, environment);
 

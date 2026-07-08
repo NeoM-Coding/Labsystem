@@ -125,6 +125,7 @@ class DefaultRuntimeExecutorTests {
             webEnvironment = SpringBootTest.WebEnvironment.NONE,
             properties = {
                     "lab.redis.enabled=false",
+                    "lab.rule-engine.persistence.enabled=false",
                     "dubbo.registry.address=N/A",
                     "dubbo.config-center.address=N/A",
                     "spring.profiles.active=test",

@@ -1,26 +1,32 @@
 package xyz.jasenon.lab.common.config;
 
-import io.github.sunjieyi60.uid.starter.UidGenerator;
 import com.baomidou.mybatisplus.core.incrementer.IdentifierGenerator;
+import io.github.sunjieyi60.uid.starter.UidGenerator;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.context.annotation.Bean;
 
+/**
+ * 将 uid-springboot-starter 接入 MyBatis-Plus 的 ASSIGN_ID 策略。
+ */
+@AutoConfiguration
 public class MybatisPlusConfig {
 
     @Bean
-    public CustomIdGenerator customIdGenerator(UidGenerator uidGenerator){
+    public CustomIdGenerator customIdGenerator(UidGenerator uidGenerator) {
         return new CustomIdGenerator(uidGenerator);
     }
 
-    public class CustomIdGenerator implements IdentifierGenerator {
+    public static class CustomIdGenerator implements IdentifierGenerator {
+
         private final UidGenerator generator;
-        public CustomIdGenerator(UidGenerator generator){
+
+        public CustomIdGenerator(UidGenerator generator) {
             this.generator = generator;
         }
 
         @Override
         public Number nextId(Object entity) {
-            return this.generator.getUID();
+            return generator.getUID();
         }
     }
-
 }

@@ -24,7 +24,7 @@ import xyz.jasenon.lab.common.model.device.devices.*;
 public class Device extends BaseEntity {
     // 设备名称
     private String deviceName;
-    // 属于
+    // 属于 laboratoryId
     private String belongTo;
     // 设备类型
     protected DeviceType deviceType;

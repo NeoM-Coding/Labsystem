@@ -53,12 +53,6 @@ CREATE TABLE IF NOT EXISTS `device` (
     KEY `idx_device_socket_gateway` (`socket_gateway_id`, `delete_at`),
     KEY `idx_device_group` (`group_id`, `delete_at`),
     UNIQUE KEY `uk_device_bus_address` (`gateway_id`, `device_type`, `address`, `self_id`),
-    CONSTRAINT `fk_device_gateway`
-        FOREIGN KEY (`gateway_id`) REFERENCES `gateway` (`id`)
-        ON UPDATE CASCADE ON DELETE RESTRICT,
-    CONSTRAINT `fk_device_socket_gateway`
-        FOREIGN KEY (`socket_gateway_id`) REFERENCES `gateway` (`id`)
-        ON UPDATE CASCADE ON DELETE RESTRICT,
     CONSTRAINT `chk_device_type`
         CHECK (`device_type` IN ('Access', 'AirCondition', 'Sensor', 'CircuitBreak', 'Light')),
     CONSTRAINT `chk_device_address_range`
@@ -88,9 +82,6 @@ CREATE TABLE IF NOT EXISTS `access_record` (
     KEY `idx_access_record_device_time` (`device_id`, `create_at`),
     KEY `idx_access_record_address_time` (`address`, `create_at`),
     KEY `idx_access_record_delete` (`delete_at`),
-    CONSTRAINT `fk_access_record_device`
-        FOREIGN KEY (`device_id`) REFERENCES `device` (`id`)
-        ON UPDATE CASCADE ON DELETE RESTRICT,
     CONSTRAINT `chk_access_record_bool`
         CHECK (`is_open` IN (0, 1) AND `is_lock` IN (0, 1)),
     CONSTRAINT `chk_access_record_value`
@@ -115,9 +106,6 @@ CREATE TABLE IF NOT EXISTS `air_condition_record` (
     KEY `idx_air_condition_record_device_time` (`device_id`, `create_at`),
     KEY `idx_air_condition_record_addr_time` (`address`, `self_id`, `create_at`),
     KEY `idx_air_condition_record_delete` (`delete_at`),
-    CONSTRAINT `fk_air_condition_record_device`
-        FOREIGN KEY (`device_id`) REFERENCES `device` (`id`)
-        ON UPDATE CASCADE ON DELETE RESTRICT,
     CONSTRAINT `chk_air_condition_record_bool`
         CHECK (`is_open` IN (0, 1)),
     CONSTRAINT `chk_air_condition_record_mode`
@@ -148,9 +136,6 @@ CREATE TABLE IF NOT EXISTS `circuit_break_record` (
     KEY `idx_circuit_break_record_device_time` (`device_id`, `create_at`),
     KEY `idx_circuit_break_record_addr_time` (`address`, `create_at`),
     KEY `idx_circuit_break_record_delete` (`delete_at`),
-    CONSTRAINT `fk_circuit_break_record_device`
-        FOREIGN KEY (`device_id`) REFERENCES `device` (`id`)
-        ON UPDATE CASCADE ON DELETE RESTRICT,
     CONSTRAINT `chk_circuit_break_record_bool`
         CHECK (`is_open` IN (0, 1) AND `is_fix` IN (0, 1) AND `is_lock` IN (0, 1)),
     CONSTRAINT `chk_circuit_break_record_value`
@@ -178,9 +163,6 @@ CREATE TABLE IF NOT EXISTS `light_record` (
     KEY `idx_light_record_device_time` (`device_id`, `create_at`),
     KEY `idx_light_record_addr_time` (`address`, `self_id`, `create_at`),
     KEY `idx_light_record_delete` (`delete_at`),
-    CONSTRAINT `fk_light_record_device`
-        FOREIGN KEY (`device_id`) REFERENCES `device` (`id`)
-        ON UPDATE CASCADE ON DELETE RESTRICT,
     CONSTRAINT `chk_light_record_bool`
         CHECK (`is_open` IN (0, 1) AND `is_lock` IN (0, 1)),
     CONSTRAINT `chk_light_record_value`
@@ -203,9 +185,6 @@ CREATE TABLE IF NOT EXISTS `sensor_record` (
     KEY `idx_sensor_record_device_time` (`device_id`, `create_at`),
     KEY `idx_sensor_record_addr_time` (`address`, `self_id`, `create_at`),
     KEY `idx_sensor_record_delete` (`delete_at`),
-    CONSTRAINT `fk_sensor_record_device`
-        FOREIGN KEY (`device_id`) REFERENCES `device` (`id`)
-        ON UPDATE CASCADE ON DELETE RESTRICT,
     CONSTRAINT `chk_sensor_record_value`
         CHECK (
             `address` >= 0
@@ -258,11 +237,57 @@ CREATE TABLE IF NOT EXISTS `rule_runtime_revision` (
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_rule_runtime_revision_no` (`runtime_id`, `revision_no`),
     KEY `idx_rule_runtime_revision_time` (`runtime_id`, `create_at`),
-    CONSTRAINT `fk_rule_runtime_revision_runtime`
-        FOREIGN KEY (`runtime_id`) REFERENCES `rule_runtime` (`runtime_id`)
-        ON UPDATE CASCADE ON DELETE RESTRICT,
     CONSTRAINT `chk_rule_runtime_revision_no`
         CHECK (`revision_no` > 0),
     CONSTRAINT `chk_rule_runtime_schema_version`
         CHECK (`schema_version` > 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='规则Runtime不可变JSON版本';
+
+CREATE TABLE IF NOT EXISTS `user` (
+    `id` VARCHAR(64) NOT NULL COMMENT '用户ID',
+    `name` VARCHAR(128) NOT NULL COMMENT '用户昵称，系统内唯一',
+    `username` VARCHAR(128) NOT NULL COMMENT '用户名/登录名',
+    `password` VARCHAR(255) NOT NULL COMMENT '密码摘要',
+    `phone` VARCHAR(32) NULL COMMENT '手机号',
+    `email` VARCHAR(255) NULL COMMENT '邮箱',
+    `mark` VARCHAR(512) NULL COMMENT '备注',
+    `create_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `update_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    `delete_at` DATETIME(3) NULL,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_user_name` (`name`),
+    UNIQUE KEY `uk_user_username` (`username`),
+    UNIQUE KEY `uk_user_phone` (`phone`),
+    UNIQUE KEY `uk_user_email` (`email`),
+    KEY `idx_user_delete` (`delete_at`),
+    KEY `idx_user_create_time` (`create_at`),
+    CONSTRAINT `chk_user_name_not_blank`
+        CHECK (CHAR_LENGTH(TRIM(`name`)) > 0),
+    CONSTRAINT `chk_user_username_not_blank`
+        CHECK (CHAR_LENGTH(TRIM(`username`)) > 0),
+    CONSTRAINT `chk_user_password_not_blank`
+        CHECK (CHAR_LENGTH(TRIM(`password`)) > 0),
+    CONSTRAINT `chk_user_phone_not_blank`
+        CHECK (`phone` IS NULL OR CHAR_LENGTH(TRIM(`phone`)) > 0),
+    CONSTRAINT `chk_user_email_not_blank`
+        CHECK (`email` IS NULL OR CHAR_LENGTH(TRIM(`email`)) > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='用户表';
+
+CREATE TABLE IF NOT EXISTS `laboratory` (
+    `id` VARCHAR(64) NOT NULL COMMENT '实验室ID',
+    `building_name` VARCHAR(128) NULL COMMENT '所属楼栋名称，用于筛选',
+    `org_name` VARCHAR(128) NULL COMMENT '所属单位名称，用于筛选',
+    `laboratory_name` VARCHAR(128) NOT NULL COMMENT '实验室名称',
+    `extra` JSON NULL COMMENT '实验室动态配置',
+    `manager` JSON NULL COMMENT '实验室负责人列表，对应 Laboratory.manager',
+    `create_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `update_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    `delete_at` DATETIME(3) NULL,
+    PRIMARY KEY (`id`),
+    KEY `idx_laboratory_building` (`building_name`, `delete_at`),
+    KEY `idx_laboratory_org` (`org_name`, `delete_at`),
+    KEY `idx_laboratory_name` (`laboratory_name`, `delete_at`),
+    KEY `idx_laboratory_delete` (`delete_at`),
+    CONSTRAINT `chk_laboratory_name_not_blank`
+        CHECK (CHAR_LENGTH(TRIM(`laboratory_name`)) > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='实验室基础信息表';

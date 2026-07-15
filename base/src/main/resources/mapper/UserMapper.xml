@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="xyz.jasenon.lab.base.mapper.UserMapper">
+    <!-- 在此处添加SQL映射语句 -->
+
+    <select id="isNameExsist" resultType="boolean">
+        select count(name) from user where name = #{name};
+    </select>
+
+    <select id="getUserByUsername" resultType="xyz.jasenon.lab.common.model.base.User">
+        select * from user where username = ${username};
+    </select>
+</mapper>

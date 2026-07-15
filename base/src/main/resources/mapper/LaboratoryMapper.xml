@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="xyz.jasenon.lab.base.mapper.LaboratoryMapper">
+    <!-- 在此处添加SQL映射语句 -->
+
+    <resultMap id="pair" type="xyz.jasenon.lab.common.util.Pair">
+        <constructor>
+            <arg column="f"/>
+            <arg column="s"/>
+        </constructor>
+    </resultMap>
+
+
+    <select id="collectionOrgName" resultMap="pair">
+        select id as f, org_name as s from laboratory;
+    </select>
+
+    <select id="collectionBuildingName" resultMap="pair">
+        select id as f, building_name as s from laboratory;
+    </select>
+
+</mapper>

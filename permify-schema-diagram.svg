@@ -1,0 +1,346 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1200" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif">
+  <defs>
+    <!-- 渐变定义 -->
+    <linearGradient id="grad-user" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366f1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#818cf8;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="grad-app" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0ea5e9;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#38bdf8;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="grad-lab" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#10b981;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#34d399;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="grad-device" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f59e0b;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#fbbf24;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="grad-permission" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8b5cf6;stop-opacity:0.1" />
+      <stop offset="100%" style="stop-color:#a78bfa;stop-opacity:0.05" />
+    </linearGradient>
+    <linearGradient id="grad-action" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ef4444;stop-opacity:0.1" />
+      <stop offset="100%" style="stop-color:#f87171;stop-opacity:0.05" />
+    </linearGradient>
+    
+    <!-- 箭头标记 -->
+    <marker id="arrow-relation" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b"/>
+    </marker>
+    <marker id="arrow-ref" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8"/>
+    </marker>
+    <marker id="arrow-entity" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#475569"/>
+    </marker>
+    
+    <!-- 阴影 -->
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="115%">
+      <feDropShadow dx="2" dy="3" stdDeviation="4" flood-opacity="0.15"/>
+    </filter>
+    <filter id="shadow-sm" x="-5%" y="-5%" width="110%" height="115%">
+      <feDropShadow dx="1" dy="2" stdDeviation="2" flood-opacity="0.1"/>
+    </filter>
+  </defs>
+  
+  <!-- 背景 -->
+  <rect width="1600" height="1200" fill="#f8fafc"/>
+  
+  <!-- 标题 -->
+  <text x="800" y="45" text-anchor="middle" font-size="24" font-weight="bold" fill="#1e293b">Permify Schema - 权限关系图</text>
+  <text x="800" y="70" text-anchor="middle" font-size="13" fill="#64748b">Entity Relationships · Permissions · Actions</text>
+  
+  <!-- ==================== 用户实体 ==================== -->
+  <g transform="translate(80, 100)">
+    <rect x="0" y="0" width="160" height="60" rx="12" fill="url(#grad-user)" filter="url(#shadow)"/>
+    <text x="80" y="30" text-anchor="middle" font-size="16" font-weight="bold" fill="white">👤 user</text>
+    <text x="80" y="48" text-anchor="middle" font-size="10" fill="rgba(255,255,255,0.85)">用户实体</text>
+  </g>
+  
+  <!-- ==================== APP 实体 ==================== -->
+  <g transform="translate(380, 90)" filter="url(#shadow)">
+    <rect x="0" y="0" width="480" height="680" rx="16" fill="white" stroke="#0ea5e9" stroke-width="2"/>
+    <rect x="0" y="0" width="480" height="48" rx="16" fill="url(#grad-app)"/>
+    <rect x="0" y="32" width="480" height="16" fill="url(#grad-app)"/>
+    <text x="240" y="32" text-anchor="middle" font-size="18" font-weight="bold" fill="white">📦 app</text>
+    <text x="240" y="46" text-anchor="middle" font-size="10" fill="rgba(255,255,255,0.9)">系统级单例 · app:main</text>
+    
+    <!-- Relations -->
+    <text x="20" y="75" font-size="13" font-weight="bold" fill="#0c4a6e">🔗 Relations (19)</text>
+    <g transform="translate(20, 85)">
+      <rect x="0" y="0" width="220" height="210" rx="8" fill="#f0f9ff" stroke="#bae6fd" stroke-width="1"/>
+      <text x="10" y="20" font-size="11" font-weight="600" fill="#0369a1">平台管理员</text>
+      <text x="10" y="38" font-size="10" fill="#475569">super_admin → @user</text>
+      <text x="10" y="54" font-size="10" fill="#475569">app_authz_admin → @user</text>
+      <text x="10" y="76" font-size="11" font-weight="600" fill="#0369a1">系统模块</text>
+      <text x="10" y="94" font-size="10" fill="#475569">account_manager → @user</text>
+      <text x="10" y="110" font-size="10" fill="#475569">base_manager → @user</text>
+      <text x="10" y="132" font-size="11" font-weight="600" fill="#0369a1">教学</text>
+      <text x="10" y="150" font-size="10" fill="#475569">edu_semester_manager → @user</text>
+      <text x="10" y="166" font-size="10" fill="#475569">edu_timetable_scheduler → @user</text>
+      <text x="10" y="182" font-size="10" fill="#475569">edu_timetable_viewer → @user</text>
+    </g>
+    <g transform="translate(245, 85)">
+      <rect x="0" y="0" width="215" height="210" rx="8" fill="#f0f9ff" stroke="#bae6fd" stroke-width="1"/>
+      <text x="10" y="20" font-size="11" font-weight="600" fill="#0369a1">智控</text>
+      <text x="10" y="38" font-size="10" fill="#475569">smart_control_manager</text>
+      <text x="10" y="54" font-size="10" fill="#475569">smart_control_enable_disable_manager</text>
+      <text x="10" y="70" font-size="10" fill="#475569">smart_control_viewer</text>
+      <text x="10" y="86" font-size="10" fill="#475569">access_control_controller</text>
+      <text x="10" y="102" font-size="10" fill="#475569">circuitbreak_control_controller</text>
+      <text x="10" y="118" font-size="10" fill="#475569">light_control_controller</text>
+      <text x="10" y="134" font-size="10" fill="#475569">aircondition_control_controller</text>
+      <text x="10" y="156" font-size="11" font-weight="600" fill="#0369a1">监控 and 数据</text>
+      <text x="10" y="174" font-size="10" fill="#475569">monitor_control_viewer</text>
+      <text x="10" y="190" font-size="10" fill="#475569">data_analysis_*</text>
+    </g>
+    
+    <!-- Permissions -->
+    <text x="20" y="315" font-size="13" font-weight="600" fill="#7c3aed">🔐 Permissions</text>
+    <g transform="translate(20, 325)">
+      <rect x="0" y="0" width="225" height="120" rx="8" fill="url(#grad-permission)" stroke="#c4b5fd" stroke-width="1"/>
+      <text x="10" y="20" font-size="11" font-weight="600" fill="#6d28d9">基础权限</text>
+      <text x="10" y="38" font-size="10" fill="#475569">is_super_admin = super_admin</text>
+      <text x="10" y="54" font-size="10" fill="#475569">app_permission_admin = super_admin | app_authz_admin</text>
+      <text x="10" y="72" font-size="11" font-weight="600" fill="#6d28d9">菜单权限</text>
+      <text x="10" y="90" font-size="10" fill="#475569">menu_account / menu_base / menu_edu</text>
+      <text x="10" y="106" font-size="10" fill="#475569">menu_smart_control / menu_data_analysis</text>
+    </g>
+    <g transform="translate(255, 325)">
+      <rect x="0" y="0" width="205" height="120" rx="8" fill="url(#grad-permission)" stroke="#c4b5fd" stroke-width="1"/>
+      <text x="10" y="20" font-size="11" font-weight="600" fill="#6d28d9">智控权限</text>
+      <text x="10" y="38" font-size="10" fill="#475569">smart_control_view</text>
+      <text x="10" y="54" font-size="10" fill="#475569">smart_control_manage</text>
+      <text x="10" y="70" font-size="10" fill="#475569">access_control_manage</text>
+      <text x="10" y="86" font-size="10" fill="#475569">circuitbreak_control_manage</text>
+      <text x="10" y="102" font-size="10" fill="#475569">light/aircondition_manage</text>
+    </g>
+    
+    <!-- Actions -->
+    <text x="20" y="465" font-size="13" font-weight="600" fill="#dc2626">⚡ Actions</text>
+    <g transform="translate(20, 475)">
+      <rect x="0" y="0" width="440" height="190" rx="8" fill="url(#grad-action)" stroke="#fca5a5" stroke-width="1"/>
+      <g transform="translate(10, 10)">
+        <text font-size="11" font-weight="600" fill="#b91c1c">授权操作</text>
+        <text y="18" font-size="10" fill="#475569">grant_app_permission · grant_lab_permission</text>
+      </g>
+      <g transform="translate(10, 55)">
+        <text font-size="11" font-weight="600" fill="#b91c1c">账号管理</text>
+        <text y="18" font-size="10" fill="#475569">account_create · account_update · account_delete</text>
+      </g>
+      <g transform="translate(10, 95)">
+        <text font-size="11" font-weight="600" fill="#b91c1c">实验室管理</text>
+        <text y="18" font-size="10" fill="#475569">lab_create · lab_update · lab_delete</text>
+      </g>
+      <g transform="translate(230, 55)">
+        <text font-size="11" font-weight="600" fill="#b91c1c">教学操作</text>
+        <text y="18" font-size="10" fill="#475569">edu_timetable_schedule</text>
+      </g>
+      <g transform="translate(230, 95)">
+        <text font-size="11" font-weight="600" fill="#b91c1c">智控操作</text>
+        <text y="18" font-size="10" fill="#475569">smart_control_enable_disable</text>
+      </g>
+      <g transform="translate(10, 140)">
+        <text font-size="11" font-weight="600" fill="#b91c1c">数据分析</text>
+        <text y="18" font-size="10" fill="#475569">data_analysis_edu/aircondition/circuitbreak_view</text>
+      </g>
+    </g>
+  </g>
+  
+  <!-- ==================== 实验室实体 ==================== -->
+  <g transform="translate(30, 820)" filter="url(#shadow)">
+    <rect x="0" y="0" width="700" height="350" rx="16" fill="white" stroke="#10b981" stroke-width="2"/>
+    <rect x="0" y="0" width="700" height="48" rx="16" fill="url(#grad-lab)"/>
+    <rect x="0" y="32" width="700" height="16" fill="url(#grad-lab)"/>
+    <text x="350" y="32" text-anchor="middle" font-size="18" font-weight="bold" fill="white">🧪 laboratory</text>
+    <text x="350" y="46" text-anchor="middle" font-size="10" fill="rgba(255,255,255,0.9)">核心数据范围资源</text>
+    
+    <!-- Relations -->
+    <text x="20" y="75" font-size="13" font-weight="bold" fill="#065f46">🔗 Relations</text>
+    <g transform="translate(20, 85)">
+      <rect x="0" y="0" width="200" height="110" rx="8" fill="#ecfdf5" stroke="#a7f3d0" stroke-width="1"/>
+      <text x="10" y="22" font-size="11" font-weight="600" fill="#047857">关联</text>
+      <text x="10" y="40" font-size="10" fill="#475569">app → @app (app:main)</text>
+      <text x="10" y="60" font-size="10" fill="#475569">creator → @user</text>
+      <text x="10" y="76" font-size="10" fill="#475569">viewer → @user</text>
+      <text x="10" y="92" font-size="10" fill="#475569">manager → @user</text>
+      <text x="10" y="108" font-size="10" fill="#475569">authz_admin → @user</text>
+    </g>
+    
+    <!-- Scope Permissions -->
+    <text x="240" y="75" font-size="13" font-weight="600" fill="#7c3aed">🔐 范围权限 (Scope)</text>
+    <g transform="translate(240, 85)">
+      <rect x="0" y="0" width="210" height="110" rx="8" fill="url(#grad-permission)" stroke="#c4b5fd" stroke-width="1"/>
+      <text x="10" y="20" font-size="11" font-weight="600" fill="#6d28d9">基础范围</text>
+      <text x="10" y="38" font-size="10" fill="#475569">view_scope = viewer | manager | ...</text>
+      <text x="10" y="54" font-size="10" fill="#475569">manage_scope = manager | authz_admin | ...</text>
+      <text x="10" y="74" font-size="10" fill="#475569">view = view_scope</text>
+      <text x="10" y="90" font-size="10" fill="#475569">update = manage_scope ∧ app.lab_update</text>
+      <text x="10" y="106" font-size="10" fill="#475569">delete = manage_scope ∧ app.lab_delete</text>
+    </g>
+    
+    <!-- Authorization -->
+    <text x="470" y="75" font-size="13" font-weight="600" fill="#7c3aed">🔑 授权管理</text>
+    <g transform="translate(470, 85)">
+      <rect x="0" y="0" width="210" height="110" rx="8" fill="url(#grad-permission)" stroke="#c4b5fd" stroke-width="1"/>
+      <text x="10" y="20" font-size="11" font-weight="600" fill="#6d28d9">授权操作</text>
+      <text x="10" y="38" font-size="10" fill="#475569">grant_scope_permission = authz_admin | app.*</text>
+      <text x="10" y="56" font-size="10" fill="#475569">grant_viewer = grant_scope_permission</text>
+      <text x="10" y="74" font-size="10" fill="#475569">grant_manager = grant_scope_permission</text>
+      <text x="10" y="92" font-size="10" fill="#b91c1c">grant_authz_admin = app.grant_lab_permission</text>
+    </g>
+    
+    <!-- Device Permissions -->
+    <text x="20" y="220" font-size="13" font-weight="600" fill="#7c3aed">🏭 实验室下设备权限 (view_scope ∧ app.*)</text>
+    <g transform="translate(20, 230)">
+      <rect x="0" y="0" width="330" height="105" rx="8" fill="url(#grad-permission)" stroke="#c4b5fd" stroke-width="1"/>
+      <text x="10" y="20" font-size="11" font-weight="600" fill="#6d28d9">通用设备权限</text>
+      <text x="10" y="38" font-size="10" fill="#475569">device_view = view_scope ∧ app.smart_control_view</text>
+      <text x="10" y="54" font-size="10" fill="#475569">device_manage = view_scope ∧ app.smart_control_manage</text>
+      <text x="10" y="70" font-size="10" fill="#475569">device_enable_disable = view_scope ∧ app.*</text>
+      <text x="10" y="90" font-size="10" fill="#475569">monitor_control_view = view_scope ∧ app.*</text>
+    </g>
+    <g transform="translate(365, 230)">
+      <rect x="0" y="0" width="315" height="105" rx="8" fill="url(#grad-permission)" stroke="#c4b5fd" stroke-width="1"/>
+      <text x="10" y="20" font-size="11" font-weight="600" fill="#6d28d9">分设备类型控制</text>
+      <text x="10" y="38" font-size="10" fill="#475569">access_control_manage = view_scope ∧ app.*</text>
+      <text x="10" y="54" font-size="10" fill="#475569">circuitbreak_control_manage = view_scope ∧ app.*</text>
+      <text x="10" y="70" font-size="10" fill="#475569">light_control_manage = view_scope ∧ app.*</text>
+      <text x="10" y="86" font-size="10" fill="#475569">aircondition_control_manage = view_scope ∧ app.*</text>
+    </g>
+  </g>
+  
+  <!-- ==================== 设备实体 ==================== -->
+  <g transform="translate(780, 820)" filter="url(#shadow)">
+    <rect x="0" y="0" width="520" height="350" rx="16" fill="white" stroke="#f59e0b" stroke-width="2"/>
+    <rect x="0" y="0" width="520" height="48" rx="16" fill="url(#grad-device)"/>
+    <rect x="0" y="32" width="520" height="16" fill="url(#grad-device)"/>
+    <text x="260" y="32" text-anchor="middle" font-size="18" font-weight="bold" fill="white">🔌 device</text>
+    <text x="260" y="46" text-anchor="middle" font-size="10" fill="rgba(255,255,255,0.9)">挂载在 laboratory 之下</text>
+    
+    <!-- Relations -->
+    <text x="20" y="75" font-size="13" font-weight="bold" fill="#92400e">🔗 Relations</text>
+    <g transform="translate(20, 85)">
+      <rect x="0" y="0" width="200" height="50" rx="8" fill="#fffbeb" stroke="#fde68a" stroke-width="1"/>
+      <text x="10" y="22" font-size="11" font-weight="600" fill="#b45309">关联</text>
+      <text x="10" y="42" font-size="10" fill="#475569">lab → @laboratory</text>
+    </g>
+    
+    <!-- Permissions -->
+    <text x="240" y="75" font-size="13" font-weight="600" fill="#7c3aed">🔐 权限 (全部委托 lab.*)</text>
+    <g transform="translate(240, 85)">
+      <rect x="0" y="0" width="260" height="50" rx="8" fill="url(#grad-permission)" stroke="#c4b5fd" stroke-width="1"/>
+      <text x="10" y="20" font-size="11" font-weight="600" fill="#6d28d9">基础权限</text>
+      <text x="10" y="38" font-size="10" fill="#475569">view = lab.device_view | manage = lab.device_manage</text>
+    </g>
+    
+    <text x="20" y="165" font-size="13" font-weight="600" fill="#7c3aed">⚡ Actions</text>
+    <g transform="translate(20, 175)">
+      <rect x="0" y="0" width="240" height="60" rx="8" fill="url(#grad-action)" stroke="#fca5a5" stroke-width="1"/>
+      <text x="10" y="20" font-size="11" font-weight="600" fill="#b91c1c">设备操作</text>
+      <text x="10" y="40" font-size="10" fill="#475569">operate = manage</text>
+      <text x="10" y="55" font-size="10" fill="#475569">enable_disable = lab.device_enable_disable</text>
+    </g>
+    
+    <text x="280" y="165" font-size="13" font-weight="600" fill="#7c3aed">🏭 分设备类型</text>
+    <g transform="translate(280, 175)">
+      <rect x="0" y="0" width="220" height="60" rx="8" fill="url(#grad-permission)" stroke="#c4b5fd" stroke-width="1"/>
+      <text x="10" y="20" font-size="10" fill="#475569">access_control_manage = lab.*</text>
+      <text x="10" y="36" font-size="10" fill="#475569">circuitbreak_control_manage = lab.*</text>
+      <text x="10" y="52" font-size="10" fill="#475569">light/aircondition_manage = lab.*</text>
+    </g>
+    
+    <text x="20" y="265" font-size="13" font-weight="600" fill="#7c3aed">📊 监控权限</text>
+    <g transform="translate(20, 275)">
+      <rect x="0" y="0" width="480" height="55" rx="8" fill="url(#grad-permission)" stroke="#c4b5fd" stroke-width="1"/>
+      <text x="10" y="20" font-size="11" font-weight="600" fill="#6d28d9">监控查看</text>
+      <text x="10" y="40" font-size="10" fill="#475569">monitor_view = lab.monitor_control_view → 继承自 laboratory 的 view_scope ∧ app.monitor_control_view</text>
+    </g>
+  </g>
+  
+  <!-- ==================== 关系连线 ==================== -->
+  
+  <!-- user → app 关系 (super_admin 等) -->
+  <line x1="240" y1="130" x2="380" y2="140" stroke="#64748b" stroke-width="2" stroke-dasharray="6,3" marker-end="url(#arrow-relation)"/>
+  <rect x="265" y="115" width="95" height="22" rx="4" fill="white" stroke="#94a3b8" stroke-width="1"/>
+  <text x="312" y="130" text-anchor="middle" font-size="9" fill="#64748b">19 Relations</text>
+  
+  <!-- user → laboratory 关系 (creator/viewer/manager) -->
+  <line x1="160" y1="160" x2="100" y2="820" stroke="#64748b" stroke-width="2" stroke-dasharray="6,3" marker-end="url(#arrow-relation)"/>
+  <rect x="60" y="470" width="105" height="22" rx="4" fill="white" stroke="#94a3b8" stroke-width="1"/>
+  <text x="112" y="485" text-anchor="middle" font-size="9" fill="#64748b">creator/viewer/mgr</text>
+  
+  <!-- laboratory → app 关系 -->
+  <path d="M 580 870 Q 580 800 580 770 Q 580 700 620 500" fill="none" stroke="#10b981" stroke-width="2.5" stroke-dasharray="8,4" marker-end="url(#arrow-entity)"/>
+  <rect x="585" y="670" width="85" height="22" rx="4" fill="#ecfdf5" stroke="#10b981" stroke-width="1"/>
+  <text x="627" y="685" text-anchor="middle" font-size="9" font-weight="600" fill="#065f46">lab → app</text>
+  
+  <!-- device → laboratory 关系 -->
+  <line x1="880" y1="870" x2="730" y2="870" stroke="#f59e0b" stroke-width="2.5" marker-end="url(#arrow-entity)"/>
+  <rect x="775" y="848" width="75" height="22" rx="4" fill="#fffbeb" stroke="#f59e0b" stroke-width="1"/>
+  <text x="812" y="863" text-anchor="middle" font-size="9" font-weight="600" fill="#92400e">device → lab</text>
+  
+  <!-- laboratory 跨层权限引用 (虚线) -->
+  <path d="M 530 1050 Q 530 700 500 600 Q 480 500 480 470" fill="none" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="4,4" marker-end="url(#arrow-ref)"/>
+  <rect x="495" y="680" width="80" height="20" rx="4" fill="#f5f3ff" stroke="#a78bfa" stroke-width="1"/>
+  <text x="535" y="694" text-anchor="middle" font-size="8" fill="#7c3aed">app.* 引用</text>
+  
+  <!-- device 委托 lab 权限 (虚线) -->
+  <path d="M 860 1050 Q 860 950 730 1000" fill="none" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="4,4"/>
+  <rect x="810" y="970" width="55" height="20" rx="4" fill="#fffbeb" stroke="#fbbf24" stroke-width="1"/>
+  <text x="837" y="984" text-anchor="middle" font-size="8" fill="#92400e">委托 lab</text>
+  
+  <!-- ==================== 图例 ==================== -->
+  <g transform="translate(1330, 100)">
+    <rect x="0" y="0" width="240" height="200" rx="12" fill="white" stroke="#e2e8f0" stroke-width="1" filter="url(#shadow-sm)"/>
+    <text x="120" y="25" text-anchor="middle" font-size="13" font-weight="bold" fill="#1e293b">📋 图例</text>
+    
+    <g transform="translate(15, 40)">
+      <rect x="0" y="0" width="14" height="14" rx="3" fill="url(#grad-user)"/>
+      <text x="22" y="12" font-size="10" fill="#475569">user - 用户实体</text>
+    </g>
+    <g transform="translate(15, 62)">
+      <rect x="0" y="0" width="14" height="14" rx="3" fill="url(#grad-app)"/>
+      <text x="22" y="12" font-size="10" fill="#475569">app - 系统单例</text>
+    </g>
+    <g transform="translate(15, 84)">
+      <rect x="0" y="0" width="14" height="14" rx="3" fill="url(#grad-lab)"/>
+      <text x="22" y="12" font-size="10" fill="#475569">laboratory - 实验室</text>
+    </g>
+    <g transform="translate(15, 106)">
+      <rect x="0" y="0" width="14" height="14" rx="3" fill="url(#grad-device)"/>
+      <text x="22" y="12" font-size="10" fill="#475569">device - 设备</text>
+    </g>
+    <g transform="translate(15, 128)">
+      <rect x="0" y="0" width="14" height="14" rx="3" fill="url(#grad-permission)" stroke="#c4b5fd" stroke-width="1"/>
+      <text x="22" y="12" font-size="10" fill="#475569">Permission 权限</text>
+    </g>
+    <g transform="translate(15, 150)">
+      <rect x="0" y="0" width="14" height="14" rx="3" fill="url(#grad-action)" stroke="#fca5a5" stroke-width="1"/>
+      <text x="22" y="12" font-size="10" fill="#475569">Action 操作</text>
+    </g>
+    <g transform="translate(15, 172)">
+      <line x1="0" y1="7" x2="30" y2="7" stroke="#64748b" stroke-width="2" stroke-dasharray="6,3"/>
+      <text x="38" y="11" font-size="10" fill="#475569">Relation 关联</text>
+    </g>
+    <g transform="translate(130, 40)">
+      <line x1="0" y1="7" x2="30" y2="7" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="4,4"/>
+      <text x="38" y="11" font-size="10" fill="#475569">跨层引用</text>
+    </g>
+  </g>
+  
+  <!-- ==================== 权限继承链路标注 ==================== -->
+  <g transform="translate(1100, 340)">
+    <rect x="0" y="0" width="230" height="130" rx="10" fill="white" stroke="#e2e8f0" stroke-width="1" filter="url(#shadow-sm)"/>
+    <text x="115" y="22" text-anchor="middle" font-size="12" font-weight="bold" fill="#1e293b">🔗 权限继承链路</text>
+    <text x="15" y="42" font-size="10" fill="#475569">1. user → app (19 relations)</text>
+    <text x="15" y="58" font-size="10" fill="#475569">2. user → laboratory (5 relations)</text>
+    <text x="15" y="74" font-size="10" fill="#475569">3. laboratory → app (引用 app 权限)</text>
+    <text x="15" y="90" font-size="10" fill="#475569">4. device → laboratory (委托 lab 权限)</text>
+    <text x="15" y="110" font-size="9" fill="#6366f1" font-weight="600">💡 super_admin 全局穿透所有层级</text>
+    <text x="15" y="125" font-size="9" fill="#6366f1" font-weight="600">💡 lab 权限 = scope ∧ app.feature</text>
+  </g>
+</svg>

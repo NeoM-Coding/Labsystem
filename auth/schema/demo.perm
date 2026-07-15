@@ -1,0 +1,8 @@
+entity user {}
+
+entity device {
+    relation operator @user
+    relation admin @user
+
+    action operate = operator or admin
+}

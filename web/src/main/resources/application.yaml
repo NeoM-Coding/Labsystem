@@ -5,6 +5,20 @@ spring:
 server:
   port: 8989
 
+lab:
+  auth:
+    permify:
+      enabled: true
+      base-url: http://localhost:3476
+      tenant-id: t1
+      subject-header: X-User-Id
+      subject-type-header: X-User-Type
+      default-subject-type: user
+      schema-version: ""
+      snap-token: ""
+      depth: 20
+      lookup-page-size: 100
+
 dubbo:
   application:
     name: ${spring.application.name}

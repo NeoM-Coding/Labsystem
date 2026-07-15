@@ -31,6 +31,7 @@
         <module>api</module>
         <module>redis</module>
         <module>mqtt</module>
+        <module>auth</module>
         <module>web</module>
         <module>edu</module>
         <module>rule-engine</module>
@@ -40,6 +41,7 @@
     <properties>
         <java.version>17</java.version>
         <dubbo.version>3.3.6</dubbo.version>
+        <permify-java.version>1.6.1</permify-java.version>
         <version>0.0.1</version>
     </properties>
 

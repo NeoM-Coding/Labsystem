@@ -1,0 +1,572 @@
+// CN: 用户实体，代表系统中的登录账号。
+// EN: User entity, representing an authenticated account in the system.
+entity user {}
+
+
+// CN: 建模约定：
+//     permission 用于描述身份、范围、菜单可见性和聚合能力；
+//     action 用于描述明确的业务动作，例如 create/update/delete/grant/schedule/enable_disable。
+//     super_admin 由系统初始化，默认进入全部 permission/action；
+//     app_authz_admin 只表示“可以发起授权操作”，不能自动获得被授权的业务权限。
+//     “只能把自己拥有的权限授予下级用户”由业务代码在写关系前校验。
+// EN: Modeling convention:
+//     use permission for identity, scope, menu visibility, and derived capabilities;
+//     use action for explicit business operations such as create/update/delete/grant/schedule/enable_disable.
+//     super_admin is bootstrapped by the system and included in every permission/action;
+//     app_authz_admin only means the user can initiate authorization operations, and does not imply business permissions.
+//     Business code must verify that a grantor can only grant permissions they already hold before writing relations.
+
+
+// CN: app 是系统级单例资源，建议实际使用 app:main。
+//     它承载菜单级权限、平台级功能权限、全局授权管理权限。
+// EN: app is a system-level singleton resource, usually app:main.
+//     It holds menu-level permissions, global feature permissions, and global authorization administration.
+entity app {
+
+    // =========================
+    // CN: 平台级管理员关系
+    // EN: Platform-level administrator relations
+    // =========================
+
+    // CN: 超级管理员，拥有最高权限。
+    // EN: Super administrator with the highest privileges.
+    relation super_admin @user
+
+    // CN: 应用授权管理员，只能发起授权操作。
+    //     它不自动拥有账号、实验室、智控、数据分析等业务权限。
+    // EN: Application authorization administrator, only allowed to initiate grant operations.
+    //     It does not automatically have account, lab, smart-control, or data-analysis permissions.
+    relation app_authz_admin @user
+
+
+    // =========================
+    // CN: 系统功能模块关系
+    // EN: System feature module relations
+    // =========================
+
+    // CN: 账号管理权限关系。
+    // EN: Account management relation.
+    relation account_manager @user
+
+    // CN: 基础信息管理权限关系，例如实验室创建、修改、删除。
+    // EN: Base information management relation, such as laboratory create/update/delete.
+    relation base_manager @user
+
+
+    // =========================
+    // CN: 教学相关权限关系
+    // EN: Education-related permission relations
+    // =========================
+
+    // CN: 学期管理者。
+    // EN: Semester manager.
+    relation edu_semester_manager @user
+
+    // CN: 课表排课者。
+    // EN: Timetable scheduler.
+    relation edu_timetable_scheduler @user
+
+    // CN: 课表查看者。
+    // EN: Timetable viewer.
+    relation edu_timetable_viewer @user
+
+
+    // =========================
+    // CN: 智控相关权限关系
+    // EN: Smart control related permission relations
+    // =========================
+
+    // CN: 智控总管理者，通常拥有所有设备控制能力。
+    // EN: Smart control manager, usually allowed to control all device types.
+    relation smart_control_manager @user
+
+    // CN: 智控启用/禁用管理者。
+    // EN: Smart control enable/disable manager.
+    relation smart_control_enable_disable_manager @user
+
+    // CN: 智控查看者。
+    // EN: Smart control viewer.
+    relation smart_control_viewer @user
+
+    // CN: 门禁控制权限关系。
+    // EN: Access control device controller relation.
+    relation access_control_controller @user
+
+    // CN: 空开/电路控制权限关系。
+    // EN: Circuit breaker control relation.
+    relation circuitbreak_control_controller @user
+
+    // CN: 灯光控制权限关系。
+    // EN: Light control relation.
+    relation light_control_controller @user
+
+    // CN: 空调控制权限关系。
+    // EN: Air conditioner control relation.
+    relation aircondition_control_controller @user
+
+
+    // =========================
+    // CN: 监控与数据分析权限关系
+    // EN: Monitoring and data analysis permission relations
+    // =========================
+
+    // CN: 监控查看权限关系。
+    // EN: Monitor viewing relation.
+    relation monitor_control_viewer @user
+
+    // CN: 教学数据分析权限关系。
+    // EN: Education data analysis relation.
+    relation data_analysis_edu @user
+
+    // CN: 空调数据分析权限关系。
+    // EN: Air conditioner data analysis relation.
+    relation data_analysis_aircondition @user
+
+    // CN: 电路/空开数据分析权限关系。
+    // EN: Circuit breaker data analysis relation.
+    relation data_analysis_circuitbreak @user
+
+
+    // =========================
+    // CN: 平台级基础权限
+    // EN: Platform-level base permissions
+    // =========================
+
+    // CN: 判断用户是否为超级管理员。
+    // EN: Checks whether the user is a super administrator.
+    permission is_super_admin = super_admin
+
+    // CN: 平台授权操作资格，包括超级管理员和 app 授权管理员。
+    //     授权范围必须由业务代码限制为“授权者自己已经拥有的权限”。
+    // EN: Platform grant capability, including super_admin and app_authz_admin.
+    //     Business code must restrict grants to permissions the grantor already has.
+    permission app_permission_admin = super_admin or app_authz_admin
+
+    // CN: 是否可以分配 app 层权限。
+    //     注意：这里只表示可以发起授权操作，不能表示可以任意分配所有权限。
+    // EN: Whether the user can grant app-level permissions.
+    //     Note: this only means the user may initiate a grant, not grant arbitrary permissions.
+    action grant_app_permission = app_permission_admin
+
+    // CN: 是否可以分配 laboratory 层权限。
+    //     注意：这里只表示可以发起授权操作，具体可授予项由代码校验。
+    // EN: Whether the user can grant laboratory-level permissions.
+    //     Note: this only means the user may initiate a grant; concrete grantable permissions are checked in code.
+    action grant_lab_permission = app_permission_admin
+
+
+    // =========================
+    // CN: 账号管理菜单与接口权限
+    // EN: Account management menu and API permissions
+    // =========================
+
+    // CN: 是否可以看到账号管理菜单。
+    // EN: Whether the user can see the account management menu.
+    permission menu_account = is_super_admin or account_manager
+
+    // CN: 是否可以查看账号。
+    // EN: Whether the user can view accounts.
+    permission account_view = is_super_admin or menu_account
+
+    // CN: 是否可以创建账号。
+    // EN: Whether the user can create accounts.
+    action account_create = is_super_admin or account_manager
+
+    // CN: 是否可以修改账号。
+    // EN: Whether the user can update accounts.
+    action account_update = is_super_admin or account_manager
+
+    // CN: 是否可以删除账号。
+    // EN: Whether the user can delete accounts.
+    action account_delete = is_super_admin or account_manager
+
+
+    // =========================
+    // CN: 基础信息管理权限
+    // EN: Base information management permissions
+    // =========================
+
+    // CN: 是否可以看到基础信息菜单。
+    // EN: Whether the user can see the base information menu.
+    permission menu_base = is_super_admin or base_manager
+
+    // CN: 是否可以创建实验室。
+    // EN: Whether the user can create laboratories.
+    action lab_create = is_super_admin or base_manager
+
+    // CN: 是否可以修改实验室基础信息。
+    // EN: Whether the user can update laboratory metadata.
+    action lab_update = is_super_admin or base_manager
+
+    // CN: 是否可以删除实验室。
+    // EN: Whether the user can delete laboratories.
+    action lab_delete = is_super_admin or base_manager
+
+
+    // =========================
+    // CN: 教学管理权限
+    // EN: Education management permissions
+    // =========================
+
+    // CN: 是否可以看到教学菜单。
+    // EN: Whether the user can see the education menu.
+    permission menu_edu = is_super_admin or edu_semester_manager or edu_timetable_scheduler or edu_timetable_viewer
+
+    // CN: 是否可以查看学期信息。
+    // EN: Whether the user can view semester information.
+    permission edu_semester_view = is_super_admin or menu_edu
+
+    // CN: 是否可以管理学期。
+    // EN: Whether the user can manage semesters.
+    permission edu_semester_manage = is_super_admin or edu_semester_manager
+
+    // CN: 是否可以查看课表。
+    // EN: Whether the user can view timetables.
+    permission edu_timetable_view = is_super_admin or edu_timetable_viewer or edu_timetable_scheduler
+
+    // CN: 是否可以排课。
+    // EN: Whether the user can schedule timetables.
+    action edu_timetable_schedule = is_super_admin or edu_timetable_scheduler
+
+
+    // =========================
+    // CN: 智控菜单与通用设备权限
+    // EN: Smart control menu and general device permissions
+    // =========================
+
+    // CN: 是否可以看到智控菜单。
+    // EN: Whether the user can see the smart control menu.
+    permission menu_smart_control = is_super_admin or smart_control_viewer or smart_control_manager or access_control_controller or circuitbreak_control_controller or light_control_controller or aircondition_control_controller
+
+    // CN: 是否可以查看智控模块。
+    // EN: Whether the user can view the smart control module.
+    permission smart_control_view = is_super_admin or menu_smart_control
+
+    // CN: 是否拥有通用智控管理权限。
+    // EN: Whether the user has general smart control management permission.
+    permission smart_control_manage = is_super_admin or smart_control_manager
+
+    // CN: 是否可以启用或禁用智控功能。
+    // EN: Whether the user can enable or disable smart control features.
+    action smart_control_enable_disable = is_super_admin or smart_control_manager or smart_control_enable_disable_manager
+
+
+    // =========================
+    // CN: 分设备类型控制权限
+    // EN: Device-type-specific control permissions
+    // =========================
+
+    // CN: 是否可以控制门禁设备。
+    // EN: Whether the user can control access control devices.
+    permission access_control_manage = is_super_admin or smart_control_manager or access_control_controller
+
+    // CN: 是否可以控制空开/电路设备。
+    // EN: Whether the user can control circuit breaker devices.
+    permission circuitbreak_control_manage = is_super_admin or smart_control_manager or circuitbreak_control_controller
+
+    // CN: 是否可以控制灯光设备。
+    // EN: Whether the user can control light devices.
+    permission light_control_manage = is_super_admin or smart_control_manager or light_control_controller
+
+    // CN: 是否可以控制空调设备。
+    // EN: Whether the user can control air conditioner devices.
+    permission aircondition_control_manage = is_super_admin or smart_control_manager or aircondition_control_controller
+
+
+    // =========================
+    // CN: 监控查看权限
+    // EN: Monitor viewing permissions
+    // =========================
+
+    // CN: 是否可以查看监控。
+    // EN: Whether the user can view monitoring information.
+    permission monitor_control_view = is_super_admin or monitor_control_viewer or smart_control_viewer or smart_control_manager
+
+
+    // =========================
+    // CN: 数据分析权限
+    // EN: Data analysis permissions
+    // =========================
+
+    // CN: 是否可以看到数据分析菜单。
+    // EN: Whether the user can see the data analysis menu.
+    permission menu_data_analysis = is_super_admin or data_analysis_edu or data_analysis_aircondition or data_analysis_circuitbreak
+
+    // CN: 是否可以查看教学数据分析。
+    // EN: Whether the user can view education data analysis.
+    permission data_analysis_edu_view = is_super_admin or data_analysis_edu
+
+    // CN: 是否可以查看空调数据分析。
+    // EN: Whether the user can view air conditioner data analysis.
+    permission data_analysis_aircondition_view = is_super_admin or data_analysis_aircondition
+
+    // CN: 是否可以查看电路/空开数据分析。
+    // EN: Whether the user can view circuit breaker data analysis.
+    permission data_analysis_circuitbreak_view = is_super_admin or data_analysis_circuitbreak
+}
+
+
+// CN: laboratory 是实验室资源，也是当前系统中最核心的数据范围资源。
+//     unit 和 building 不建模为实体，只作为 laboratory 的普通属性用于查询筛选。
+// EN: laboratory is the lab resource and the core data-scope resource in this system.
+//     unit and building are not modeled as entities; they are plain laboratory attributes for query filtering.
+entity laboratory {
+
+    // CN: 每个实验室关联一个 app 单例资源，通常是 app:main。
+    //     用于在实验室级权限判断中引用 app 层功能权限。
+    // EN: Each laboratory is linked to the singleton app resource, usually app:main.
+    //     This allows laboratory-level checks to reference app-level feature permissions.
+    relation app @app
+
+    // CN: 实验室创建者。是否让创建者天然拥有管理权取决于业务规则。
+    // EN: Laboratory creator. Whether the creator naturally has management permission depends on business rules.
+    relation creator @user
+
+    // CN: 实验室查看者，只拥有该实验室的数据可见性。
+    // EN: Laboratory viewer, only has visibility over this laboratory.
+    relation viewer @user
+
+    // CN: 实验室管理者，拥有该实验室的数据范围管理权。
+    // EN: Laboratory manager, has management permission over this laboratory scope.
+    relation manager @user
+
+    // CN: 实验室授权管理员，可以分配该实验室下的权限。
+    // EN: Laboratory authorization administrator, allowed to grant permissions within this laboratory.
+    relation authz_admin @user
+
+
+    // =========================
+    // CN: 实验室基础范围权限
+    // EN: Laboratory base scope permissions
+    // =========================
+
+    // CN: 实验室可见范围权限。
+    //     viewer、manager、authz_admin、creator 都可以看到实验室；
+    //     super_admin 通过 app.is_super_admin 获得全局可见性。
+    // EN: Laboratory visibility scope.
+    //     viewer, manager, authz_admin, and creator can view the lab;
+    //     super_admin gets global visibility through app.is_super_admin.
+    permission view_scope = viewer or manager or authz_admin or creator or app.is_super_admin
+
+    // CN: 实验室管理范围权限。
+    //     manager、authz_admin、creator 可以管理实验室；
+    //     super_admin 通过 app.is_super_admin 获得全局管理范围。
+    // EN: Laboratory management scope.
+    //     manager, authz_admin, and creator can manage the lab;
+    //     super_admin gets global management scope through app.is_super_admin.
+    permission manage_scope = manager or authz_admin or creator or app.is_super_admin
+
+    // CN: 查看实验室。
+    // EN: View laboratory.
+    permission view = view_scope
+
+    // CN: 修改实验室信息需要同时满足：
+    //     1. 拥有该实验室的管理范围；
+    //     2. 拥有 app 层 lab_update 功能权限。
+    // EN: Updating laboratory metadata requires both:
+    //     1. management scope over this laboratory;
+    //     2. app-level lab_update feature permission.
+    action update = manage_scope and app.lab_update
+
+    // CN: 删除实验室需要同时满足：
+    //     1. 拥有该实验室的管理范围；
+    //     2. 拥有 app 层 lab_delete 功能权限。
+    // EN: Deleting a laboratory requires both:
+    //     1. management scope over this laboratory;
+    //     2. app-level lab_delete feature permission.
+    action delete = manage_scope and app.lab_delete
+
+
+    // =========================
+    // CN: 实验室授权管理权限
+    // EN: Laboratory authorization management permissions
+    // =========================
+
+    // CN: 是否可以分配该实验室下的普通范围权限。
+    //     实验室 authz_admin 可以授权 viewer/manager；
+    //     app.grant_lab_permission 可以进行平台级授权。
+    // EN: Whether the user can grant normal scope permissions under this laboratory.
+    //     lab authz_admin can grant viewer/manager;
+    //     app.grant_lab_permission allows platform-level lab authorization.
+    permission grant_scope_permission = authz_admin or app.grant_lab_permission
+
+    // CN: 是否可以授予 viewer。
+    // EN: Whether the user can grant viewer.
+    action grant_viewer = grant_scope_permission
+
+    // CN: 是否可以授予 manager。
+    // EN: Whether the user can grant manager.
+    action grant_manager = grant_scope_permission
+
+    // CN: 是否可以授予 authz_admin。
+    //     这里只允许 app 层授权管理员授予，避免实验室授权管理员自我扩权。
+    // EN: Whether the user can grant authz_admin.
+    //     Only app-level authorization administrators can grant this to avoid self-escalation.
+    action grant_authz_admin = app.grant_lab_permission
+
+
+    // =========================
+    // CN: 实验室下设备通用权限
+    // EN: General device permissions under laboratory
+    // =========================
+
+    // CN: 查看实验室下设备需要：
+    //     1. 能看到该实验室；
+    //     2. 拥有 app 层智控查看权限。
+    // EN: Viewing devices under this laboratory requires:
+    //     1. visibility over this laboratory;
+    //     2. app-level smart control view permission.
+    permission device_view = view_scope and app.smart_control_view
+
+    // CN: 管理实验室下设备需要：
+    //     1. 能看到该实验室；
+    //     2. 拥有 app 层通用智控管理权限。
+    // EN: Managing devices under this laboratory requires:
+    //     1. visibility over this laboratory;
+    //     2. app-level general smart control management permission.
+    permission device_manage = view_scope and app.smart_control_manage
+
+    // CN: 启用/禁用实验室下设备需要：
+    //     1. 能看到该实验室；
+    //     2. 拥有 app 层启用/禁用权限。
+    // EN: Enabling/disabling devices under this laboratory requires:
+    //     1. visibility over this laboratory;
+    //     2. app-level enable/disable permission.
+    permission device_enable_disable = view_scope and app.smart_control_enable_disable
+
+
+    // =========================
+    // CN: 实验室下分设备类型控制权限
+    // EN: Device-type-specific control permissions under laboratory
+    // =========================
+
+    // CN: 控制门禁设备需要实验室可见性 + app 层门禁控制权限。
+    // EN: Controlling access control devices requires lab visibility + app-level access control permission.
+    permission access_control_manage = view_scope and app.access_control_manage
+
+    // CN: 控制空开/电路设备需要实验室可见性 + app 层空开/电路控制权限。
+    // EN: Controlling circuit breaker devices requires lab visibility + app-level circuit breaker control permission.
+    permission circuitbreak_control_manage = view_scope and app.circuitbreak_control_manage
+
+    // CN: 控制灯光设备需要实验室可见性 + app 层灯光控制权限。
+    // EN: Controlling light devices requires lab visibility + app-level light control permission.
+    permission light_control_manage = view_scope and app.light_control_manage
+
+    // CN: 控制空调设备需要实验室可见性 + app 层空调控制权限。
+    // EN: Controlling air conditioner devices requires lab visibility + app-level air conditioner control permission.
+    permission aircondition_control_manage = view_scope and app.aircondition_control_manage
+
+
+    // =========================
+    // CN: 实验室下监控查看权限
+    // EN: Monitor viewing permission under laboratory
+    // =========================
+
+    // CN: 查看实验室监控需要实验室可见性 + app 层监控查看权限。
+    // EN: Viewing laboratory monitoring requires lab visibility + app-level monitor viewing permission.
+    permission monitor_control_view = view_scope and app.monitor_control_view
+
+
+    // =========================
+    // CN: 实验室下教学权限
+    // EN: Education permissions under laboratory
+    // =========================
+
+    // CN: 查看实验室课表需要实验室可见性 + app 层课表查看权限。
+    // EN: Viewing laboratory timetable requires lab visibility + app-level timetable view permission.
+    permission edu_timetable_view = view_scope and app.edu_timetable_view
+
+    // CN: 调度实验室课表需要实验室可见性 + app 层排课权限。
+    // EN: Scheduling laboratory timetable requires lab visibility + app-level timetable schedule permission.
+    action edu_timetable_schedule = view_scope and app.edu_timetable_schedule
+
+
+    // =========================
+    // CN: 实验室下数据分析权限
+    // EN: Data analysis permissions under laboratory
+    // =========================
+
+    // CN: 查看实验室教学数据分析需要实验室可见性 + app 层教学数据分析权限。
+    // EN: Viewing laboratory education data analysis requires lab visibility + app-level education data analysis permission.
+    permission data_analysis_edu_view = view_scope and app.data_analysis_edu_view
+
+    // CN: 查看实验室空调数据分析需要实验室可见性 + app 层空调数据分析权限。
+    // EN: Viewing laboratory air conditioner data analysis requires lab visibility + app-level air conditioner data analysis permission.
+    permission data_analysis_aircondition_view = view_scope and app.data_analysis_aircondition_view
+
+    // CN: 查看实验室电路/空开数据分析需要实验室可见性 + app 层电路/空开数据分析权限。
+    // EN: Viewing laboratory circuit breaker data analysis requires lab visibility + app-level circuit breaker data analysis permission.
+    permission data_analysis_circuitbreak_view = view_scope and app.data_analysis_circuitbreak_view
+}
+
+
+// CN: device 是设备资源，挂载在 laboratory 之下。
+//     device 自身不直接保存用户授权，所有权限都委托给所属 laboratory 推导。
+// EN: device is a device resource attached to a laboratory.
+//     It does not directly store user grants; all permissions are delegated to its parent laboratory.
+entity device {
+
+    // CN: 设备所属实验室。
+    // EN: The laboratory this device belongs to.
+    relation lab @laboratory
+
+
+    // =========================
+    // CN: 设备查看权限
+    // EN: Device view permission
+    // =========================
+
+    // CN: 查看设备，继承自所属实验室的 device_view。
+    // EN: View device, inherited from the parent laboratory's device_view.
+    permission view = lab.device_view
+
+
+    // =========================
+    // CN: 设备通用管理权限
+    // EN: General device management permissions
+    // =========================
+
+    // CN: 通用设备管理权限。
+    // EN: General device management permission.
+    permission manage = lab.device_manage
+
+    // CN: 操作设备。后续 check 操作可使用 device.operate 作为通用设备操作入口。
+    // EN: Operate device. Future check operations can use device.operate as the general device operation entry.
+    action operate = manage
+
+    // CN: 启用/禁用设备权限。
+    // EN: Device enable/disable permission.
+    action enable_disable = lab.device_enable_disable
+
+
+    // =========================
+    // CN: 分设备类型控制权限
+    // EN: Device-type-specific control permissions
+    // =========================
+
+    // CN: 门禁设备控制权限。
+    // EN: Access control device management permission.
+    permission access_control_manage = lab.access_control_manage
+
+    // CN: 空开/电路设备控制权限。
+    // EN: Circuit breaker device management permission.
+    permission circuitbreak_control_manage = lab.circuitbreak_control_manage
+
+    // CN: 灯光设备控制权限。
+    // EN: Light device management permission.
+    permission light_control_manage = lab.light_control_manage
+
+    // CN: 空调设备控制权限。
+    // EN: Air conditioner device management permission.
+    permission aircondition_control_manage = lab.aircondition_control_manage
+
+
+    // =========================
+    // CN: 设备监控权限
+    // EN: Device monitoring permission
+    // =========================
+
+    // CN: 查看设备监控。
+    // EN: View device monitoring.
+    permission monitor_view = lab.monitor_control_view
+}

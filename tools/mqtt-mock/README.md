@@ -12,6 +12,14 @@ npm run dev
 
 `npm run dev` 使用 `tsx watch`，修改 TypeScript 源码后会自动重启。启动入口会先通过 `dotenv` 载入当前目录下的 `.env`，再创建 MQTT client。
 
+同时会启动运行时设备管理页面，默认地址：
+
+```text
+http://127.0.0.1:8787
+```
+
+页面和 MQTT handler 共用同一份内存状态。控制类指令会更新设备状态，查询类指令会从当前状态生成响应；状态不会持久化，mock 进程重启后会按默认状态重新创建设备。
+
 默认配置对应当前集成测试：
 
 ```text
@@ -20,6 +28,9 @@ MQTT_SUBSCRIBE_TOPIC=test/accept/+
 MQTT_REPLY_TOPIC=test/send
 MQTT_TOPIC_REGEX=^test/accept/(?<topicKey>[^/]+)$
 MQTT_REPLY_TOPIC_TEMPLATE=test/send/${topicKey}
+MQTT_MOCK_WEB_ENABLED=true
+MQTT_MOCK_WEB_HOST=127.0.0.1
+MQTT_MOCK_WEB_PORT=8787
 ```
 
 这表示 mock 会订阅 `test/accept/+`，收到 `test/accept/1` 时回复到 `test/send/1`，收到 `test/accept/gateway-a` 时回复到 `test/send/gateway-a`。
@@ -66,7 +77,17 @@ mock 会按 payload 第 0 位地址区分设备类型：
 | Light | `OPEN_LIGHT`, `CLOSE_LIGHT`, `LOCK_LIGHT`, `UNLOCK_LIGHT`, `REQUEST_LIGHT_DATA` |
 | Sensor | `REQUEST_SENSOR_DATA` |
 
-查询类响应会根据 `address` 和 `selfId` 生成不同数据，便于验证多设备轮询、记录持久化和 Redis hash 的 field-level 访问。
+设备运行时状态字段对齐 Java record model：
+
+| 设备 | 状态字段 |
+| --- | --- |
+| Access | `opened`, `locked`, `lockStatus`, `delayTime` |
+| CircuitBreak | `opened`, `fixed`, `locked`, `voltage`, `current`, `power`, `energy`, `leakage`, `temperature` |
+| AirCondition | `opened`, `mode`, `temperature`, `speed`, `roomTemperature`, `errorCode` |
+| Light | `opened`, `locked` |
+| Sensor | `temperature`, `humidity`, `light`, `smoke` |
+
+查询类响应会根据当前运行时状态生成；新设备首次出现时会根据 `address` 和 `selfId` 生成默认状态，便于验证多设备轮询、记录持久化和 Redis hash 的 field-level 访问。
 
 校验位会按 Java 端当前实现生成：
 

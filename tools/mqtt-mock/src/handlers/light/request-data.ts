@@ -1,4 +1,5 @@
 import { appendUnsignedSum, verifyUnsignedSum } from "../../protocol/checksum.js";
+import { ensureDevice, type LightDeviceState } from "../../state/device-store.js";
 import type { CommandHandler } from "../types.js";
 
 export const requestLightDataHandler: CommandHandler = {
@@ -14,6 +15,14 @@ export const requestLightDataHandler: CommandHandler = {
       throw new Error("REQUEST_LIGHT_DATA checksum failed");
     }
 
-    return appendUnsignedSum([context.address, 0x03, context.selfId, 0xff, 0xff, 0x00]);
+    const state = ensureDevice("Light", context.address, context.selfId) as LightDeviceState;
+    return appendUnsignedSum([
+      context.address,
+      0x03,
+      context.selfId,
+      state.opened ? 0xff : 0x00,
+      state.locked ? 0xff : 0x00,
+      0x00
+    ]);
   }
 };

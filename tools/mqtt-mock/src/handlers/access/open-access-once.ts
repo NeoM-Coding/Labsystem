@@ -1,4 +1,5 @@
 import { appendUnsignedSum, verifyUnsignedSum } from "../../protocol/checksum.js";
+import { ensureDevice, updateDevice } from "../../state/device-store.js";
 import type { CommandHandler } from "../types.js";
 
 export const openAccessOnceHandler: CommandHandler = {
@@ -13,6 +14,8 @@ export const openAccessOnceHandler: CommandHandler = {
     if (!verifyUnsignedSum(payload)) {
       throw new Error("OPEN_ACCESS_ONCE checksum failed");
     }
+    const state = ensureDevice("Access", context.address);
+    updateDevice(state.key, { opened: true });
     return appendUnsignedSum([context.address, 0x0a, 0x02, 0xff]);
   }
 };

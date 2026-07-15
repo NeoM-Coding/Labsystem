@@ -4,8 +4,10 @@ import { loadConfig } from "./config.js";
 import { toBuffer, toHex, toUnsignedBytes } from "./protocol/bytes.js";
 import { resolveResponse } from "./handlers/index.js";
 import { decodeTopic } from "./topic/decoder.js";
+import { startWebServer } from "./web-server.js";
 
 const config = loadConfig();
+const webServer = startWebServer(config);
 
 const client = mqtt.connect(config.mqttUrl, {
   clientId: config.clientId,
@@ -60,6 +62,7 @@ process.once("SIGINT", shutdown);
 process.once("SIGTERM", shutdown);
 
 function shutdown(): void {
+  webServer?.close();
   client.end(false, {}, () => {
     console.info("[mqtt-mock] stopped");
     process.exit(0);

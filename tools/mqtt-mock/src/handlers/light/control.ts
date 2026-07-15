@@ -1,4 +1,5 @@
 import { appendUnsignedSum, verifyUnsignedSum } from "../../protocol/checksum.js";
+import { ensureDevice, updateDevice } from "../../state/device-store.js";
 import type { CommandHandler } from "../types.js";
 
 const commandNames = new Map<string, string>([
@@ -24,6 +25,9 @@ export const lightControlHandler: CommandHandler = {
       throw new Error("LIGHT_CONTROL checksum failed");
     }
 
+    const state = ensureDevice("Light", context.address, context.selfId);
+    updateDevice(state.key, lightPatch(payload));
+
     return appendUnsignedSum([
       context.address,
       0x0a,
@@ -33,3 +37,18 @@ export const lightControlHandler: CommandHandler = {
     ]);
   }
 };
+
+function lightPatch(payload: readonly number[]): Record<string, unknown> {
+  const patch: Record<string, unknown> = {};
+  if (payload[3] === 0xff) {
+    patch.opened = true;
+  } else if (payload[3] === 0x00) {
+    patch.opened = false;
+  }
+  if (payload[4] === 0xff) {
+    patch.locked = true;
+  } else if (payload[4] === 0x00) {
+    patch.locked = false;
+  }
+  return patch;
+}

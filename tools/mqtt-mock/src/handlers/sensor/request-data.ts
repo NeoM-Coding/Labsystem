@@ -1,6 +1,7 @@
 import { appendUnsignedSum, verifyUnsignedSum } from "../../protocol/checksum.js";
+import { ensureDevice, type SensorDeviceState } from "../../state/device-store.js";
 import type { CommandHandler } from "../types.js";
-import { u16, u32, vary } from "../shared/device-state.js";
+import { u16, u32 } from "../shared/device-state.js";
 
 export const requestSensorDataHandler: CommandHandler = {
   commandLine: "REQUEST_SENSOR_DATA",
@@ -15,10 +16,11 @@ export const requestSensorDataHandler: CommandHandler = {
       throw new Error("REQUEST_SENSOR_DATA checksum failed");
     }
 
-    const temperatureTenths = vary(245, context.address, context.selfId);
-    const humidityTenths = vary(558, context.address, context.selfId);
-    const lightTenths = 1000 + context.address * 10 + context.selfId;
-    const smoke = vary(12, context.address, context.selfId);
+    const state = ensureDevice("Sensor", context.address, context.selfId) as SensorDeviceState;
+    const temperatureTenths = Math.round(state.temperature * 10);
+    const humidityTenths = Math.round(state.humidity * 10);
+    const lightTenths = Math.round(state.light * 10);
+    const smoke = Math.round(state.smoke);
 
     return appendUnsignedSum([
       context.address,

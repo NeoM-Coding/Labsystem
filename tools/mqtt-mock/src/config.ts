@@ -8,6 +8,9 @@ export interface MockConfig {
   topicRegex?: string;
   replyTopicTemplate?: string;
   qos: 0 | 1 | 2;
+  webEnabled: boolean;
+  webHost: string;
+  webPort: number;
 }
 
 function optional(value: string | undefined): string | undefined {
@@ -19,6 +22,15 @@ function qos(value: string | undefined): 0 | 1 | 2 {
     return Number(value) as 1 | 2;
   }
   return 0;
+}
+
+function enabled(value: string | undefined): boolean {
+  return value !== "false" && value !== "0";
+}
+
+function port(value: string | undefined, fallback: number): number {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 function mqttWildcardTopic(value: string): string {
@@ -38,6 +50,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): MockConfig {
     fallbackReplyTopic: env.MQTT_REPLY_TOPIC ?? "test/send",
     topicRegex: optional(env.MQTT_TOPIC_REGEX) ?? "^test/accept/(?<topicKey>[^/]+)$",
     replyTopicTemplate: optional(env.MQTT_REPLY_TOPIC_TEMPLATE) ?? "test/send/${topicKey}",
-    qos: qos(env.MQTT_QOS)
+    qos: qos(env.MQTT_QOS),
+    webEnabled: enabled(env.MQTT_MOCK_WEB_ENABLED),
+    webHost: env.MQTT_MOCK_WEB_HOST ?? "127.0.0.1",
+    webPort: port(env.MQTT_MOCK_WEB_PORT, 8787)
   };
 }

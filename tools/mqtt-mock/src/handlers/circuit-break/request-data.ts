@@ -1,5 +1,6 @@
 import { appendCrc16 } from "../../protocol/checksum.js";
 import type { Bytes } from "../../protocol/bytes.js";
+import { ensureDevice, type CircuitBreakDeviceState } from "../../state/device-store.js";
 import type { CommandHandler } from "../types.js";
 import { floatLE } from "../shared/device-state.js";
 import { matchesCheckedPrefix } from "../shared/match.js";
@@ -14,24 +15,24 @@ export const requestCircuitBreakDataHandler: CommandHandler = {
       return undefined;
     }
 
-    return appendCrc16(circuitBreakStatus(context.address));
+    return appendCrc16(circuitBreakStatus(ensureDevice("CircuitBreak", context.address) as CircuitBreakDeviceState));
   }
 };
 
-function circuitBreakStatus(address: number): Bytes {
+function circuitBreakStatus(state: CircuitBreakDeviceState): Bytes {
   const body = new Array<number>(219).fill(0);
-  body[0] = address;
+  body[0] = state.address;
   body[1] = 0x03;
   body[2] = 0xe8;
-  body[3] = 0x01;
-  body[4] = address % 2 === 0 ? 0x03 : 0x01;
+  body[3] = state.fixed ? 0x01 : 0x00;
+  body[4] = (state.opened ? 0x01 : 0x00) | (state.locked ? 0x02 : 0x00);
 
-  write(body, 7, floatLE(0.12 + address / 1000));
-  write(body, 11, floatLE(26.5 + (address % 3)));
-  write(body, 55, floatLE(220 + (address % 5)));
-  write(body, 119, floatLE(1.2 + (address % 4) / 10));
-  write(body, 151, floatLE(260 + address));
-  write(body, 215, floatLE(1234.5 + address));
+  write(body, 7, floatLE(state.leakage));
+  write(body, 11, floatLE(state.temperature));
+  write(body, 55, floatLE(state.voltage));
+  write(body, 119, floatLE(state.current));
+  write(body, 151, floatLE(state.power));
+  write(body, 215, floatLE(state.energy));
   return body;
 }
 

@@ -10,8 +10,10 @@ import xyz.jasenon.lab.base.util.SaTokenUtil;
 import xyz.jasenon.lab.common.exception.BusinessException;
 import xyz.jasenon.lab.base.api.validation.ValidationErrors;
 import xyz.jasenon.lab.base.api.model.User;
+import xyz.jasenon.lab.observability.annotation.Traced;
 
 @DubboService
+@Traced("user-service")
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
 
     private static final int BAD_REQUEST = 400;

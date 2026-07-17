@@ -32,6 +32,7 @@
         <module>device-domain</module>
         <module>mqtt-protocol</module>
         <module>auth-api</module>
+        <module>observability</module>
         <module>base-api</module>
         <module>api</module>
         <module>redis</module>

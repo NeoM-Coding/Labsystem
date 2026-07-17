@@ -9,10 +9,12 @@ import xyz.jasenon.lab.common.exception.BusinessException;
 import xyz.jasenon.lab.base.api.validation.ValidationErrors;
 import xyz.jasenon.lab.base.api.model.Laboratory;
 import xyz.jasenon.lab.common.util.Pair;
+import xyz.jasenon.lab.observability.annotation.Traced;
 
 import java.util.List;
 
 @DubboService
+@Traced("laboratory-service")
 public class LaboratoryServiceImpl extends ServiceImpl<LaboratoryMapper, Laboratory> implements LaboratoryService {
 
     private static final int BAD_REQUEST = 400;

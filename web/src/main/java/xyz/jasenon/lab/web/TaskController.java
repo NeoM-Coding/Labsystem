@@ -10,12 +10,14 @@ import xyz.jasenon.lab.api.mqtt.dto.MqttResponseDto;
 import xyz.jasenon.lab.api.mqtt.dto.MqttTaskDto;
 import xyz.jasenon.lab.web.response.DiyResponseEntity;
 import xyz.jasenon.lab.common.util.R;
+import xyz.jasenon.lab.observability.annotation.Traced;
 
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
 @RestController
 @RequestMapping("/mqtt-io")
+@Traced("mqtt-web")
 public class TaskController {
 
     @DubboReference(check = false)

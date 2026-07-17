@@ -18,6 +18,7 @@ import xyz.jasenon.lab.mqtt.client.mqtt.MqttTask;
 import xyz.jasenon.lab.mqtt.config.MqttOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import xyz.jasenon.lab.observability.annotation.Traced;
 
 import java.util.List;
 import java.util.Map;
@@ -33,6 +34,7 @@ import java.util.stream.Collectors;
  * {@link xyz.jasenon.lab.mqtt.client.common.Poll}
  */
 @DubboService
+@Traced("mqtt-polling-service")
 public class SysPollingManager implements MqttPollCo {
 
     private static final Logger log = LoggerFactory.getLogger(SysPollingManager.class);

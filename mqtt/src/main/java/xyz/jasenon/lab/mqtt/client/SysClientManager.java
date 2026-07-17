@@ -24,6 +24,7 @@ import xyz.jasenon.lab.mqtt.client.mqtt.MqttCallback;
 import xyz.jasenon.lab.mqtt.client.mqtt.MqttClient;
 import xyz.jasenon.lab.mqtt.client.mqtt.MqttTask;
 import xyz.jasenon.lab.mqtt.config.MqttOptions;
+import xyz.jasenon.lab.observability.annotation.Traced;
 
 import java.util.List;
 import java.util.Objects;
@@ -35,6 +36,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 @DubboService
+@Traced("mqtt-client-service")
 public class SysClientManager implements MqttIo, MqttGatewayCRUD {
 
     private static final Logger log = LoggerFactory.getLogger(SysClientManager.class);

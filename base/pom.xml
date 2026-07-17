@@ -46,6 +46,11 @@
             <artifactId>auth-api</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>xyz.jasenon.lab</groupId>
+            <artifactId>observability</artifactId>
+            <version>${project.version}</version>
+        </dependency>
 
         <dependency>
             <groupId>com.baomidou</groupId>

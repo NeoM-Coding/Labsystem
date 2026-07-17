@@ -2,7 +2,9 @@ package xyz.jasenon.lab.common.util;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
+import java.util.Map;
 import java.util.concurrent.*;
 import java.util.function.Supplier;
 
@@ -122,38 +124,38 @@ public final class AsyncExecutor {
         throw new AssertionError("工具类禁止实例化");
     }
 
-    // ==================== TraceId 包装工具 ====================
+    // ==================== MDC 包装工具 ====================
 
     /**
-     * 包装 Runnable，传递 TraceId 到新线程
+     * 包装 Runnable，传递完整 MDC 到新线程
      */
     private static Runnable wrapWithTraceId(Runnable runnable) {
-        String traceId = TraceIdContext.get();
+        Map<String, String> context = MDC.getCopyOfContextMap();
         return () -> {
+            Map<String, String> previous = MDC.getCopyOfContextMap();
             try {
-                if (traceId != null) {
-                    TraceIdContext.put(traceId);
-                }
+                if (context != null) MDC.setContextMap(context);
                 runnable.run();
             } finally {
-                TraceIdContext.clear();
+                MDC.clear();
+                if (previous != null) MDC.setContextMap(previous);
             }
         };
     }
 
     /**
-     * 包装 Supplier，传递 TraceId 到新线程
+     * 包装 Supplier，传递完整 MDC 到新线程
      */
     private static <T> Supplier<T> wrapWithTraceId(Supplier<T> supplier) {
-        String traceId = TraceIdContext.get();
+        Map<String, String> context = MDC.getCopyOfContextMap();
         return () -> {
+            Map<String, String> previous = MDC.getCopyOfContextMap();
             try {
-                if (traceId != null) {
-                    TraceIdContext.put(traceId);
-                }
+                if (context != null) MDC.setContextMap(context);
                 return supplier.get();
             } finally {
-                TraceIdContext.clear();
+                MDC.clear();
+                if (previous != null) MDC.setContextMap(previous);
             }
         };
     }

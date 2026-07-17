@@ -3,9 +3,9 @@ spring:
     name: rule-engine
 
   datasource:
-    url: jdbc:mysql://localhost:3306/lab_sys?useUnicode=true&characterEncoding=utf-8
-    username: root
-    password: sbx159357!?.
+    url: ${LAB_DB_URL:jdbc:mysql://localhost:3306/lab_sys?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai}
+    username: ${MYSQL_USERNAME:root}
+    password: ${MYSQL_PASSWORD:lab-system-local}
 
 server:
   port: 3334
@@ -16,6 +16,10 @@ dubbo:
     qos-port: 4445
   provider:
     timeout: 5_000
+  registry:
+    address: nacos://${NACOS_HOST:localhost}:${NACOS_PORT:8848}
+  config-center:
+    address: nacos://${NACOS_HOST:localhost}:${NACOS_PORT:8848}
 
 lab:
   rule-engine:
@@ -33,8 +37,9 @@ lab:
 
   redis:
     enabled: true
-    host: localhost
-    port: 6379
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+    password: ${REDIS_PASSWORD:}
     database: 0
     timeout-millis: 15_000
     pool:

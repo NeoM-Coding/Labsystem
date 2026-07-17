@@ -9,8 +9,8 @@ lab:
   auth:
     permify:
       enabled: true
-      base-url: http://localhost:3476
-      tenant-id: t1
+      base-url: http://${PERMIFY_HOST:localhost}:${PERMIFY_HTTP_PORT:3476}
+      tenant-id: ${PERMIFY_TENANT_ID:t1}
       subject-header: X-User-Id
       subject-type-header: X-User-Type
       default-subject-type: user
@@ -25,3 +25,7 @@ dubbo:
     qos-port: 5555
   consumer:
     timeout: 5_000
+  registry:
+    address: nacos://${NACOS_HOST:localhost}:${NACOS_PORT:8848}
+  config-center:
+    address: nacos://${NACOS_HOST:localhost}:${NACOS_PORT:8848}

@@ -3,7 +3,9 @@ dubbo:
     logger: slf4j
     name: BaseApplication
   registry:
-    address: zookeeper://${zookeeper.address:127.0.0.1}:2181
+    address: nacos://${NACOS_HOST:localhost}:${NACOS_PORT:8848}
+  config-center:
+    address: nacos://${NACOS_HOST:localhost}:${NACOS_PORT:8848}
   protocol:
     name: tri
     port: 50051

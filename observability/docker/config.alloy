@@ -1,0 +1,32 @@
+loki.source.file "lab_system" {
+  targets = [
+    {
+      __path__ = "/var/log/lab-system/*.log",
+      job      = "lab-system-cloud",
+    },
+  ]
+  file_match {
+    enabled     = true
+    sync_period = "5s"
+  }
+  forward_to = [loki.process.lab_system.receiver]
+}
+
+loki.process "lab_system" {
+  stage.regex {
+    source     = "filename"
+    expression = ".*/(?P<service>[^/]+)\\.log$"
+  }
+  stage.labels {
+    values = {
+      service = "",
+    }
+  }
+  forward_to = [loki.write.local.receiver]
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

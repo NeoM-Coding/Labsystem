@@ -8,14 +8,13 @@ import org.eclipse.paho.client.mqttv3.MqttException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.http.HttpStatus;
 import xyz.jasenon.lab.api.mqtt.MqttGatewayCRUD;
 import xyz.jasenon.lab.api.mqtt.MqttIo;
 import xyz.jasenon.lab.api.mqtt.dto.MqttResponseDto;
 import xyz.jasenon.lab.api.mqtt.dto.MqttTaskDto;
-import xyz.jasenon.lab.common.command.Task;
+import xyz.jasenon.lab.mqtt.protocol.command.Task;
 import xyz.jasenon.lab.common.exception.BusinessException;
-import xyz.jasenon.lab.common.model.gateway.gateways.RS485Gateway;
+import xyz.jasenon.lab.device.model.gateway.gateways.RS485Gateway;
 import xyz.jasenon.lab.mqtt.client.common.PendingRequest;
 import xyz.jasenon.lab.mqtt.client.event.GatewayClientReadyEvent;
 import xyz.jasenon.lab.mqtt.client.event.GatewayClientsInitialRebuildCompletedEvent;
@@ -39,6 +38,8 @@ import java.util.stream.Collectors;
 public class SysClientManager implements MqttIo, MqttGatewayCRUD {
 
     private static final Logger log = LoggerFactory.getLogger(SysClientManager.class);
+    private static final int NOT_FOUND = 404;
+    private static final int INTERNAL_SERVER_ERROR = 500;
 
     private final TaskHelper thelper;
     private final GatewayHelper ghelper;
@@ -73,33 +74,33 @@ public class SysClientManager implements MqttIo, MqttGatewayCRUD {
 
     public MqttResponseDto syncSend(MqttTaskDto dto) throws ExecutionException, InterruptedException, TimeoutException {
         MqttTask userTask = thelper.help(dto);
-        if (userTask == null) throw new BusinessException(HttpStatus.NOT_FOUND.value(),"device doesn't exist!");
+        if (userTask == null) throw new BusinessException(NOT_FOUND, "device doesn't exist!");
         var client = (AbstractSysClient<MqttTask>) ClientsRuntime.client(userTask.getGatewayId());
         if (client != null){
             PendingRequest<MqttTask> task = userTask.decorate();
             client.offer(task);
             return toResponseDto(task.getFuture().get(task.getTimeout(), TimeUnit.MILLISECONDS));
         }
-        throw new BusinessException(HttpStatus.NOT_FOUND.value(),"gateway doesn't exist!");
+        throw new BusinessException(NOT_FOUND, "gateway doesn't exist!");
     }
 
     public CompletableFuture<MqttResponseDto> asyncSend(MqttTaskDto dto) {
         MqttTask userTask = thelper.help(dto);
-        if (userTask == null) throw new BusinessException(HttpStatus.NOT_FOUND.value(),"device doesn't exist!");
+        if (userTask == null) throw new BusinessException(NOT_FOUND, "device doesn't exist!");
         var client = (AbstractSysClient<MqttTask>) ClientsRuntime.client(userTask.getGatewayId());
         if (client != null){
             PendingRequest<MqttTask> task = userTask.decorate();
             client.offer(task);
             return task.getFuture().thenApply(this::toResponseDto);
         }
-        throw new BusinessException(HttpStatus.NOT_FOUND.value(),"gateway doesn't exist!");
+        throw new BusinessException(NOT_FOUND, "gateway doesn't exist!");
     }
 
     private MqttResponseDto toResponseDto(Object resp) {
         if (resp instanceof Task task) {
             return MqttResponseDto.of(task.getGatewayId(), task.getPayload());
         }
-        throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR.value(), "unsupported mqtt response type");
+        throw new BusinessException(INTERNAL_SERVER_ERROR, "unsupported mqtt response type");
     }
 
     public static void remove(AbstractSysClient<? extends Task> client) {

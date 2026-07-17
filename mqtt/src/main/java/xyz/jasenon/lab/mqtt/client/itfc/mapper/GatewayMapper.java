@@ -2,7 +2,7 @@ package xyz.jasenon.lab.mqtt.client.itfc.mapper;
 
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Select;
-import xyz.jasenon.lab.common.model.gateway.gateways.RS485Gateway;
+import xyz.jasenon.lab.device.model.gateway.gateways.RS485Gateway;
 
 import java.util.List;
 

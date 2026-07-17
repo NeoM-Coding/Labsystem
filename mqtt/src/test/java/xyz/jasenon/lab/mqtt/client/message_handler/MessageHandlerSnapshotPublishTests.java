@@ -4,10 +4,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import xyz.jasenon.lab.common.event.DeviceRecordSnapshotEvent;
-import xyz.jasenon.lab.common.event.RuleEngineChannels;
-import xyz.jasenon.lab.common.model.device.BaseRecord;
-import xyz.jasenon.lab.common.model.device.DeviceType;
+import xyz.jasenon.lab.device.event.DeviceRecordSnapshotEvent;
+import xyz.jasenon.lab.device.event.RuleEngineChannels;
+import xyz.jasenon.lab.device.model.BaseRecord;
+import xyz.jasenon.lab.device.model.DeviceType;
 import xyz.jasenon.lab.redis.core.RedisBus;
 
 import java.time.Duration;

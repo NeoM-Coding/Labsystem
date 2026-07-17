@@ -5,7 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import xyz.jasenon.lab.common.config.MybatisPlusConfig;
+import xyz.jasenon.lab.persistence.config.MybatisPlusConfig;
 import xyz.jasenon.lab.engine.RuleEngineApplication;
 import xyz.jasenon.lab.engine.definition.RuntimeRevision;
 

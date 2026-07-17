@@ -416,7 +416,7 @@ public class RuntimePersistHelper implements RuntimePersist {
     }
 
     private record DeviceIdentity(
-            xyz.jasenon.lab.common.model.device.DeviceType deviceType,
+            xyz.jasenon.lab.device.model.DeviceType deviceType,
             String deviceId
     ) {
     }

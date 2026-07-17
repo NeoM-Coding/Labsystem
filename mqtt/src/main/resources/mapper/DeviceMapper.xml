@@ -4,15 +4,15 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="xyz.jasenon.lab.mqtt.client.itfc.mapper.DeviceMapper">
     <!-- 在此处添加SQL映射语句 -->
-    <resultMap id="DeviceResultMap" type="xyz.jasenon.lab.common.model.device.Device" autoMapping="true">
+    <resultMap id="DeviceResultMap" type="xyz.jasenon.lab.device.model.Device" autoMapping="true">
         <id javaType="string" column="id" property="id"/>
         
-        <discriminator javaType="xyz.jasenon.lab.common.model.device.DeviceType" column="device_type">
-            <case value="Access" resultType="xyz.jasenon.lab.common.model.device.devices.Access"/>
-            <case value="AirCondition" resultType="xyz.jasenon.lab.common.model.device.devices.AirCondition"/>
-            <case value="CircuitBreak" resultType="xyz.jasenon.lab.common.model.device.devices.CircuitBreak"/>
-            <case value="Light" resultType="xyz.jasenon.lab.common.model.device.devices.Light"/>
-            <case value="Sensor" resultType="xyz.jasenon.lab.common.model.device.devices.Sensor"/>
+        <discriminator javaType="xyz.jasenon.lab.device.model.DeviceType" column="device_type">
+            <case value="Access" resultType="xyz.jasenon.lab.device.model.devices.Access"/>
+            <case value="AirCondition" resultType="xyz.jasenon.lab.device.model.devices.AirCondition"/>
+            <case value="CircuitBreak" resultType="xyz.jasenon.lab.device.model.devices.CircuitBreak"/>
+            <case value="Light" resultType="xyz.jasenon.lab.device.model.devices.Light"/>
+            <case value="Sensor" resultType="xyz.jasenon.lab.device.model.devices.Sensor"/>
         </discriminator>
         
     </resultMap>

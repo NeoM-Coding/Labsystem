@@ -5,11 +5,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import xyz.jasenon.lab.common.Const;
-import xyz.jasenon.lab.common.event.DeviceRecordSnapshotEvent;
-import xyz.jasenon.lab.common.event.RuleEngineChannels;
-import xyz.jasenon.lab.common.model.device.BaseRecord;
-import xyz.jasenon.lab.common.model.device.DeviceType;
+import xyz.jasenon.lab.device.event.DeviceRecordSnapshotEvent;
+import xyz.jasenon.lab.device.event.RuleEngineChannels;
+import xyz.jasenon.lab.device.model.BaseRecord;
+import xyz.jasenon.lab.device.model.DeviceRecordKeys;
+import xyz.jasenon.lab.device.model.DeviceType;
 import xyz.jasenon.lab.common.util.ObjectMapUtil;
 import xyz.jasenon.lab.redis.core.RedisBus;
 
@@ -17,7 +17,7 @@ import java.time.Instant;
 import java.time.Duration;
 import java.util.Map;
 
-public abstract class MessageHandler<R extends BaseRecord> implements Const.Key {
+public abstract class MessageHandler<R extends BaseRecord> {
 
     private static final Logger log = LoggerFactory.getLogger(MessageHandler.class);
     private static final ObjectMapper OBJECT_MAPPER = JsonMapper.builder().findAndAddModules().build();
@@ -47,7 +47,7 @@ public abstract class MessageHandler<R extends BaseRecord> implements Const.Key 
         // 刷 redis hash 用于快速获取对应字段 统计用
         // 同时 redis 数据 expire 也可以作为设备在线判断
         Map<String, String> rmap = ObjectMapUtil.toStringMap(r);
-        jedis.hsetex(RECORD_KEY(deviceType, deviceId), rmap, Duration.ofSeconds(15));
+        jedis.hsetex(DeviceRecordKeys.recordKey(deviceType, deviceId), rmap, Duration.ofSeconds(15));
         publishSnapshot(deviceId, rmap);
 
         // 落库

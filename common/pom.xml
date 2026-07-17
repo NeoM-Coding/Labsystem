@@ -11,18 +11,28 @@
     </parent>
 
     <artifactId>common</artifactId>
+    <name>common</name>
+    <description>Lightweight shared kernel without domain or persistence models</description>
 
     <dependencies>
         <dependency>
-            <groupId>io.github.sunjieyi60</groupId>
-            <artifactId>baidu-uidgenerator-spring-boot3-starter</artifactId>
-            <version>1.0</version>
+            <groupId>cn.hutool</groupId>
+            <artifactId>hutool-all</artifactId>
+            <version>5.8.40</version>
         </dependency>
-
         <dependency>
-            <groupId>com.baomidou</groupId>
-            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
-            <scope>provided</scope>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 

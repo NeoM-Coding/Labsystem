@@ -38,7 +38,7 @@ class SimpleTestTests {
         verify(engine).register(runtimeCaptor.capture());
         verifyNoMoreInteractions(engine);
         verify(listener).replay(
-                xyz.jasenon.lab.common.model.device.DeviceType.AirCondition,
+                xyz.jasenon.lab.device.model.DeviceType.AirCondition,
                 "air-condition-31-6"
         );
         verifyNoMoreInteractions(listener);

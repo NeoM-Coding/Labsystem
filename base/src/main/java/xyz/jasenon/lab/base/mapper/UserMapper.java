@@ -3,7 +3,7 @@ package xyz.jasenon.lab.base.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
-import xyz.jasenon.lab.common.model.base.User;
+import xyz.jasenon.lab.base.api.model.User;
 
 import java.util.Set;
 

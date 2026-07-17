@@ -2,7 +2,7 @@ package xyz.jasenon.lab.mqtt.client.itfc.impl;
 
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
-import xyz.jasenon.lab.common.model.device.Device;
+import xyz.jasenon.lab.device.model.Device;
 import xyz.jasenon.lab.mqtt.client.itfc.DeviceHelper;
 import xyz.jasenon.lab.mqtt.client.itfc.mapper.DeviceMapper;
 

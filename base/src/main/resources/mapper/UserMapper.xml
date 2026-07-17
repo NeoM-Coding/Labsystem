@@ -9,7 +9,7 @@
         select count(name) from user where name = #{name};
     </select>
 
-    <select id="getUserByUsername" resultType="xyz.jasenon.lab.common.model.base.User">
+    <select id="getUserByUsername" resultType="xyz.jasenon.lab.base.api.model.User">
         select * from user where username = ${username};
     </select>
 </mapper>

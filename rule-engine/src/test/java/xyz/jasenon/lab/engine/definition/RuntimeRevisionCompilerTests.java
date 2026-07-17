@@ -2,7 +2,7 @@ package xyz.jasenon.lab.engine.definition;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
-import xyz.jasenon.lab.common.model.device.DeviceType;
+import xyz.jasenon.lab.device.model.DeviceType;
 import xyz.jasenon.lab.engine.action.Action;
 import xyz.jasenon.lab.engine.action.ReportAction;
 import xyz.jasenon.lab.engine.definition.RuntimeRevision.ActionDefinition;

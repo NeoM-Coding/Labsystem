@@ -2,7 +2,7 @@ package xyz.jasenon.lab.engine.eval;
 
 import lombok.Getter;
 import lombok.Setter;
-import xyz.jasenon.lab.common.model.device.DeviceType;
+import xyz.jasenon.lab.device.model.DeviceType;
 
 @Getter
 @Setter

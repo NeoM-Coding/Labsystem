@@ -6,7 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
-import xyz.jasenon.lab.common.model.device.DeviceType;
+import xyz.jasenon.lab.device.model.DeviceType;
 import xyz.jasenon.lab.engine.action.ActionGroup;
 import xyz.jasenon.lab.engine.eval.EvalNode;
 import xyz.jasenon.lab.engine.eval.LogicType;

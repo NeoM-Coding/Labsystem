@@ -1,6 +1,6 @@
 package xyz.jasenon.lab.engine.event;
 
-import xyz.jasenon.lab.common.model.device.DeviceType;
+import xyz.jasenon.lab.device.model.DeviceType;
 
 import java.util.Objects;
 

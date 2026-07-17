@@ -2,9 +2,9 @@ package xyz.jasenon.lab.mqtt.client.itfc.impl;
 
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
-import xyz.jasenon.lab.common.model.gateway.Gateway;
-import xyz.jasenon.lab.common.model.gateway.gateways.RS485Gateway;
-import xyz.jasenon.lab.common.model.gateway.gateways.SocketGateway;
+import xyz.jasenon.lab.device.model.gateway.Gateway;
+import xyz.jasenon.lab.device.model.gateway.gateways.RS485Gateway;
+import xyz.jasenon.lab.device.model.gateway.gateways.SocketGateway;
 import xyz.jasenon.lab.mqtt.client.itfc.GatewayHelper;
 import xyz.jasenon.lab.mqtt.client.itfc.mapper.GatewayMapper;
 

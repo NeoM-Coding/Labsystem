@@ -10,7 +10,7 @@ import org.springframework.context.annotation.Primary;
 import xyz.jasenon.lab.api.mqtt.MqttIo;
 import xyz.jasenon.lab.api.mqtt.dto.MqttResponseDto;
 import xyz.jasenon.lab.api.mqtt.dto.MqttTaskDto;
-import xyz.jasenon.lab.common.model.device.DeviceType;
+import xyz.jasenon.lab.device.model.DeviceType;
 import xyz.jasenon.lab.engine.Engine;
 import xyz.jasenon.lab.engine.RuleEngineApplication;
 import xyz.jasenon.lab.engine.action.*;

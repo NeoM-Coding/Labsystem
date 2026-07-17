@@ -1,21 +1,17 @@
 package xyz.jasenon.lab.mqtt.client.itfc.impl;
 
-import cn.hutool.core.util.StrUtil;
 import lombok.AllArgsConstructor;
-import org.apache.tomcat.util.http.fileupload.ByteArrayOutputStream;
 import org.springframework.stereotype.Service;
 import xyz.jasenon.lab.api.mqtt.dto.MqttTaskDto;
-import xyz.jasenon.lab.common.model.device.Address;
-import xyz.jasenon.lab.common.model.device.Device;
-import xyz.jasenon.lab.common.model.device.SelfId;
+import xyz.jasenon.lab.device.model.Address;
+import xyz.jasenon.lab.device.model.Device;
+import xyz.jasenon.lab.device.model.SelfId;
 import xyz.jasenon.lab.mqtt.client.itfc.TaskHelper;
 import xyz.jasenon.lab.mqtt.client.itfc.mapper.DeviceMapper;
 import xyz.jasenon.lab.mqtt.client.mqtt.MqttTask;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Queue;
-import java.util.stream.IntStream;
 
 @Service
 @AllArgsConstructor

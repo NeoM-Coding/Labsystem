@@ -1,6 +1,6 @@
 package xyz.jasenon.lab.mqtt.client;
 
-import xyz.jasenon.lab.common.command.Task;
+import xyz.jasenon.lab.mqtt.protocol.command.Task;
 
 import java.util.HashSet;
 import java.util.Map;

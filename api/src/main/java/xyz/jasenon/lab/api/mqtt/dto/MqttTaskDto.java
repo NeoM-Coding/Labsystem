@@ -2,8 +2,8 @@ package xyz.jasenon.lab.api.mqtt.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
-import xyz.jasenon.lab.common.model.device.DeviceType;
-import xyz.jasenon.lab.common.command.CommandLine;
+import xyz.jasenon.lab.device.model.DeviceType;
+import xyz.jasenon.lab.mqtt.protocol.command.CommandLine;
 
 import java.io.Serializable;
 

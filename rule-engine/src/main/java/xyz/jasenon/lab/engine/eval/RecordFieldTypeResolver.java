@@ -1,12 +1,12 @@
 package xyz.jasenon.lab.engine.eval;
 
-import xyz.jasenon.lab.common.model.device.BaseRecord;
-import xyz.jasenon.lab.common.model.device.DeviceType;
-import xyz.jasenon.lab.common.model.device.records.AccessRecord;
-import xyz.jasenon.lab.common.model.device.records.AirConditionRecord;
-import xyz.jasenon.lab.common.model.device.records.CircuitBreakRecord;
-import xyz.jasenon.lab.common.model.device.records.LightRecord;
-import xyz.jasenon.lab.common.model.device.records.SensorRecord;
+import xyz.jasenon.lab.device.model.BaseRecord;
+import xyz.jasenon.lab.device.model.DeviceType;
+import xyz.jasenon.lab.device.model.records.AccessRecord;
+import xyz.jasenon.lab.device.model.records.AirConditionRecord;
+import xyz.jasenon.lab.device.model.records.CircuitBreakRecord;
+import xyz.jasenon.lab.device.model.records.LightRecord;
+import xyz.jasenon.lab.device.model.records.SensorRecord;
 
 import java.lang.reflect.Field;
 import java.util.EnumMap;

@@ -1,7 +1,7 @@
 package xyz.jasenon.lab.engine.event;
 
 import lombok.Getter;
-import xyz.jasenon.lab.common.model.device.DeviceType;
+import xyz.jasenon.lab.device.model.DeviceType;
 
 import java.time.Instant;
 import java.util.Objects;

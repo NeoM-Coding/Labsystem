@@ -1,7 +1,7 @@
 package xyz.jasenon.lab.engine.definition.persistence.model;
 
 import com.baomidou.mybatisplus.annotation.TableName;
-import xyz.jasenon.lab.common.model.BaseEntity;
+import xyz.jasenon.lab.persistence.model.BaseEntity;
 
 import java.time.Instant;
 

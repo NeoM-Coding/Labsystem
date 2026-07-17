@@ -8,11 +8,11 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import xyz.jasenon.lab.api.mqtt.dto.MqttTaskDto;
-import xyz.jasenon.lab.common.model.device.DeviceType;
-import xyz.jasenon.lab.common.command.CommandLine;
-import xyz.jasenon.lab.common.command.Task;
-import xyz.jasenon.lab.common.command.seq.SeqGeneratorManager;
-import xyz.jasenon.lab.common.command.seq.SeqRuleLoader;
+import xyz.jasenon.lab.device.model.DeviceType;
+import xyz.jasenon.lab.mqtt.protocol.command.CommandLine;
+import xyz.jasenon.lab.mqtt.protocol.command.Task;
+import xyz.jasenon.lab.mqtt.protocol.command.seq.SeqGeneratorManager;
+import xyz.jasenon.lab.mqtt.protocol.command.seq.SeqRuleLoader;
 import xyz.jasenon.lab.mqtt.client.common.PendingRequest;
 import xyz.jasenon.lab.mqtt.client.common.Poll;
 

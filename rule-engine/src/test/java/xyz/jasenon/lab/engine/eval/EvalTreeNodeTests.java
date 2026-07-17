@@ -1,7 +1,7 @@
 package xyz.jasenon.lab.engine.eval;
 
 import org.junit.jupiter.api.Test;
-import xyz.jasenon.lab.common.model.device.DeviceType;
+import xyz.jasenon.lab.device.model.DeviceType;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;

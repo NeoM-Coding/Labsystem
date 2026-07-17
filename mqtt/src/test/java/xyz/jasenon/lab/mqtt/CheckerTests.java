@@ -4,8 +4,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Assertions.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import xyz.jasenon.lab.common.command.checker.CrcChecker;
-import xyz.jasenon.lab.common.command.checker.SumChecker;
+import xyz.jasenon.lab.mqtt.protocol.command.checker.CrcChecker;
+import xyz.jasenon.lab.mqtt.protocol.command.checker.SumChecker;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;

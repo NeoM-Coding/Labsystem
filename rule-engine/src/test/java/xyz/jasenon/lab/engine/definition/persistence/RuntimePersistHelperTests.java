@@ -6,7 +6,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.util.ReflectionTestUtils;
-import xyz.jasenon.lab.common.model.device.DeviceType;
+import xyz.jasenon.lab.device.model.DeviceType;
 import xyz.jasenon.lab.engine.Engine;
 import xyz.jasenon.lab.engine.RuleEngineApplication;
 import xyz.jasenon.lab.engine.definition.RuntimeRevision;

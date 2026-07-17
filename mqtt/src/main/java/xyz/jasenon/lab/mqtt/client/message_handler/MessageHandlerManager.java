@@ -2,8 +2,8 @@ package xyz.jasenon.lab.mqtt.client.message_handler;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import xyz.jasenon.lab.common.model.device.BaseRecord;
-import xyz.jasenon.lab.common.model.device.DeviceType;
+import xyz.jasenon.lab.device.model.BaseRecord;
+import xyz.jasenon.lab.device.model.DeviceType;
 import xyz.jasenon.lab.mqtt.client.common.PendingRequest;
 import xyz.jasenon.lab.mqtt.client.mqtt.MqttTask;
 

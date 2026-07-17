@@ -8,10 +8,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.lang.Nullable;
-import xyz.jasenon.lab.common.Const;
-import xyz.jasenon.lab.common.event.DeviceRecordSnapshotEvent;
-import xyz.jasenon.lab.common.event.RuleEngineChannels;
-import xyz.jasenon.lab.common.model.device.DeviceType;
+import xyz.jasenon.lab.device.event.DeviceRecordSnapshotEvent;
+import xyz.jasenon.lab.device.event.RuleEngineChannels;
+import xyz.jasenon.lab.device.model.DeviceRecordKeys;
+import xyz.jasenon.lab.device.model.DeviceType;
 import xyz.jasenon.lab.engine.Engine;
 import xyz.jasenon.lab.engine.event.DeviceEvent;
 import xyz.jasenon.lab.redis.core.RedisBus;
@@ -24,7 +24,7 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
-public class DeviceRecordChangeListener implements Const.Key {
+public class DeviceRecordChangeListener {
 
     private static final Logger log = LoggerFactory.getLogger(DeviceRecordChangeListener.class);
 
@@ -91,7 +91,7 @@ public class DeviceRecordChangeListener implements Const.Key {
         RecordIdentity identity = new RecordIdentity(deviceType, deviceId);
         Map<String, String> fields = snapshots.get(identity);
         if ((fields == null || fields.isEmpty()) && redisBus != null) {
-            fields = redisBus.hgetAll(RECORD_KEY(deviceType, deviceId));
+            fields = redisBus.hgetAll(DeviceRecordKeys.recordKey(deviceType, deviceId));
             if (fields != null && !fields.isEmpty()) {
                 snapshots.put(identity, new LinkedHashMap<>(fields));
             }

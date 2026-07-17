@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.RestController;
 import xyz.jasenon.lab.api.mqtt.MqttIo;
 import xyz.jasenon.lab.api.mqtt.dto.MqttResponseDto;
 import xyz.jasenon.lab.api.mqtt.dto.MqttTaskDto;
-import xyz.jasenon.lab.common.util.DiyResponseEntity;
+import xyz.jasenon.lab.web.response.DiyResponseEntity;
 import xyz.jasenon.lab.common.util.R;
 
 import java.util.concurrent.ExecutionException;

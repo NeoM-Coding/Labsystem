@@ -1,7 +1,7 @@
 package xyz.jasenon.lab.engine;
 
 import org.junit.jupiter.api.Test;
-import xyz.jasenon.lab.common.model.device.DeviceType;
+import xyz.jasenon.lab.device.model.DeviceType;
 import xyz.jasenon.lab.engine.action.ActionGroup;
 import xyz.jasenon.lab.engine.eval.DeviceConditionGroup;
 import xyz.jasenon.lab.engine.eval.EvalNode;

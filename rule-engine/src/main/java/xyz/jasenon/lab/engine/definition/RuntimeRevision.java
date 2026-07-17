@@ -1,7 +1,7 @@
 package xyz.jasenon.lab.engine.definition;
 
 import xyz.jasenon.lab.api.mqtt.dto.MqttTaskDto;
-import xyz.jasenon.lab.common.model.device.DeviceType;
+import xyz.jasenon.lab.device.model.DeviceType;
 import xyz.jasenon.lab.engine.action.Action;
 import xyz.jasenon.lab.engine.action.ReportAction;
 import xyz.jasenon.lab.engine.eval.LogicType;

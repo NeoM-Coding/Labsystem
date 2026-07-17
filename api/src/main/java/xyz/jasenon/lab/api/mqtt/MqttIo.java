@@ -1,6 +1,5 @@
 package xyz.jasenon.lab.api.mqtt;
 
-import org.apache.dubbo.config.annotation.DubboService;
 import xyz.jasenon.lab.api.mqtt.dto.MqttResponseDto;
 import xyz.jasenon.lab.api.mqtt.dto.MqttTaskDto;
 

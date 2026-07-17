@@ -6,7 +6,7 @@ import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import xyz.jasenon.lab.common.command.Task;
+import xyz.jasenon.lab.mqtt.protocol.command.Task;
 import xyz.jasenon.lab.common.util.AsyncExecutor;
 import xyz.jasenon.lab.mqtt.client.SysClientManager;
 import xyz.jasenon.lab.mqtt.client.message_handler.MessageHandlerManager;

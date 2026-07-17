@@ -2,7 +2,7 @@ package xyz.jasenon.lab.mqtt.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import xyz.jasenon.lab.common.config.MybatisPlusConfig;
+import xyz.jasenon.lab.persistence.config.MybatisPlusConfig;
 
 @Configuration
 public class Config {

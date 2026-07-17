@@ -4,7 +4,7 @@ import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 import xyz.jasenon.lab.common.ActiveQueue;
-import xyz.jasenon.lab.common.command.Task;
+import xyz.jasenon.lab.mqtt.protocol.command.Task;
 import xyz.jasenon.lab.mqtt.client.common.PendingRequest;
 import xyz.jasenon.lab.mqtt.client.common.Poll;
 

@@ -1,6 +1,6 @@
 package xyz.jasenon.lab.mqtt.client.common;
 
-import xyz.jasenon.lab.common.command.Task;
+import xyz.jasenon.lab.mqtt.protocol.command.Task;
 
 import java.util.concurrent.CompletableFuture;
 

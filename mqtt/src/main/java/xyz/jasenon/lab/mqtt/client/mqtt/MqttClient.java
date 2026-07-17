@@ -4,9 +4,9 @@ import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import xyz.jasenon.lab.common.command.Task;
-import xyz.jasenon.lab.common.command.seq.SeqGenerator;
-import xyz.jasenon.lab.common.command.seq.SeqGeneratorManager;
+import xyz.jasenon.lab.mqtt.protocol.command.Task;
+import xyz.jasenon.lab.mqtt.protocol.command.seq.SeqGenerator;
+import xyz.jasenon.lab.mqtt.protocol.command.seq.SeqGeneratorManager;
 import xyz.jasenon.lab.mqtt.client.AbstractSysClient;
 
 import java.util.Objects;

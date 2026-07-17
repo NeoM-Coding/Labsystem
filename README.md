@@ -35,6 +35,34 @@ lab-system-cloud
 - JUnit 5 / Spring Boot Test
 - Node.js + TypeScript，用于 MQTT 设备 mock
 
+## 本地基础设施
+
+根目录的 `compose.yml` 提供项目开发所需的完整基础设施：
+
+- MySQL 8.0.44：自动创建 `lab_sys`、`fun_cloud_base`，并导入 `sql/schema.sql`。
+- Redis 8.8、EMQX 5.8、Permify 1.6、Nacos 3.2。
+- Grafana、Loki、Alloy 日志检索与采集链路。
+
+首次启动前可按需创建本地环境文件；不创建时会使用 Compose 中的开发默认值：
+
+```bash
+cp .env.example .env
+docker compose up -d
+docker compose ps
+```
+
+常用入口：
+
+| 服务 | 地址 | 默认凭据 |
+| --- | --- | --- |
+| EMQX Dashboard | `http://localhost:18083` | `admin/public123` |
+| Nacos Console | `http://localhost:8080` | 本地模式关闭鉴权 |
+| Permify HTTP | `http://localhost:3476` | 无 |
+| Grafana | `http://localhost:3000` | `admin/admin` |
+| Alloy | `http://localhost:12345` | 无 |
+
+停止容器使用 `docker compose down`。需要连同本地数据彻底重建时使用 `docker compose down -v`；该命令会删除数据库和日志平台卷。
+
 ## 核心设计
 
 ### Dubbo 契约

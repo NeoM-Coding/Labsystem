@@ -33,6 +33,8 @@
         <module>mqtt-api</module>
         <module>auth-api</module>
         <module>observability</module>
+        <module>audit-api</module>
+        <module>audit</module>
         <module>base-api</module>
         <module>redis</module>
         <module>mqtt</module>

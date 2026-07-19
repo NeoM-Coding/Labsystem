@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS `audit_operation_log` (
+    `id` VARCHAR(64) NOT NULL COMMENT '审计日志ID',
+    `subject_id` VARCHAR(64) NOT NULL COMMENT '操作用户ID',
+    `subject_name` VARCHAR(128) NULL COMMENT '操作用户名',
+    `subject_display_name` VARCHAR(128) NULL COMMENT '操作用户显示名称',
+    `operation` VARCHAR(128) NOT NULL COMMENT '方法级操作标识',
+    `actions` VARCHAR(255) NOT NULL COMMENT '谓语集合: CREATE, EDIT, DELETE',
+    `object_types` VARCHAR(512) NOT NULL COMMENT '宾语资源类型集合',
+    `object_ids` VARCHAR(1024) NULL COMMENT '宾语资源ID集合',
+    `event_types` VARCHAR(2048) NOT NULL COMMENT '参与审计的Java事件类型集合',
+    `description` TEXT NOT NULL COMMENT '面向管理员的人类可读操作描述',
+    `trace_id` VARCHAR(128) NULL COMMENT '关联运维链路Trace ID',
+    `request_id` VARCHAR(128) NULL COMMENT '关联请求ID',
+    `occurred_at` DATETIME(3) NOT NULL COMMENT '操作发生时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_audit_subject_time` (`subject_id`, `occurred_at`),
+    KEY `idx_audit_operation_time` (`operation`, `occurred_at`),
+    KEY `idx_audit_trace_id` (`trace_id`),
+    KEY `idx_audit_request_id` (`request_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='管理员操作审计日志';

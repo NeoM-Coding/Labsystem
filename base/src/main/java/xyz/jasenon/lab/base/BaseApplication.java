@@ -5,7 +5,10 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-@EnableDubbo
+@EnableDubbo(scanBasePackages = {
+        "xyz.jasenon.lab.base.service",
+        "xyz.jasenon.lab.audit.service"
+})
 public class BaseApplication {
 
     public static void main(String[] args) {

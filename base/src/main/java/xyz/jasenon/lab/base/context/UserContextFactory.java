@@ -35,6 +35,12 @@ public final class UserContextFactory {
         );
     }
 
+    public static UserContext fromIdsAndLaboratories(User user,
+                                                     Collection<String> laboratoryIds,
+                                                     Collection<Laboratory> laboratories) {
+        return from(user, laboratoryIds, toScopes(laboratories));
+    }
+
     private static List<UserContext.LaboratoryScope> toScopes(Collection<Laboratory> laboratories) {
         if (laboratories == null || laboratories.isEmpty()) {
             return List.of();

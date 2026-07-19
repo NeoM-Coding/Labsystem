@@ -1,6 +1,10 @@
 package xyz.jasenon.lab.base.api.service;
 
+import xyz.jasenon.lab.base.api.dto.LaboratoryCreate;
+import xyz.jasenon.lab.base.api.dto.LaboratoryDelete;
+import xyz.jasenon.lab.base.api.dto.LaboratoryEdit;
 import xyz.jasenon.lab.base.api.model.Laboratory;
+import xyz.jasenon.lab.base.api.vo.LaboratoryVO;
 import xyz.jasenon.lab.common.util.Pair;
 
 import java.util.List;
@@ -11,10 +15,12 @@ public interface LaboratoryService {
 
     List<Pair<String,String>> collectionBuildingName();
 
-    Laboratory create(Laboratory laboratory);
+    List<LaboratoryVO> list(String buildingName, String orgName);
 
-    Laboratory update(String laboratoryId, Laboratory laboratory);
+    Laboratory create(LaboratoryCreate command);
 
-    void delete(String laboratoryId);
+    Laboratory update(LaboratoryEdit command);
+
+    void delete(LaboratoryDelete command);
 
 }

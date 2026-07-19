@@ -48,7 +48,17 @@
         </dependency>
         <dependency>
             <groupId>xyz.jasenon.lab</groupId>
+            <artifactId>auth</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>xyz.jasenon.lab</groupId>
             <artifactId>observability</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>xyz.jasenon.lab</groupId>
+            <artifactId>audit</artifactId>
             <version>${project.version}</version>
         </dependency>
 

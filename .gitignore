@@ -44,5 +44,6 @@ mvnw.cmd
 ### env
 .env
 /logs/
+**/logs/
 .wpscomate
 docs/毕业论文书写指南.md

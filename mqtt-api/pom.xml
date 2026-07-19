@@ -9,7 +9,9 @@
         <version>0.0.1</version>
     </parent>
 
-    <artifactId>api</artifactId>
+    <artifactId>mqtt-api</artifactId>
+    <name>mqtt-api</name>
+    <description>MQTT RPC contracts, DTOs and binary command protocol</description>
     <dependencies>
         <dependency>
             <groupId>xyz.jasenon.lab</groupId>
@@ -22,14 +24,14 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>xyz.jasenon.lab</groupId>
-            <artifactId>mqtt-protocol</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 

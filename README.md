@@ -7,8 +7,8 @@
 ```text
 lab-system-cloud
 ├── uid-springboot-starter  # 本地 uid-generator starter，支持独立数据源分配 workerId
-├── common                  # 公共模型、命令协议、校验器、序列匹配、IndexedQueue、MyBatis-Plus ID 配置
-├── api                     # 分布式接口契约和 DTO
+├── common                  # 轻量通用类型、异常、队列和工具
+├── mqtt-api                # MQTT Dubbo 契约、DTO 和二进制命令协议
 ├── mqtt                    # MQTT 网关客户端、轮询调度、任务队列、设备/网关 Mapper
 ├── redis                   # Jedis 自动配置、RedisBus、Pub/Sub 和 hash 能力
 ├── rule-engine             # 事件驱动规则引擎，基于设备字段事件增量推演 runtime/action group
@@ -67,14 +67,14 @@ docker compose ps
 
 ### Dubbo 契约
 
-项目不使用 OpenFeign。分布式接口契约统一放在 `api` 模块，例如：
+项目不使用 OpenFeign。MQTT 分布式接口契约和命令协议统一放在 `mqtt-api` 模块，例如：
 
 ```text
-api/src/main/java/xyz/jasenon/lab/api/mqtt/MqttIo.java
-api/src/main/java/xyz/jasenon/lab/api/mqtt/dto/MqttTaskDto.java
+mqtt-api/src/main/java/xyz/jasenon/lab/api/mqtt/MqttIo.java
+mqtt-api/src/main/java/xyz/jasenon/lab/api/mqtt/dto/MqttTaskDto.java
 ```
 
-服务实现模块依赖 `api` 和 `common`，由 Dubbo 负责服务暴露、发现和治理。
+服务实现模块依赖 `mqtt-api`，由 Dubbo 负责服务暴露、发现和治理。
 
 ### 全局 ID
 

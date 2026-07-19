@@ -30,11 +30,10 @@
         <module>common</module>
         <module>persistence-core</module>
         <module>device-domain</module>
-        <module>mqtt-protocol</module>
+        <module>mqtt-api</module>
         <module>auth-api</module>
         <module>observability</module>
         <module>base-api</module>
-        <module>api</module>
         <module>redis</module>
         <module>mqtt</module>
         <module>auth</module>

@@ -59,7 +59,7 @@ mqtt
 
 - `MqttPollCo`：启停设备轮询。
 
-这意味着 `web` 等模块不直接依赖 Paho MQTT client，而是通过 `api` 模块中的 Dubbo 契约调用 `mqtt` 模块。
+这意味着 `web` 等模块不直接依赖 Paho MQTT client，而是通过 `mqtt-api` 模块中的 Dubbo 契约调用 `mqtt` 模块。
 
 ### 网关运行时层
 
@@ -113,7 +113,7 @@ private volatile PendingRequest<REQ> current;
 
 ### MqttTaskDto
 
-`api` 模块中的 `MqttTaskDto` 是远程调用入参，包含：
+`mqtt-api` 模块中的 `MqttTaskDto` 是远程调用入参，包含：
 
 - `commandLine`：设备指令枚举。
 - `args`：指令模板参数。
@@ -399,8 +399,8 @@ mock 按指令 payload 识别设备类型，生成符合 Java handler decode 逻
 
 当前 MQTT 模块已经形成了比较清晰的边界：
 
-- Dubbo 入参和返回值放在 `api`。
-- 设备、网关、命令、校验、字节工具放在 `common`。
+- Dubbo 入参、返回值、命令、校验和字节工具放在 `mqtt-api`。
+- 设备和网关领域模型放在 `device-domain`。
 - MQTT client runtime、轮询、消息处理和 mapper 放在 `mqtt`。
 - Redis 能力放在独立 `redis` 模块。
 - 设备 mock 放在 `tools/mqtt-mock`。

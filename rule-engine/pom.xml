@@ -46,13 +46,7 @@
         </dependency>
         <dependency>
             <groupId>xyz.jasenon.lab</groupId>
-            <artifactId>mqtt-protocol</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-
-        <dependency>
-            <groupId>xyz.jasenon.lab</groupId>
-            <artifactId>api</artifactId>
+            <artifactId>mqtt-api</artifactId>
             <version>0.0.1</version>
         </dependency>
 

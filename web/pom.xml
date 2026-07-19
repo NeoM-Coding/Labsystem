@@ -27,7 +27,12 @@
         </dependency>
         <dependency>
             <groupId>xyz.jasenon.lab</groupId>
-            <artifactId>api</artifactId>
+            <artifactId>mqtt-api</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>xyz.jasenon.lab</groupId>
+            <artifactId>base-api</artifactId>
             <version>${project.version}</version>
         </dependency>
 
@@ -41,6 +46,20 @@
             <groupId>xyz.jasenon.lab</groupId>
             <artifactId>auth</artifactId>
             <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>cn.dev33</groupId>
+            <artifactId>sa-token-spring-boot3-starter</artifactId>
+            <version>1.45.0</version>
+        </dependency>
+        <dependency>
+            <groupId>cn.dev33</groupId>
+            <artifactId>sa-token-alone-redis</artifactId>
+            <version>1.45.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.data</groupId>
+            <artifactId>spring-data-redis</artifactId>
         </dependency>
         <dependency>
             <groupId>xyz.jasenon.lab</groupId>

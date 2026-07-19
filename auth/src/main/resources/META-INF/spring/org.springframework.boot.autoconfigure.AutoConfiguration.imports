@@ -1,1 +1,2 @@
 xyz.jasenon.lab.auth.config.PermifyAuthAutoConfiguration
+xyz.jasenon.lab.auth.config.UserContextStoreAutoConfiguration

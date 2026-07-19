@@ -2,8 +2,8 @@
 
 鉴权代码按契约和实现拆分：
 
-- `auth-api`：`PreAuth`、`PostAuth`、权限名称、`UserContext` 和异常，不依赖 Permify SDK。
-- `auth`：Permify Java Client、AOP、配置开关和 DSL Schema。
+- `auth-api`：权限、关系、Permify 操作契约、`UserContext` 和异常，不依赖 Permify SDK。
+- `auth`：Permify Java Client、授权服务、Command Handler、AOP、配置开关和 DSL Schema。
 
 ## 配置
 
@@ -17,31 +17,29 @@ lab:
       schema-version: ""
 ```
 
-`enabled=false` 时不会创建 `AuthClient` 和鉴权切面。`schema-version` 为空时，客户端会在第一次 `grant` 或 `check` 时向 Permify 查询最新版本。
+`enabled=false` 时不会创建 `AuthClient` 和鉴权切面。`schema-version` 为空时，客户端会在第一次访问 Permify 时查询最新版本。
 
-## 注解
+## 业务鉴权
 
-常量实体 ID：
-
-```java
-@PreAuth(
-        entityType = SourceType.laboratory,
-        entityId = "lab-1",
-        permission = "view"
-)
-```
-
-从方法参数解析实体 ID：
+业务方法使用 `@ActionAuthorized`，切面从方法参数中查找对应的 `ActionCommandHandler`：
 
 ```java
-@PreAuth(
-        entityType = SourceType.laboratory,
-        entityId = "#laboratoryId",
-        idMode = Mode.Sqel,
-        permission = "update"
-)
+@ActionAuthorized
+public Laboratory update(LaboratoryEdit command) {
+    // business logic
+}
 ```
 
-SpEL 支持参数名、`#p0`、`#a0` 以及参数对象属性，例如 `#command.laboratoryId`。表达式只基于被拦截方法的参数求值。
+每种业务 Command 在服务模块提供 Handler，把它转换成 Permify `ActionCommand`：
 
-切面默认使用 `user` 作为 subject type，并从 `UserContextHolder` 中读取 `userId`。`PreAuth` 在方法执行前检查；`PostAuth` 仅在方法正常返回后检查。
+```java
+public final class LaboratoryEditActionHandler
+        extends AbstractAppActionCommandHandler<LaboratoryEdit> {
+
+    public LaboratoryEditActionHandler() {
+        super(LaboratoryEdit.class, Action.App.manage_laboratory);
+    }
+}
+```
+
+`ActionAuthorizationAspect` 从 `UserContextHolder` 获取当前用户，聚合全部参数产生的 `ActionCommand`，逐个调用 Permify 检查。没有已注册 Handler 的受保护方法会被视为授权配置错误。

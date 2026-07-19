@@ -1,0 +1,71 @@
+entity user {
+
+}
+
+entity app {
+
+	relation super_admin @user
+
+	relation user_manager @user
+
+	relation user_viewer @user
+
+	action create_user = user_manager or super_admin
+
+	action edit_user = user_manager or super_admin
+
+	action delete_user = super_admin
+
+	action list_user = user_manager or user_viewer or super_admin
+
+	relation edu_semester_manager @user
+
+	relation edu_semester_viewer @user
+
+	action manage_semester = edu_semester_manager or super_admin
+
+	action list_semester = edu_semester_manager or edu_semester_viewer or super_admin
+
+	relation edu_timetable_manager @user
+
+	relation edu_timetable_viewer @user
+
+	action manage_timetable = edu_timetable_manager or super_admin
+
+	action view_timetable = edu_timetable_manager or edu_timetable_viewer or super_admin
+
+	relation laboratory_manager @user
+
+	action manage_laboratory = laboratory_manager or super_admin
+
+	relation smart_manager @user
+
+	relation smart_viewer @user
+
+	relation smart_keeper @user
+
+	action manage_smart_strategy = smart_manager or super_admin
+
+	action change_smart_strategy_status = smart_manager or smart_keeper or super_admin
+
+	action list_smart_strategies = smart_manager or smart_keeper or smart_viewer or super_admin
+
+	relation data_analyst @user
+
+	action edu_data_analysis = data_analyst or super_admin
+
+	action air_condition_data_analysis = data_analyst or super_admin
+
+	action circuit_break_data_analysis = data_analyst or super_admin
+
+}
+
+entity laboratory {
+
+	relation app @app
+
+	relation viewer @user
+
+	permission can_view = app.super_admin or viewer
+
+}

@@ -3,29 +3,26 @@ package xyz.jasenon.lab.auth.permission;
 public interface Action extends Permission {
 
     enum App implements Action {
-        grant_app_permission,
-        grant_lab_permission,
-        account_view,
-        account_create,
-        account_update,
-        account_delete,
-        lab_create,
-        lab_update,
-        lab_delete,
-        edu_semester_view,
-        edu_semester_manage,
-        edu_timetable_view,
-        edu_timetable_schedule,
-        smart_control_view,
-        smart_control_manage,
-        smart_control_enable_disable,
-        access_control_manage,
-        circuitbreak_control_manage,
-        light_control_manage,
-        aircondition_control_manage,
-        data_analysis_edu_view,
-        data_analysis_aircondition_view,
-        data_analysis_circuitbreak_view;
+        create_user,
+        edit_user,
+        delete_user,
+        list_user,
+
+        manage_semester,
+        list_semester,
+
+        manage_timetable,
+        view_timetable,
+
+        manage_laboratory,
+
+        manage_smart_strategy,
+        change_smart_strategy_status,
+        list_smart_strategies,
+
+        edu_data_analysis,
+        air_condition_data_analysis,
+        circuit_break_data_analysis;
 
         @Override
         public String str() {
@@ -34,13 +31,13 @@ public interface Action extends Permission {
     }
 
     enum Laboratory implements Action {
-        view,
-        update,
-        delete;
+        can_view;
 
         @Override
         public String str() {
             return name();
         }
     }
+
+
 }

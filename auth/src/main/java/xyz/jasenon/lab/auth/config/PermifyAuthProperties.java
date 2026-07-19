@@ -9,6 +9,8 @@ public class PermifyAuthProperties {
     private String baseUrl = "http://localhost:3476";
     private String tenantId = "t1";
     private String schemaVersion = "";
+    private int depth = 20;
+    private long lookupPageSize = 100;
 
     public boolean isEnabled() {
         return enabled;
@@ -40,5 +42,21 @@ public class PermifyAuthProperties {
 
     public void setSchemaVersion(String schemaVersion) {
         this.schemaVersion = schemaVersion;
+    }
+
+    public int getDepth() {
+        return depth;
+    }
+
+    public void setDepth(int depth) {
+        this.depth = depth <= 0 ? 20 : depth;
+    }
+
+    public long getLookupPageSize() {
+        return lookupPageSize;
+    }
+
+    public void setLookupPageSize(long lookupPageSize) {
+        this.lookupPageSize = lookupPageSize <= 0 ? 100 : lookupPageSize;
     }
 }

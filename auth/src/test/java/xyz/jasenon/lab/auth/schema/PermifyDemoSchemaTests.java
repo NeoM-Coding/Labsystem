@@ -46,6 +46,23 @@ class PermifyDemoSchemaTests {
         assertTrue(schema.contains("action enable_disable = lab.device_enable_disable"));
     }
 
+    @Test
+    void labSystemV2SchemaDefinesFlattenedApplicationRolesAndLaboratoryScope() throws IOException {
+        String schema = Files.readString(schemaPath("lab-system-v2.perm"));
+
+        assertTrue(schema.contains("entity app"));
+        assertTrue(schema.contains("relation super_admin @user"));
+        assertTrue(schema.contains("relation user_manager @user"));
+        assertTrue(schema.contains("relation laboratory_manager @user"));
+        assertTrue(schema.contains("action create_user = user_manager or super_admin"));
+        assertTrue(schema.contains("action view_timetable = edu_timetable_manager or edu_timetable_viewer or super_admin"));
+        assertTrue(schema.contains("action manage_laboratory = laboratory_manager or super_admin"));
+        assertTrue(schema.contains("entity laboratory"));
+        assertTrue(schema.contains("relation viewer @user"));
+        assertTrue(schema.contains("permission can_view = app.super_admin or viewer"));
+        assertFalse(schema.contains("view_timetable = edu_timetable_manager or edu_semester_viewer"));
+    }
+
     private Path demoSchema() {
         return schemaPath("demo.perm");
     }

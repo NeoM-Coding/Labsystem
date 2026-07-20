@@ -2,12 +2,13 @@ name: lab-system-cloud
 
 services:
   mysql:
-    image: mysql:8.0.44
+    image: ${MYSQL_IMAGE:-mysql:8.0.44}
     restart: unless-stopped
     environment:
       TZ: ${TZ:-Asia/Shanghai}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-lab-system-local}
-      MYSQL_DATABASE: lab_sys
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD:-lab-system-local}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-lab_sys}
+      UID_DATABASE: ${UID_DATABASE:-fun_cloud_base}
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_0900_ai_ci
@@ -16,7 +17,7 @@ services:
       - "${MYSQL_PORT:-3306}:3306"
     volumes:
       - mysql-data:/var/lib/mysql
-      - ./infra/mysql/init/00-databases.sql:/docker-entrypoint-initdb.d/00-databases.sql:ro
+      - ./infra/mysql/init/00-databases.sh:/docker-entrypoint-initdb.d/00-databases.sh:ro
       - ./sql/schema.sql:/docker-entrypoint-initdb.d/10-lab-schema.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
@@ -26,21 +27,30 @@ services:
       start_period: 20s
 
   redis:
-    image: redis:8.8.0-alpine
+    image: ${REDIS_IMAGE:-redis:8.8.0-alpine}
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes", "--save", "60", "1"]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    command:
+      - /bin/sh
+      - -c
+      - |
+        if [ -n "$${REDIS_PASSWORD}" ]; then
+          exec redis-server --appendonly yes --save 60 1 --requirepass "$${REDIS_PASSWORD}"
+        fi
+        exec redis-server --appendonly yes --save 60 1
     ports:
       - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis-data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "if [ -n \"$${REDIS_PASSWORD}\" ]; then redis-cli -a \"$${REDIS_PASSWORD}\" ping; else redis-cli ping; fi"]
       interval: 5s
       timeout: 3s
       retries: 20
 
   emqx:
-    image: emqx/emqx:5.8.5
+    image: ${EMQX_IMAGE:-emqx/emqx:5.8.5}
     restart: unless-stopped
     hostname: emqx
     environment:
@@ -64,7 +74,7 @@ services:
       start_period: 20s
 
   permify:
-    image: ghcr.io/permify/permify:v1.6.7
+    image: ${PERMIFY_IMAGE:-ghcr.io/permify/permify:v1.6.7}
     restart: unless-stopped
     ports:
       - "${PERMIFY_HTTP_PORT:-3476}:3476"
@@ -76,11 +86,11 @@ services:
       retries: 20
 
   nacos:
-    image: nacos/nacos-server:v3.2.3
+    image: ${NACOS_IMAGE:-nacos/nacos-server:v3.2.3}
     restart: unless-stopped
     environment:
       MODE: standalone
-      NACOS_AUTH_ENABLE: "false"
+      NACOS_AUTH_ENABLE: ${NACOS_AUTH_ENABLE:-false}
       NACOS_AUTH_TOKEN: ${NACOS_AUTH_TOKEN:-bGFiLXN5c3RlbS1jbG91ZC1sb2NhbC1uYWNvcy10b2tlbi0yMDI2}
       NACOS_AUTH_IDENTITY_KEY: ${NACOS_AUTH_IDENTITY_KEY:-lab-system}
       NACOS_AUTH_IDENTITY_VALUE: ${NACOS_AUTH_IDENTITY_VALUE:-lab-system-local}
@@ -96,7 +106,7 @@ services:
       start_period: 30s
 
   loki:
-    image: grafana/loki:3.7.3
+    image: ${LOKI_IMAGE:-grafana/loki:3.7.3}
     restart: unless-stopped
     command: -config.file=/etc/loki/config.yml
     ports:
@@ -111,21 +121,21 @@ services:
       retries: 20
 
   alloy:
-    image: grafana/alloy:v1.16.1
+    image: ${ALLOY_IMAGE:-grafana/alloy:v1.16.1}
     restart: unless-stopped
     command: run --server.http.listen-addr=0.0.0.0:12345 /etc/alloy/config.alloy
     ports:
       - "${ALLOY_PORT:-12345}:12345"
     volumes:
       - ./observability/docker/config.alloy:/etc/alloy/config.alloy:ro
-      - ./logs:/var/log/lab-system:ro
+      - ${LOG_PATH:-./logs}:/var/log/lab-system:ro
       - alloy-data:/var/lib/alloy/data
     depends_on:
       loki:
         condition: service_healthy
 
   grafana:
-    image: grafana/grafana:13.1.0
+    image: ${GRAFANA_IMAGE:-grafana/grafana:13.1.0}
     restart: unless-stopped
     ports:
       - "${GRAFANA_PORT:-3000}:3000"

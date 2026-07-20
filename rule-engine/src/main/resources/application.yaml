@@ -22,6 +22,13 @@ dubbo:
     address: nacos://${NACOS_HOST:localhost}:${NACOS_PORT:8848}
 
 lab:
+  auth:
+    permify:
+      enabled: ${PERMIFY_AUTH_ENABLED:true}
+      base-url: http://${PERMIFY_HOST:localhost}:${PERMIFY_HTTP_PORT:3476}
+      tenant-id: ${PERMIFY_TENANT_ID:t1}
+      schema-version: ""
+      depth: 20
   rule-engine:
     persistence:
       enabled: true

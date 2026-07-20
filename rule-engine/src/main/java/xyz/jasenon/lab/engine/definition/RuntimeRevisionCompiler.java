@@ -154,7 +154,9 @@ public class RuntimeRevisionCompiler {
             case Report -> new ReportAction(
                     actionGroupId,
                     new ArrayList<>(definition.userIds()),
-                    definition.reportTypes(),
+                    definition.reportTypes().stream()
+                            .map(type -> ReportAction.ReportType.valueOf(type.name()))
+                            .collect(java.util.stream.Collectors.toSet()),
                     definition.content()
             );
         };

@@ -31,6 +31,7 @@
         <module>persistence-core</module>
         <module>device-domain</module>
         <module>mqtt-api</module>
+        <module>rule-api</module>
         <module>auth-api</module>
         <module>observability</module>
         <module>audit-api</module>

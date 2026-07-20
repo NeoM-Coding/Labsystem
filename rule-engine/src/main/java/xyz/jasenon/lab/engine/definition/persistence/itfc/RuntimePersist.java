@@ -25,6 +25,8 @@ public interface RuntimePersist {
 
     boolean disable(String runtimeId);
 
+    RuntimeRevision get(String runtimeId);
+
     /**
      * 查询每个未删除 Runtime 的当前发布 revision，包含禁用项。
      */

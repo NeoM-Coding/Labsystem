@@ -25,6 +25,8 @@ import xyz.jasenon.lab.engine.definition.persistence.model.RuleRuntimeRevisionEn
 import xyz.jasenon.lab.engine.event.DeviceEventKey;
 import xyz.jasenon.lab.engine.listener.DeviceRecordChangeListener;
 import xyz.jasenon.lab.engine.runtime.Runtime;
+import xyz.jasenon.lab.auth.context.UserContext;
+import xyz.jasenon.lab.auth.context.UserContextHolder;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -97,7 +99,7 @@ public class RuntimePersistHelper implements RuntimePersist {
                 int metadataRows = runtimeMapper.insert(new RuleRuntimeEntity(
                         checked.runtimeId(),
                         checked.runtimeId(),
-                        SYSTEM_USER,
+                        currentActor(),
                         checked.isEnabled(),
                         status(checked),
                         1,
@@ -191,16 +193,19 @@ public class RuntimePersistHelper implements RuntimePersist {
     }
 
     @Override
+    public RuntimeRevision get(String runtimeId) {
+        requireText(runtimeId, "runtimeId");
+        CurrentRuntimeRevision row = revisionMapper.selectCurrent(runtimeId);
+        return row == null ? null : decode(row);
+    }
+
+    @Override
     public List<RuntimeRevision> fetch() {
         List<RuntimeRevision> revisions = new ArrayList<>();
         for (CurrentRuntimeRevision row : revisionMapper.selectAllCurrent()) {
             try {
-                RuntimeRevision revision = objectMapper.readValue(
-                        row.getDefinition(),
-                        RuntimeRevision.class
-                );
-                revisions.add(revision.withEnabled(Boolean.TRUE.equals(row.getEnabled())));
-            } catch (JsonProcessingException e) {
+                revisions.add(decode(row));
+            } catch (IllegalStateException e) {
                 log.error(
                         "[RuleEngine] skip malformed runtime revision, runtime-id:{}",
                         row.getRuntimeId(),
@@ -293,18 +298,7 @@ public class RuntimePersistHelper implements RuntimePersist {
                     "runtime disappeared while metadata row was locked: " + runtimeId
             );
         }
-        try {
-            RuntimeRevision revision = objectMapper.readValue(
-                    row.getDefinition(),
-                    RuntimeRevision.class
-            );
-            return revision.withEnabled(Boolean.TRUE.equals(row.getEnabled()));
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException(
-                    "invalid runtime revision JSON: " + runtimeId,
-                    e
-            );
-        }
+        return decode(row);
     }
 
     private Integer lockCurrentRevision(String runtimeId) {
@@ -322,8 +316,30 @@ public class RuntimePersistHelper implements RuntimePersist {
                 SCHEMA_VERSION,
                 encoded.json(),
                 encoded.checksum(),
-                SYSTEM_USER
+                currentActor()
         ));
+    }
+
+    private RuntimeRevision decode(CurrentRuntimeRevision row) {
+        try {
+            RuntimeRevision revision = objectMapper.readValue(
+                    row.getDefinition(),
+                    RuntimeRevision.class
+            );
+            return revision.withEnabled(Boolean.TRUE.equals(row.getEnabled()));
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException(
+                    "invalid runtime revision JSON: " + row.getRuntimeId(),
+                    e
+            );
+        }
+    }
+
+    private static String currentActor() {
+        UserContext context = UserContextHolder.get();
+        return context == null || context.getUserId() == null || context.getUserId().isBlank()
+                ? SYSTEM_USER
+                : context.getUserId();
     }
 
     private void synchronizeEngine(RuntimeRevision revision, Runtime compiled) {

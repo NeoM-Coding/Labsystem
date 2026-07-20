@@ -49,6 +49,16 @@
             <artifactId>mqtt-api</artifactId>
             <version>0.0.1</version>
         </dependency>
+        <dependency>
+            <groupId>xyz.jasenon.lab</groupId>
+            <artifactId>rule-api</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>xyz.jasenon.lab</groupId>
+            <artifactId>auth</artifactId>
+            <version>${project.version}</version>
+        </dependency>
 
         <dependency>
             <groupId>xyz.jasenon.lab</groupId>

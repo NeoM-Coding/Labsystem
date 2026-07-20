@@ -46,8 +46,21 @@ public class TraceDubboFilter implements Filter {
     private Result invokeProvider(Invoker<?> invoker, Invocation invocation) {
         Object traceId = RpcContext.getServerAttachment().getAttachment(TRACE_ATTACHMENT);
         Object requestId = RpcContext.getServerAttachment().getAttachment(REQUEST_ATTACHMENT);
+        Object user = RpcContext.getServerAttachment()
+                .getObjectAttachment(UserContextHolder.DUBBO_ATTACHMENT_KEY);
+        if (user == null) {
+            user = RpcContext.getServerAttachment()
+                    .getObjectAttachment(UserContextHolder.LEGACY_DUBBO_ATTACHMENT_KEY);
+        }
+        UserContextHolder.clear();
+        if (user instanceof UserContext userContext) {
+            UserContextHolder.set(userContext);
+        }
         try (TraceContext.Scope ignored = TraceContext.open(stringValue(traceId), stringValue(requestId))) {
             return invoker.invoke(invocation);
+        } finally {
+            // Dubbo provider 线程会复用，必须在调用完成后清除用户上下文。
+            UserContextHolder.clear();
         }
     }
 

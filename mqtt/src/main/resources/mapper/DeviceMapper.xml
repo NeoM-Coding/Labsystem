@@ -8,13 +8,35 @@
         <id javaType="string" column="id" property="id"/>
         
         <discriminator javaType="xyz.jasenon.lab.device.model.DeviceType" column="device_type">
-            <case value="Access" resultType="xyz.jasenon.lab.device.model.devices.Access"/>
-            <case value="AirCondition" resultType="xyz.jasenon.lab.device.model.devices.AirCondition"/>
-            <case value="CircuitBreak" resultType="xyz.jasenon.lab.device.model.devices.CircuitBreak"/>
-            <case value="Light" resultType="xyz.jasenon.lab.device.model.devices.Light"/>
-            <case value="Sensor" resultType="xyz.jasenon.lab.device.model.devices.Sensor"/>
+            <case value="Access" resultMap="AccessDeviceResultMap"/>
+            <case value="AirCondition" resultMap="AirConditionDeviceResultMap"/>
+            <case value="CircuitBreak" resultMap="CircuitBreakDeviceResultMap"/>
+            <case value="Light" resultMap="LightDeviceResultMap"/>
+            <case value="Sensor" resultMap="SensorDeviceResultMap"/>
         </discriminator>
-        
+    </resultMap>
+
+    <resultMap id="AccessDeviceResultMap" type="xyz.jasenon.lab.device.model.devices.Access" autoMapping="true">
+        <id javaType="string" column="id" property="id"/>
+        <result column="is_lock" property="locked"/>
+    </resultMap>
+
+    <resultMap id="AirConditionDeviceResultMap" type="xyz.jasenon.lab.device.model.devices.AirCondition" autoMapping="true">
+        <id javaType="string" column="id" property="id"/>
+        <result column="is_lock" property="locked"/>
+    </resultMap>
+
+    <resultMap id="CircuitBreakDeviceResultMap" type="xyz.jasenon.lab.device.model.devices.CircuitBreak" autoMapping="true">
+        <id javaType="string" column="id" property="id"/>
+    </resultMap>
+
+    <resultMap id="LightDeviceResultMap" type="xyz.jasenon.lab.device.model.devices.Light" autoMapping="true">
+        <id javaType="string" column="id" property="id"/>
+        <result column="is_lock" property="locked"/>
+    </resultMap>
+
+    <resultMap id="SensorDeviceResultMap" type="xyz.jasenon.lab.device.model.devices.Sensor" autoMapping="true">
+        <id javaType="string" column="id" property="id"/>
     </resultMap>
     
     <select id="getDeviceById" resultMap="DeviceResultMap">
@@ -24,6 +46,44 @@
     <select id="listAll" resultMap="DeviceResultMap">
         SELECT * FROM `device` WHERE `delete_at` IS NULL;
     </select>
+
+    <select id="list" resultMap="DeviceResultMap">
+        SELECT * FROM `device`
+        WHERE `delete_at` IS NULL
+        <if test="gateway_id != null and gateway_id != ''">
+            AND `gateway_id` = #{gateway_id}
+        </if>
+        <if test="laboratory_id != null and laboratory_id != ''">
+            AND `belong_to` = #{laboratory_id}
+        </if>
+        ORDER BY `create_at` DESC;
+    </select>
+
+    <insert id="addDevice">
+        INSERT INTO `device` (
+            `id`, `device_name`, `belong_to`, `device_type`, `polling`, `gateway_id`,
+            `address`, `self_id`, `socket_gateway_id`, `group_id`, `is_lock`
+        ) VALUES (
+            #{device.id}, #{device.deviceName}, #{device.belongTo}, #{device.deviceType},
+            #{device.polling}, #{device.gatewayId}, #{device.address},
+            <choose>
+                <when test="device.deviceType != null and (device.deviceType.name() == 'AirCondition' or device.deviceType.name() == 'Light' or device.deviceType.name() == 'Sensor')">#{device.selfId}</when>
+                <otherwise>NULL</otherwise>
+            </choose>,
+            <choose>
+                <when test="device.deviceType != null and device.deviceType.name() == 'AirCondition'">#{device.socketGatewayId}</when>
+                <otherwise>NULL</otherwise>
+            </choose>,
+            <choose>
+                <when test="device.deviceType != null and device.deviceType.name() == 'AirCondition'">#{device.groupId}</when>
+                <otherwise>NULL</otherwise>
+            </choose>,
+            <choose>
+                <when test="device.deviceType != null and (device.deviceType.name() == 'Access' or device.deviceType.name() == 'AirCondition' or device.deviceType.name() == 'Light')">#{device.locked}</when>
+                <otherwise>FALSE</otherwise>
+            </choose>
+        );
+    </insert>
 
     <update id="updateDevice">
         UPDATE `device`
@@ -44,7 +104,7 @@
             <choose>
                 <when test="device.deviceType != null and device.deviceType.name() == 'Access'">
                     `address` = #{device.address},
-                    `is_lock` = #{device.lock},
+                    `is_lock` = #{device.locked},
                 </when>
                 <when test="device.deviceType != null and device.deviceType.name() == 'AirCondition'">
                     `address` = #{device.address},
@@ -55,7 +115,7 @@
                     <if test="device.groupId != null">
                         `group_id` = #{device.groupId},
                     </if>
-                    `is_lock` = #{device.lock},
+                    `is_lock` = #{device.locked},
                 </when>
                 <when test="device.deviceType != null and device.deviceType.name() == 'CircuitBreak'">
                     `address` = #{device.address},
@@ -63,7 +123,7 @@
                 <when test="device.deviceType != null and device.deviceType.name() == 'Light'">
                     `address` = #{device.address},
                     `self_id` = #{device.selfId},
-                    `is_lock` = #{device.lock},
+                    `is_lock` = #{device.locked},
                 </when>
                 <when test="device.deviceType != null and device.deviceType.name() == 'Sensor'">
                     `address` = #{device.address},
@@ -73,5 +133,11 @@
             `update_at` = CURRENT_TIMESTAMP(3)
         </set>
         WHERE `delete_at` IS NULL AND `id` = #{device.id};
+    </update>
+
+    <update id="removeDevice">
+        UPDATE `device`
+        SET `delete_at` = CURRENT_TIMESTAMP(3), `polling` = FALSE
+        WHERE `delete_at` IS NULL AND `id` = #{device_id};
     </update>
 </mapper>

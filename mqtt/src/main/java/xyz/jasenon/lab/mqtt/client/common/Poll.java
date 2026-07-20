@@ -120,7 +120,7 @@ public class Poll<REQ extends Task> implements Delayed {
                 CommandLine.REQUEST_ACCESS_DATA, new int[]{},
                 DeviceType.Access, access.getId()
         );
-        MqttTask task = helper.help(dto);
+        MqttTask task = helper.help(access, dto);
         return new Poll<>(task);
     }
 
@@ -129,7 +129,7 @@ public class Poll<REQ extends Task> implements Delayed {
                 CommandLine.REQUEST_AIR_CONDITION_DATA_RS485, new int[]{},
                 DeviceType.AirCondition, airCondition.getId()
         );
-        MqttTask task = helper.help(dto);
+        MqttTask task = helper.help(airCondition, dto);
         return new Poll<>(task);
     }
 
@@ -138,7 +138,7 @@ public class Poll<REQ extends Task> implements Delayed {
                 CommandLine.REQUEST_CIRCUITBREAK_DATA, new int[]{},
                 DeviceType.CircuitBreak, circuitBreak.getId()
         );
-        MqttTask task = helper.help(dto);
+        MqttTask task = helper.help(circuitBreak, dto);
         return new Poll<>(task);
     }
 
@@ -147,7 +147,7 @@ public class Poll<REQ extends Task> implements Delayed {
                 CommandLine.REQUEST_LIGHT_DATA, new int[]{},
                 DeviceType.Light, light.getId()
         );
-        MqttTask task = helper.help(dto);
+        MqttTask task = helper.help(light, dto);
         return new Poll<>(task);
     }
 
@@ -156,7 +156,7 @@ public class Poll<REQ extends Task> implements Delayed {
                 CommandLine.REQUEST_SENSOR_DATA, new int[]{},
                 DeviceType.Sensor, sensor.getId()
         );
-        MqttTask task = helper.help(dto);
+        MqttTask task = helper.help(sensor, dto);
         return new Poll<>(task);
     }
 }

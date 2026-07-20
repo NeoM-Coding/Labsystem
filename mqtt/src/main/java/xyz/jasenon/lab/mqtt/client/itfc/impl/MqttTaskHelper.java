@@ -23,6 +23,12 @@ public class MqttTaskHelper implements TaskHelper {
     public MqttTask help(MqttTaskDto dto) {
         Device device = deviceMapper.getDeviceById(dto.getDeviceId());
         if (device == null) return null;
+        return help(device, dto);
+    }
+
+    @Override
+    public MqttTask help(Device device, MqttTaskDto dto) {
+        if (device == null || dto == null) return null;
         // 处理args参数
         List<Integer> stream = new ArrayList<>();
         if (device instanceof Address){

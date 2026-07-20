@@ -8,7 +8,6 @@ import org.eclipse.paho.client.mqttv3.MqttException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
-import xyz.jasenon.lab.api.mqtt.MqttGatewayCRUD;
 import xyz.jasenon.lab.api.mqtt.MqttIo;
 import xyz.jasenon.lab.api.mqtt.dto.MqttResponseDto;
 import xyz.jasenon.lab.api.mqtt.dto.MqttTaskDto;
@@ -37,7 +36,7 @@ import java.util.stream.Collectors;
 
 @DubboService
 @Traced("mqtt-client-service")
-public class SysClientManager implements MqttIo, MqttGatewayCRUD {
+public class SysClientManager implements MqttIo {
 
     private static final Logger log = LoggerFactory.getLogger(SysClientManager.class);
     private static final int NOT_FOUND = 404;
@@ -122,6 +121,23 @@ public class SysClientManager implements MqttIo, MqttGatewayCRUD {
     }
 
     /**
+     * CRUD 写路径主动刷新运行时；周期看门狗只负责连接异常后的最终修复。
+     */
+    void registerGateway(RS485Gateway gateway) {
+        synchronized (ClientsRuntime.class) {
+            AbstractSysClient<? extends Task> previous = ClientsRuntime.remove(gateway.getId());
+            close(previous);
+            start(gateway, "GatewayLifecycle");
+        }
+    }
+
+    void unregisterGateway(String gatewayId) {
+        synchronized (ClientsRuntime.class) {
+            close(ClientsRuntime.remove(gatewayId));
+        }
+    }
+
+    /**
      * 借助GatewayHelper 提供的能力list all gatewayId
      * 遍历clients entryset 检查缺失了哪个 gateway
      * 由watchdog 重新拉起他  并使用slf4j 记录warn
@@ -170,7 +186,7 @@ public class SysClientManager implements MqttIo, MqttGatewayCRUD {
                     }
 
                     log.warn("[GatewayWatchDog] gateway-id:{} client missing, watchdog restarting", gateway.getId());
-                    start(gateway);
+                    start(gateway, "GatewayWatchDog");
                 }
 
                 nowClientIds.stream()
@@ -189,13 +205,13 @@ public class SysClientManager implements MqttIo, MqttGatewayCRUD {
         eventPublisher.publishEvent(new GatewayClientsInitialRebuildCompletedEvent(clientIds()));
     }
 
-    private void start(RS485Gateway gateway) {
+    private void start(RS485Gateway gateway, String trigger) {
         if (gateway.getSendTopic() == null || gateway.getAcceptTopic() == null) {
-            log.warn("[GatewayWatchDog] gateway-id:{} topic missing, skip client restart", gateway.getId());
+            log.warn("[{}] gateway-id:{} topic missing, skip client start", trigger, gateway.getId());
             return;
         }
         if (options.getConnect().getUrl() == null || options.getConnect().getUrl().isBlank()) {
-            log.warn("[GatewayWatchDog] gateway-id:{} mqtt url missing, skip client restart", gateway.getId());
+            log.warn("[{}] gateway-id:{} mqtt url missing, skip client start", trigger, gateway.getId());
             return;
         }
 
@@ -212,13 +228,13 @@ public class SysClientManager implements MqttIo, MqttGatewayCRUD {
             client.connect(connectOptions());
             register(client);
             if (ClientsRuntime.client(gateway.getId()) == client) {
-                log.info("[GatewayWatchDog] gateway-id:{} client restarted by watchdog", gateway.getId());
+                log.info("[{}] gateway-id:{} client registered", trigger, gateway.getId());
                 eventPublisher.publishEvent(new GatewayClientReadyEvent(gateway.getId()));
             } else {
                 close(client);
             }
         } catch (MqttException e) {
-            log.warn("[GatewayWatchDog] gateway-id:{} client restart failed", gateway.getId(), e);
+            log.warn("[{}] gateway-id:{} client start failed; watchdog will retry", trigger, gateway.getId(), e);
             ClientsRuntime.remove(client);
             close(client);
         }

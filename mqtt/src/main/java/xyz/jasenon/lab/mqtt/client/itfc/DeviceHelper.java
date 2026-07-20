@@ -10,6 +10,12 @@ public interface DeviceHelper {
 
     List<Device> listAll();
 
+    List<Device> list(String gatewayId, String laboratoryId);
+
+    boolean addDevice(Device device);
+
     boolean updateDevice(Device device);
+
+    boolean removeDevice(String deviceId);
 
 }

@@ -118,6 +118,45 @@ public class SysPollingManager implements MqttPollCo {
         return Pair.of(true, "poll disabled");
     }
 
+    /**
+     * 设备 CRUD 成功后立即对齐运行时，避免等待看门狗周期。
+     */
+    void synchronizeRuntime(Device previous, Device current) {
+        unregisterRuntime(previous);
+        if (current != null && current.isPolling()) {
+            registerRuntime(current);
+        }
+    }
+
+    private void registerRuntime(Device device) {
+        Poll<MqttTask> poll = pollOf(device);
+        if (poll == null) {
+            log.warn("[PollingLifecycle] device-id:{} can't create poll", device.getId());
+            return;
+        }
+        AbstractSysClient<MqttTask> client = pollClient(device.getGatewayId());
+        if (client == null) {
+            log.warn(
+                    "[PollingLifecycle] gateway-id:{} isn't ready for device-id:{}; watchdog will retry",
+                    device.getGatewayId(),
+                    device.getId()
+            );
+            return;
+        }
+        client.offer(poll);
+    }
+
+    private void unregisterRuntime(Device device) {
+        if (device == null) {
+            return;
+        }
+        Poll<MqttTask> poll = pollOf(device);
+        AbstractSysClient<MqttTask> client = pollClient(device.getGatewayId());
+        if (poll != null && client != null) {
+            client.remove(poll);
+        }
+    }
+
     @EventListener
     public void onGatewayClientReady(GatewayClientReadyEvent event) {
         syncRuntimeForGateways(Set.of(event.getGatewayId()), "GatewayClientReadyEvent");

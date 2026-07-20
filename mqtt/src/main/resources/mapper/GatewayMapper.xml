@@ -4,4 +4,49 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="xyz.jasenon.lab.mqtt.client.itfc.mapper.GatewayMapper">
 
+    <resultMap id="RS485GatewayResultMap" type="xyz.jasenon.lab.device.model.gateway.gateways.RS485Gateway" autoMapping="true">
+        <id column="id" property="id"/>
+        <result column="using_in" property="usingIn"
+                typeHandler="com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler"/>
+    </resultMap>
+
+    <select id="listAll" resultMap="RS485GatewayResultMap">
+        SELECT * FROM `gateway`
+        WHERE `delete_at` IS NULL AND `gateway_type` = 'RS485'
+        ORDER BY `create_at` DESC;
+    </select>
+
+    <select id="getById" resultMap="RS485GatewayResultMap">
+        SELECT * FROM `gateway`
+        WHERE `delete_at` IS NULL AND `gateway_type` = 'RS485' AND `id` = #{gateway_id}
+        LIMIT 1;
+    </select>
+
+    <insert id="addRS485Gateway">
+        INSERT INTO `gateway` (
+            `id`, `gateway_name`, `using_in`, `gateway_type`, `send_topic`, `accept_topic`
+        ) VALUES (
+            #{gateway.id}, #{gateway.gatewayName},
+            #{gateway.usingIn,typeHandler=com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler},
+            'RS485', #{gateway.sendTopic}, #{gateway.acceptTopic}
+        );
+    </insert>
+
+    <update id="updateRS485Gateway">
+        UPDATE `gateway`
+        SET `gateway_name` = #{gateway.gatewayName},
+            `using_in` = #{gateway.usingIn,typeHandler=com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler},
+            `gateway_type` = 'RS485',
+            `send_topic` = #{gateway.sendTopic},
+            `accept_topic` = #{gateway.acceptTopic},
+            `update_at` = CURRENT_TIMESTAMP(3)
+        WHERE `delete_at` IS NULL AND `gateway_type` = 'RS485' AND `id` = #{gateway.id};
+    </update>
+
+    <update id="removeRS485Gateway">
+        UPDATE `gateway`
+        SET `delete_at` = CURRENT_TIMESTAMP(3)
+        WHERE `delete_at` IS NULL AND `gateway_type` = 'RS485' AND `id` = #{gateway_id};
+    </update>
+
 </mapper>

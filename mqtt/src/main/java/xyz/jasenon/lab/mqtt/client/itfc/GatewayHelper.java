@@ -9,13 +9,13 @@ public interface GatewayHelper {
 
     List<RS485Gateway> listAll();
 
-    interface CRUD {
-        boolean addRS485Gateway();
+    RS485Gateway getById(String gatewayId);
 
-        boolean updateRS485Gateway(String gatewayId, RS485Gateway gateway);
+    boolean addRS485Gateway(RS485Gateway gateway);
 
-        boolean remobeRS485Gateway(String gatewayId);
-    }
+    boolean updateRS485Gateway(RS485Gateway gateway);
+
+    boolean removeRS485Gateway(String gatewayId);
 
     /*
      * 为集群考虑  根据当前机器的workid以及所有works  获取只归属自己管理的gateway

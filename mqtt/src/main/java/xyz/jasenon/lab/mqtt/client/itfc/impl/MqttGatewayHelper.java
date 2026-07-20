@@ -4,11 +4,9 @@ import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import xyz.jasenon.lab.device.model.gateway.Gateway;
 import xyz.jasenon.lab.device.model.gateway.gateways.RS485Gateway;
-import xyz.jasenon.lab.device.model.gateway.gateways.SocketGateway;
 import xyz.jasenon.lab.mqtt.client.itfc.GatewayHelper;
 import xyz.jasenon.lab.mqtt.client.itfc.mapper.GatewayMapper;
 
-import java.util.ArrayList;
 import java.util.List;
 
 @AllArgsConstructor
@@ -20,6 +18,26 @@ public class MqttGatewayHelper implements GatewayHelper {
     @Override
     public List<RS485Gateway> listAll() {
         return gatewayMapper.listAll();
+    }
+
+    @Override
+    public RS485Gateway getById(String gatewayId) {
+        return gatewayMapper.getById(gatewayId);
+    }
+
+    @Override
+    public boolean addRS485Gateway(RS485Gateway gateway) {
+        return gatewayMapper.addRS485Gateway(gateway);
+    }
+
+    @Override
+    public boolean updateRS485Gateway(RS485Gateway gateway) {
+        return gatewayMapper.updateRS485Gateway(gateway);
+    }
+
+    @Override
+    public boolean removeRS485Gateway(String gatewayId) {
+        return gatewayMapper.removeRS485Gateway(gatewayId);
     }
 
     @Override

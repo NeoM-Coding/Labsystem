@@ -25,7 +25,22 @@ public class MqttDeviceHelper implements DeviceHelper {
     }
 
     @Override
+    public List<Device> list(String gatewayId, String laboratoryId) {
+        return deviceMapper.list(gatewayId, laboratoryId);
+    }
+
+    @Override
+    public boolean addDevice(Device device) {
+        return deviceMapper.addDevice(device);
+    }
+
+    @Override
     public boolean updateDevice(Device device) {
         return deviceMapper.updateDevice(device);
+    }
+
+    @Override
+    public boolean removeDevice(String deviceId) {
+        return deviceMapper.removeDevice(deviceId);
     }
 }

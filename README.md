@@ -41,6 +41,7 @@ lab-system-cloud
 
 - MySQL 8.0.44：自动创建 `lab_sys`、`fun_cloud_base`，并导入 `sql/schema.sql`。
 - Redis 8.8、EMQX 5.8、Permify 1.6、Nacos 3.2。
+- PostgreSQL 17：作为 Permify 专用持久化数据库，不与业务 MySQL 混用。
 - Grafana、Loki、Alloy 日志检索与采集链路。
 
 首次启动建议使用一键部署脚本。脚本会创建 `.env`、启动 Compose、导入数据库

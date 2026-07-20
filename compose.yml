@@ -73,12 +73,40 @@ services:
       retries: 20
       start_period: 20s
 
+  permify-postgres:
+    image: ${POSTGRES_IMAGE:-postgres:17.10-alpine3.23}
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      POSTGRES_DB: ${PERMIFY_POSTGRES_DATABASE:-permify}
+      POSTGRES_USER: ${PERMIFY_POSTGRES_USERNAME:-permify}
+      POSTGRES_PASSWORD: ${PERMIFY_POSTGRES_PASSWORD:-permify-local}
+    ports:
+      - "${PERMIFY_POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - permify-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
   permify:
     image: ${PERMIFY_IMAGE:-ghcr.io/permify/permify:v1.6.7}
     restart: unless-stopped
+    environment:
+      PERMIFY_DATABASE_ENGINE: postgres
+      PERMIFY_DATABASE_URI: postgres://${PERMIFY_POSTGRES_USERNAME:-permify}:${PERMIFY_POSTGRES_PASSWORD:-permify-local}@permify-postgres:5432/${PERMIFY_POSTGRES_DATABASE:-permify}?sslmode=disable
+      PERMIFY_DATABASE_AUTO_MIGRATE: "true"
     ports:
       - "${PERMIFY_HTTP_PORT:-3476}:3476"
       - "${PERMIFY_GRPC_PORT:-3478}:3478"
+    depends_on:
+      permify-postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "/bin/sh", "-c", "wget -qO- http://127.0.0.1:3476/healthz >/dev/null"]
       interval: 5s
@@ -152,6 +180,7 @@ services:
 
 volumes:
   mysql-data:
+  permify-postgres-data:
   redis-data:
   emqx-data:
   emqx-log:

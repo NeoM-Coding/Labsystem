@@ -172,12 +172,59 @@ schema_request_body() {
     ' "$1"
 }
 
+schema_checksum() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | awk '{print $1}'
+        return
+    fi
+    if command -v shasum >/dev/null 2>&1; then
+        shasum -a 256 "$1" | awk '{print $1}'
+        return
+    fi
+    die "sha256sum or shasum is required to checksum the Permify schema"
+}
+
+store_bootstrap_metadata() {
+    local key_sql value_sql
+    key_sql="$(utf8_sql "$1")"
+    value_sql="$(utf8_sql "$2")"
+    mysql_query <<SQL
+INSERT INTO \`system_bootstrap_metadata\` (meta_key, meta_value)
+VALUES (${key_sql}, ${value_sql})
+ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), update_at = CURRENT_TIMESTAMP(3);
+SQL
+}
+
+read_bootstrap_metadata() {
+    local key_sql
+    key_sql="$(utf8_sql "$1")"
+    mysql_query <<SQL
+SELECT meta_value FROM \`system_bootstrap_metadata\` WHERE meta_key = ${key_sql} LIMIT 1;
+SQL
+}
+
 upload_permify_schema() {
-    local schema_file schema_response
+    local schema_file schema_response schema_list
+    local current_checksum stored_checksum stored_version
 
     schema_file="$PERMIFY_SCHEMA_FILE"
     [[ "$schema_file" = /* ]] || schema_file="$ROOT_DIR/$schema_file"
     [[ -f "$schema_file" ]] || die "Permify schema file not found: $schema_file"
+
+    current_checksum="$(schema_checksum "$schema_file")"
+    stored_checksum="$(read_bootstrap_metadata 'permify.schema.checksum')"
+    stored_version="$(read_bootstrap_metadata 'permify.schema.version')"
+    if [[ "$current_checksum" == "$stored_checksum" && -n "$stored_version" ]]; then
+        schema_list="$(curl --fail-with-body --silent --show-error \
+            -X POST "http://127.0.0.1:${PERMIFY_HTTP_PORT}/v1/tenants/${PERMIFY_TENANT_ID}/schemas/list" \
+            -H 'Content-Type: application/json' \
+            --data-binary '{"page_size":100,"continuous_token":""}')"
+        if printf '%s' "$schema_list" | grep -Fq "\"$stored_version\""; then
+            PERMIFY_SCHEMA_VERSION="$stored_version"
+            log "Permify schema is unchanged: $PERMIFY_SCHEMA_VERSION"
+            return
+        fi
+    fi
 
     log "uploading Permify schema: $schema_file"
     schema_response="$(curl --fail-with-body --silent --show-error \
@@ -187,6 +234,8 @@ upload_permify_schema() {
     PERMIFY_SCHEMA_VERSION="$(printf '%s' "$schema_response" \
         | sed -nE 's/.*"schema_version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p')"
     [[ -n "$PERMIFY_SCHEMA_VERSION" ]] || die "Permify did not return schema_version: $schema_response"
+    store_bootstrap_metadata 'permify.schema.checksum' "$current_checksum"
+    store_bootstrap_metadata 'permify.schema.version' "$PERMIFY_SCHEMA_VERSION"
     log "Permify schema version: $PERMIFY_SCHEMA_VERSION"
 }
 

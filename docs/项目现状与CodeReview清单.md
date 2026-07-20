@@ -313,7 +313,7 @@ Jedis 自动配置和共享 Redis 能力。`RedisBus` 提供 KV、Hash、TTL、P
 
 [`sql/schema.sql`](../sql/schema.sql) 当前包含 gateway、device、五类设备记录、rule runtime/revision、user、laboratory 和 audit log 表，全部使用逻辑关联，不声明数据库外键。
 
-[`compose.yml`](../compose.yml) 定义 MySQL 8.0.44、Redis、EMQX、Permify、Nacos、Loki、Alloy 和 Grafana。该配置已经做过格式检查，但不代表所有容器和应用已经完成真实联调。
+[`compose.yml`](../compose.yml) 定义 MySQL 8.0.44、Permify 专用 PostgreSQL 17、Redis、EMQX、Permify、Nacos、Loki、Alloy 和 Grafana。该配置已经做过格式检查，但不代表所有容器和应用已经完成真实联调。
 
 ## 5. 下一阶段建议
 

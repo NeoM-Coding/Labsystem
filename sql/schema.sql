@@ -312,3 +312,11 @@ CREATE TABLE IF NOT EXISTS `audit_operation_log` (
     KEY `idx_audit_trace_id` (`trace_id`),
     KEY `idx_audit_request_id` (`request_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='管理员操作审计日志';
+
+CREATE TABLE IF NOT EXISTS `system_bootstrap_metadata` (
+    `meta_key` VARCHAR(128) NOT NULL COMMENT '初始化元数据键',
+    `meta_value` TEXT NOT NULL COMMENT '初始化元数据值',
+    `update_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+        ON UPDATE CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (`meta_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='部署初始化元数据';

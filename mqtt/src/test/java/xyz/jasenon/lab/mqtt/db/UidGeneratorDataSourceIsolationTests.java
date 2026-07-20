@@ -36,6 +36,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
         "spring.main.web-application-type=none",
         "server.port=0",
         "mybatis-plus.configuration.map-underscore-to-camel-case=true",
+        "spring.cloud.nacos.config.enabled=false",
+        "spring.cloud.nacos.discovery.enabled=false",
+        "dubbo.registry.address=N/A",
+        "dubbo.config-center.address=N/A",
         "fun.uid.assigner-mode=db",
         "fun.uid.generator-mode=none",
         "fun.uid.datasource.driver-class-name=org.h2.Driver",
@@ -101,6 +105,26 @@ class UidGeneratorDataSourceIsolationTests {
         assertNotNull(entity.getId());
         assertTrue(entity.getId() > 0);
         assertEquals(1, saved);
+    }
+
+    @Test
+    void customMapperInsertAlsoUsesUidGeneratorForPrimaryKey() {
+        TestUidEntity entity = new TestUidEntity();
+        entity.setName("created-by-custom-mapper");
+
+        int inserted = mapper.insertCustom(entity);
+
+        assertEquals(1, inserted);
+        assertNotNull(entity.getId());
+        assertTrue(entity.getId() > 0);
+        assertEquals(
+                1,
+                businessJdbc.queryForObject(
+                        "SELECT COUNT(*) FROM test_uid_entity WHERE id = ?",
+                        Integer.class,
+                        entity.getId()
+                )
+        );
     }
 
     @Test

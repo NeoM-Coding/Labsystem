@@ -43,13 +43,19 @@ lab-system-cloud
 - Redis 8.8、EMQX 5.8、Permify 1.6、Nacos 3.2。
 - Grafana、Loki、Alloy 日志检索与采集链路。
 
-首次启动前可按需创建本地环境文件；不创建时会使用 Compose 中的开发默认值：
+首次启动建议使用一键部署脚本。脚本会创建 `.env`、启动 Compose、导入数据库
+schema、上传 Permify DSL，并初始化默认 super admin 用户与关系：
 
 ```bash
 cp .env.example .env
-docker compose up -d
-docker compose ps
+./scripts/deploy.sh
 ```
+
+默认登录账号和预编译 BCrypt 密码位于 `.env`，非本地环境必须修改。
+完整说明见 [docs/一键部署与初始化.md](docs/一键部署与初始化.md)。
+
+只需要操作原生 Compose 时仍可执行 `docker compose up -d`，但该方式不会运行
+MySQL 用户和 Permify schema/relation bootstrap。
 
 常用入口：
 

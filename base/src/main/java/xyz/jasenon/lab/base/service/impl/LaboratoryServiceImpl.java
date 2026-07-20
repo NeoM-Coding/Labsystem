@@ -64,6 +64,9 @@ public class LaboratoryServiceImpl extends ServiceImpl<LaboratoryMapper, Laborat
             throw new BusinessException(BAD_REQUEST, errorStr);
         }
         save(laboratory);
+
+        // todo permify grant 权限
+
         return laboratory;
     }
 
@@ -103,6 +106,8 @@ public class LaboratoryServiceImpl extends ServiceImpl<LaboratoryMapper, Laborat
             throw new BusinessException(FORBIDDEN, "你无权删除此实验室");
         }
         removeById(laboratoryId);
+
+        // todo permify 回收资源
     }
 
     private static Laboratory from(LaboratoryCreate command) {

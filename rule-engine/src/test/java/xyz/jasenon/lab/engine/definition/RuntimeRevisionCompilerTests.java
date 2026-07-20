@@ -3,13 +3,14 @@ package xyz.jasenon.lab.engine.definition;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import xyz.jasenon.lab.device.model.DeviceType;
-import xyz.jasenon.lab.engine.action.Action;
 import xyz.jasenon.lab.engine.action.ReportAction;
 import xyz.jasenon.lab.engine.definition.RuntimeRevision.ActionDefinition;
+import xyz.jasenon.lab.engine.definition.RuntimeRevision.ActionType;
 import xyz.jasenon.lab.engine.definition.RuntimeRevision.ActionGroupDefinition;
 import xyz.jasenon.lab.engine.definition.RuntimeRevision.DeviceConditionDefinition;
 import xyz.jasenon.lab.engine.definition.RuntimeRevision.DeviceConditionGroupDefinition;
 import xyz.jasenon.lab.engine.definition.RuntimeRevision.TimeConditionGroupDefinition;
+import xyz.jasenon.lab.engine.definition.RuntimeRevision.ReportType;
 import xyz.jasenon.lab.engine.eval.LogicType;
 import xyz.jasenon.lab.engine.eval.Operator;
 import xyz.jasenon.lab.engine.event.DeviceEvent;
@@ -147,10 +148,10 @@ class RuntimeRevisionCompilerTests {
 
     private static ActionDefinition reportAction() {
         return new ActionDefinition(
-                Action.ActionType.Report,
+                ActionType.Report,
                 null,
                 List.of("user-1"),
-                Set.of(ReportAction.ReportType.SMTP),
+                Set.of(ReportType.SMTP),
                 "Room temperature is too high"
         );
     }

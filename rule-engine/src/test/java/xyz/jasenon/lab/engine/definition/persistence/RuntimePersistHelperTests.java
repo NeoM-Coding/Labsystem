@@ -16,12 +16,14 @@ import xyz.jasenon.lab.engine.definition.RuntimeRevision.DeviceConditionGroupDef
 import xyz.jasenon.lab.engine.definition.RuntimeRevision.TimeConditionGroupDefinition;
 import xyz.jasenon.lab.engine.eval.LogicType;
 import xyz.jasenon.lab.engine.eval.Operator;
+import xyz.jasenon.lab.engine.runtime.Runtime;
 import xyz.jasenon.lab.engine.runtime.RuntimeTable;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest(
@@ -38,6 +40,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
                 "lab.rule-engine.simple-test.enabled=false",
                 "dubbo.registry.address=N/A",
                 "dubbo.config-center.address=N/A",
+                "dubbo.provider.export=false",
+                "lab.auth.permify.enabled=false",
                 "spring.profiles.active=test",
                 "fun.uid.assigner-mode=none"
         }
@@ -63,6 +67,8 @@ class RuntimePersistHelperTests {
     @Test
     void appendsImmutableRevisionForUpdateEnableAndDisable() {
         assertTrue(helper.register(revision("runtime-1", true, "26")));
+        RuntimeTable runtimeTable = runtimeTable();
+        Runtime registered = runtimeTable.get("runtime-1").orElseThrow();
         assertFalse(helper.register(revision("runtime-1", true, "26")));
         assertEquals(1, revisionCount("runtime-1"));
         assertTrue(helper.fetch().get(0).isEnabled());
@@ -70,14 +76,18 @@ class RuntimePersistHelperTests {
         assertTrue(helper.disable("runtime-1"));
         assertEquals(2, revisionCount("runtime-1"));
         assertFalse(helper.fetch().get(0).isEnabled());
+        assertFalse(runtimeTable.contains("runtime-1"));
 
         assertTrue(helper.enable("runtime-1"));
         assertEquals(3, revisionCount("runtime-1"));
         assertTrue(helper.fetch().get(0).isEnabled());
+        Runtime reenabled = runtimeTable.get("runtime-1").orElseThrow();
+        assertNotSame(registered, reenabled);
         assertTrue(helper.enable("runtime-1"));
         assertEquals(3, revisionCount("runtime-1"));
 
         assertTrue(helper.update("runtime-1", revision("runtime-1", true, "30")));
+        assertNotSame(reenabled, runtimeTable.get("runtime-1").orElseThrow());
         assertEquals(4, revisionCount("runtime-1"));
         assertEquals(
                 "30",
@@ -88,6 +98,7 @@ class RuntimePersistHelperTests {
         );
 
         assertTrue(helper.remove("runtime-1"));
+        assertFalse(runtimeTable.contains("runtime-1"));
         assertTrue(helper.fetch().isEmpty());
         assertEquals(4, revisionCount("runtime-1"));
     }
@@ -101,12 +112,13 @@ class RuntimePersistHelperTests {
         engine.remove("disabled-runtime");
         helper.restoreEnabledRuntimes();
 
-        RuntimeTable runtimeTable = (RuntimeTable) ReflectionTestUtils.getField(
-                engine,
-                "runtimeHelper"
-        );
+        RuntimeTable runtimeTable = runtimeTable();
         assertTrue(runtimeTable.contains("enabled-runtime"));
         assertFalse(runtimeTable.contains("disabled-runtime"));
+    }
+
+    private RuntimeTable runtimeTable() {
+        return (RuntimeTable) ReflectionTestUtils.getField(engine, "runtimeHelper");
     }
 
     private int revisionCount(String runtimeId) {

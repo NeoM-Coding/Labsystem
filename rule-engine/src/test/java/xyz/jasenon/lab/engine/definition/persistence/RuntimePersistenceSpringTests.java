@@ -28,6 +28,8 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
                 "lab.rule-engine.simple-test.enabled=false",
                 "dubbo.registry.address=N/A",
                 "dubbo.config-center.address=N/A",
+                "dubbo.provider.export=false",
+                "lab.auth.permify.enabled=false",
                 "spring.profiles.active=test",
                 "fun.uid.assigner-mode=none"
         }

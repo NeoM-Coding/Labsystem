@@ -8,6 +8,7 @@ import xyz.jasenon.lab.device.model.records.LightRecord;
 import xyz.jasenon.lab.mqtt.client.message_handler.MessageHandler;
 import xyz.jasenon.lab.mqtt.client.message_handler.MessageHandlerManager;
 import xyz.jasenon.lab.mqtt.client.message_handler.MessagePersistent;
+import xyz.jasenon.lab.mqtt.client.message_handler.RealtimeTelemetryPublisher;
 import xyz.jasenon.lab.redis.core.RedisBus;
 
 @Component
@@ -15,8 +16,9 @@ public class LightMessageHandler extends MessageHandler<LightRecord> {
     private static final Logger log = LoggerFactory.getLogger(LightMessageHandler.class);
 
     public LightMessageHandler(MessagePersistent<LightRecord> persistent,
-                               RedisBus jedis) {
-        super(persistent, jedis, DeviceType.Light);
+                               RedisBus jedis,
+                               RealtimeTelemetryPublisher realtimePublisher) {
+        super(persistent, jedis, DeviceType.Light, realtimePublisher);
         MessageHandlerManager.register(this);
         log.info("[LightMessageHandler] finish register");
     }

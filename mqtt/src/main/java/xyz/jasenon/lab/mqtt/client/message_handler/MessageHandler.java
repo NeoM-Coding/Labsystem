@@ -25,6 +25,7 @@ public abstract class MessageHandler<R extends BaseRecord> {
     // 持久化辅助
     private final MessagePersistent<R> persistent;
     private final RedisBus jedis;
+    private final RealtimeTelemetryPublisher realtimePublisher;
     public final DeviceType deviceType;
 
     public MessageHandler(
@@ -32,16 +33,29 @@ public abstract class MessageHandler<R extends BaseRecord> {
             RedisBus jedis,
             DeviceType deviceType
     ) {
+        this(persistent, jedis, deviceType, null);
+    }
+
+    public MessageHandler(MessagePersistent<R> persistent,
+                          RedisBus jedis,
+                          DeviceType deviceType,
+                          RealtimeTelemetryPublisher realtimePublisher) {
         this.persistent = persistent;
         this.jedis = jedis;
         this.deviceType = deviceType;
+        this.realtimePublisher = realtimePublisher;
     }
 
     protected abstract R decode(byte[] payload);
 
     public void persist(String deviceId, byte[] payload){
+        persist(deviceId, null, payload);
+    }
+
+    public void persist(String deviceId, String laboratoryId, byte[] payload){
         R r = decode(payload);
         r.setDeviceId(deviceId);
+        r.setLaboratoryId(laboratoryId);
         onChange(r);
 
         // 刷 redis hash 用于快速获取对应字段 统计用
@@ -60,6 +74,9 @@ public abstract class MessageHandler<R extends BaseRecord> {
      * performs no logging.
      */
     protected void onChange(R record) {
+        if (realtimePublisher != null) {
+            realtimePublisher.publish(deviceType, record);
+        }
     }
 
     private void publishSnapshot(String deviceId, Map<String, String> recordFields) {

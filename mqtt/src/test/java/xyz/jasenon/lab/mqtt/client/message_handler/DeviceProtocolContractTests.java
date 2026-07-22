@@ -314,7 +314,7 @@ class DeviceProtocolContractTests {
     private static class TestableAccessMessageHandler extends AccessMessageHandler {
 
         private TestableAccessMessageHandler() {
-            super(null, null);
+            super(null, null, null);
         }
 
         private AccessRecord decodeForTest(byte[] payload) {
@@ -325,7 +325,7 @@ class DeviceProtocolContractTests {
     private static class TestableAirConditionMessageHandler extends AirConditionMessageHandler {
 
         private TestableAirConditionMessageHandler() {
-            super(null, null);
+            super(null, null, null);
         }
 
         private AirConditionRecord decodeForTest(byte[] payload) {
@@ -336,7 +336,7 @@ class DeviceProtocolContractTests {
     private static class TestableCircuitBreakMessageHandler extends CircuitBreakMessageHandler {
 
         private TestableCircuitBreakMessageHandler() {
-            super(null, null);
+            super(null, null, null);
         }
 
         private CircuitBreakRecord decodeForTest(byte[] payload) {
@@ -347,7 +347,7 @@ class DeviceProtocolContractTests {
     private static class TestableLightMessageHandler extends LightMessageHandler {
 
         private TestableLightMessageHandler() {
-            super(null, null);
+            super(null, null, null);
         }
 
         private LightRecord decodeForTest(byte[] payload) {
@@ -358,7 +358,7 @@ class DeviceProtocolContractTests {
     private static class TestableSensorMessageHandler extends SensorMessageHandler {
 
         private TestableSensorMessageHandler() {
-            super(null, null);
+            super(null, null, null);
         }
 
         private SensorRecord decodeForTest(byte[] payload) {

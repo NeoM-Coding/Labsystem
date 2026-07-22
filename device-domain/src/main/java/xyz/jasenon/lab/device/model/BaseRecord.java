@@ -17,4 +17,8 @@ public class BaseRecord extends BaseEntity {
      */
     private String deviceId;
 
+    /** 实时事件路由字段，不参与设备记录持久化。 */
+    @TableField(exist = false)
+    private String laboratoryId;
+
 }

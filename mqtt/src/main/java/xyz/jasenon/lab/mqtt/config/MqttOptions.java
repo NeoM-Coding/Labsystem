@@ -25,6 +25,8 @@ public class MqttOptions {
 
     private Gateway gateway = new Gateway();
 
+    private Realtime realtime = new Realtime();
+
     @Getter
     @Setter
     public static class Connect {
@@ -91,6 +93,16 @@ public class MqttOptions {
                     watchdogIntervalMillis,
                     DEFAULT_GATEWAY_WATCHDOG_INTERVAL_MILLIS
             );
+        }
+    }
+
+    @Getter
+    @Setter
+    public static class Realtime {
+        private long coalesceWindowMillis = 200L;
+
+        public void setCoalesceWindowMillis(long coalesceWindowMillis) {
+            this.coalesceWindowMillis = positiveOrDefault(coalesceWindowMillis, 200L);
         }
     }
 

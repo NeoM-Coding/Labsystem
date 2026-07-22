@@ -43,7 +43,9 @@ public class MqttTaskHelper implements TaskHelper {
         int[] args = stream.stream().mapToInt(i -> (int) i).toArray();
         dto.setArgs(args);
 
-        return MqttTask.fromDto(device.getGatewayId(), dto);
+        MqttTask task = MqttTask.fromDto(device.getGatewayId(), dto);
+        task.setLaboratoryId(device.getBelongTo());
+        return task;
     }
 
 

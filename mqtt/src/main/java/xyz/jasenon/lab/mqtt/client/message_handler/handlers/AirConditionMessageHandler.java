@@ -8,6 +8,7 @@ import xyz.jasenon.lab.device.model.records.AirConditionRecord;
 import xyz.jasenon.lab.mqtt.client.message_handler.MessageHandler;
 import xyz.jasenon.lab.mqtt.client.message_handler.MessageHandlerManager;
 import xyz.jasenon.lab.mqtt.client.message_handler.MessagePersistent;
+import xyz.jasenon.lab.mqtt.client.message_handler.RealtimeTelemetryPublisher;
 import xyz.jasenon.lab.redis.core.RedisBus;
 
 @Component
@@ -15,8 +16,9 @@ public class AirConditionMessageHandler extends MessageHandler<AirConditionRecor
     private static final Logger log = LoggerFactory.getLogger(AirConditionMessageHandler.class);
 
     public AirConditionMessageHandler(MessagePersistent<AirConditionRecord> persistent,
-                                      RedisBus jedis) {
-        super(persistent, jedis, DeviceType.AirCondition);
+                                      RedisBus jedis,
+                                      RealtimeTelemetryPublisher realtimePublisher) {
+        super(persistent, jedis, DeviceType.AirCondition, realtimePublisher);
         MessageHandlerManager.register(this);
         log.info("[AirConditionMessageHandler] finish register");
     }

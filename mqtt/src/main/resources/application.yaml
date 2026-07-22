@@ -60,6 +60,8 @@ mqtt:
     watchdog-interval-millis: ${MQTT_POLL_WATCHDOG_INTERVAL_MILLIS:60000}
   gateway:
     watchdog-interval-millis: ${MQTT_GATEWAY_WATCHDOG_INTERVAL_MILLIS:60000}
+  realtime:
+    coalesce-window-millis: ${MQTT_REALTIME_COALESCE_WINDOW_MILLIS:200}
 
 lab:
   redis:

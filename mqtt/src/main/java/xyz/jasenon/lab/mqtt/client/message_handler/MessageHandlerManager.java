@@ -36,21 +36,27 @@ public class MessageHandlerManager {
             return;
         };
 
-        handler.persist(dto.deviceId, payload);
+        handler.persist(dto.deviceId, dto.laboratoryId, payload);
     }
 
 
     public static class MessageDto {
         private final DeviceType deviceType;
         private final String deviceId;
+        private final String laboratoryId;
 
-        private MessageDto(DeviceType deviceType, String deviceId){
+        private MessageDto(DeviceType deviceType, String deviceId, String laboratoryId){
             this.deviceType = deviceType;
             this.deviceId = deviceId;
+            this.laboratoryId = laboratoryId;
         }
 
         public static MessageDto from(PendingRequest<MqttTask> task){
-            return new MessageDto(task.getRequest().getType(), task.getRequest().getDeviceId());
+            return new MessageDto(
+                    task.getRequest().getType(),
+                    task.getRequest().getDeviceId(),
+                    task.getRequest().getLaboratoryId()
+            );
         }
 
         public DeviceType getDeviceType() {

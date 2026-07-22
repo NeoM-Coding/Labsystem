@@ -9,6 +9,7 @@ import xyz.jasenon.lab.mqtt.protocol.codec.ByteUtil;
 import xyz.jasenon.lab.mqtt.client.message_handler.MessageHandler;
 import xyz.jasenon.lab.mqtt.client.message_handler.MessageHandlerManager;
 import xyz.jasenon.lab.mqtt.client.message_handler.MessagePersistent;
+import xyz.jasenon.lab.mqtt.client.message_handler.RealtimeTelemetryPublisher;
 import xyz.jasenon.lab.redis.core.RedisBus;
 
 @Component
@@ -16,8 +17,9 @@ public class SensorMessageHandler extends MessageHandler<SensorRecord> {
     private static final Logger log = LoggerFactory.getLogger(SensorMessageHandler.class);
 
     public SensorMessageHandler(MessagePersistent<SensorRecord> persistent,
-                                RedisBus jedis) {
-        super(persistent, jedis, DeviceType.Sensor);
+                                RedisBus jedis,
+                                RealtimeTelemetryPublisher realtimePublisher) {
+        super(persistent, jedis, DeviceType.Sensor, realtimePublisher);
         MessageHandlerManager.register(this);
         log.info("[SensorMessageHandler] finish register");
     }

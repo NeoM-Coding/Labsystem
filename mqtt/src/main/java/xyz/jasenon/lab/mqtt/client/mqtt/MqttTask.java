@@ -32,6 +32,8 @@ public class MqttTask extends Task {
     private DeviceType type;
     // 设备id
     private String deviceId;
+    // 轮询响应实时推送所需的实验室路由信息。
+    private String laboratoryId;
 
     public MqttTask(String gatewayId) {
         super(gatewayId, new byte[]{});

@@ -8,6 +8,7 @@ import xyz.jasenon.lab.device.model.records.AccessRecord;
 import xyz.jasenon.lab.mqtt.client.message_handler.MessageHandler;
 import xyz.jasenon.lab.mqtt.client.message_handler.MessageHandlerManager;
 import xyz.jasenon.lab.mqtt.client.message_handler.MessagePersistent;
+import xyz.jasenon.lab.mqtt.client.message_handler.RealtimeTelemetryPublisher;
 import xyz.jasenon.lab.redis.core.RedisBus;
 
 @Component
@@ -16,8 +17,9 @@ public class AccessMessageHandler extends MessageHandler<AccessRecord> {
     private static final Logger log = LoggerFactory.getLogger(AccessMessageHandler.class);
 
     public AccessMessageHandler(MessagePersistent<AccessRecord> persistent,
-                                RedisBus jedis) {
-        super(persistent, jedis, DeviceType.Access);
+                                RedisBus jedis,
+                                RealtimeTelemetryPublisher realtimePublisher) {
+        super(persistent, jedis, DeviceType.Access, realtimePublisher);
         MessageHandlerManager.register(this);
         log.info("[AccessMessageHandler] finish register");
     }

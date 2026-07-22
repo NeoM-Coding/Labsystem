@@ -9,6 +9,7 @@ import xyz.jasenon.lab.mqtt.protocol.codec.ByteUtil;
 import xyz.jasenon.lab.mqtt.client.message_handler.MessageHandler;
 import xyz.jasenon.lab.mqtt.client.message_handler.MessageHandlerManager;
 import xyz.jasenon.lab.mqtt.client.message_handler.MessagePersistent;
+import xyz.jasenon.lab.mqtt.client.message_handler.RealtimeTelemetryPublisher;
 import xyz.jasenon.lab.redis.core.RedisBus;
 
 @Component
@@ -16,8 +17,9 @@ public class CircuitBreakMessageHandler extends MessageHandler<CircuitBreakRecor
     private static final Logger log = LoggerFactory.getLogger(CircuitBreakMessageHandler.class);
 
     public CircuitBreakMessageHandler(MessagePersistent<CircuitBreakRecord> persistent,
-                                      RedisBus jedis) {
-        super(persistent, jedis, DeviceType.CircuitBreak);
+                                      RedisBus jedis,
+                                      RealtimeTelemetryPublisher realtimePublisher) {
+        super(persistent, jedis, DeviceType.CircuitBreak, realtimePublisher);
         MessageHandlerManager.register(this);
         log.info("[CircuitBreakMessageHandler] finish register");
     }

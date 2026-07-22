@@ -31,4 +31,33 @@ class TraceHttpFilterTests {
         assertThat(response.getHeader(TraceContext.REQUEST_HEADER)).isNotBlank();
         assertThat(TraceContext.traceId()).isNull();
     }
+
+    @Test
+    void generatesTraceAndRequestIdsWhenClientDoesNotProvideHeaders() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        new TraceHttpFilter().doFilter(request, response, (req, res) -> {
+            assertThat(TraceContext.traceId()).matches("[0-9a-f]{32}");
+            assertThat(TraceContext.requestId()).matches("[0-9a-f]{24}");
+        });
+
+        assertThat(response.getHeader(TraceContext.TRACE_HEADER)).matches("[0-9a-f]{32}");
+        assertThat(response.getHeader(TraceContext.REQUEST_HEADER)).matches("[0-9a-f]{24}");
+        assertThat(TraceContext.traceId()).isNull();
+    }
+
+    @Test
+    void replacesInvalidDeveloperProvidedTraceId() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader(TraceContext.TRACE_HEADER, "invalid trace id with spaces");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        new TraceHttpFilter().doFilter(request, response, (req, res) ->
+                assertThat(TraceContext.traceId()).matches("[0-9a-f]{32}"));
+
+        assertThat(response.getHeader(TraceContext.TRACE_HEADER))
+                .matches("[0-9a-f]{32}")
+                .isNotEqualTo("invalid trace id with spaces");
+    }
 }

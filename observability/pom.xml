@@ -17,6 +17,11 @@
     <dependencies>
         <dependency>
             <groupId>xyz.jasenon.lab</groupId>
+            <artifactId>common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>xyz.jasenon.lab</groupId>
             <artifactId>auth-api</artifactId>
             <version>${project.version}</version>
         </dependency>

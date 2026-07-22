@@ -63,6 +63,36 @@ class UserContextRequestFilterTests {
         assertEquals(200, response.getStatus());
     }
 
+    @Test
+    void skipsContextRestorationForLoginRequest() throws Exception {
+        UserContextRequestFilter filter = new UserContextRequestFilter(
+                () -> { throw new AssertionError("login must not resolve the previous session"); },
+                new FakeStore(null)
+        );
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/sessions");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response,
+                (chainRequest, chainResponse) -> assertNull(UserContextHolder.get()));
+
+        assertEquals(200, response.getStatus());
+    }
+
+    @Test
+    void skipsContextRestorationForOpenApiDocumentation() throws Exception {
+        UserContextRequestFilter filter = new UserContextRequestFilter(
+                () -> { throw new AssertionError("documentation must be publicly accessible"); },
+                new FakeStore(null)
+        );
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/v3/api-docs.yaml");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response,
+                (chainRequest, chainResponse) -> assertNull(UserContextHolder.get()));
+
+        assertEquals(200, response.getStatus());
+    }
+
     private record FakeStore(UserContext context) implements UserContextStore {
         @Override
         public void save(UserContext context) {

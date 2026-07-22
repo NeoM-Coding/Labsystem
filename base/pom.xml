@@ -78,6 +78,11 @@
             <artifactId>sa-token-alone-redis</artifactId>
             <version>1.45.0</version>
         </dependency>
+        <dependency>
+            <groupId>cn.dev33</groupId>
+            <artifactId>sa-token-redis-jackson</artifactId>
+            <version>1.45.0</version>
+        </dependency>
 
         <dependency>
             <groupId>xyz.jasenon.lab</groupId>

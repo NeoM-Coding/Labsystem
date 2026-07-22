@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import xyz.jasenon.lab.auth.context.UserContext;
@@ -13,11 +14,17 @@ import xyz.jasenon.lab.auth.context.UserContextHolder;
 import xyz.jasenon.lab.auth.context.UserContextStore;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Optional;
 
 @Component
-@Order(Ordered.HIGHEST_PRECEDENCE)
+@Order(Ordered.HIGHEST_PRECEDENCE + 2)
 public class UserContextRequestFilter extends OncePerRequestFilter {
+
+    private static final String LOGIN_PATH = "/api/sessions";
+    private static final List<String> DOCUMENTATION_PATHS = List.of(
+            "/v3/api-docs", "/swagger-ui", "/swagger-ui.html"
+    );
 
     private final CurrentUserIdResolver userIdResolver;
     private final UserContextStore contextStore;
@@ -26,6 +33,13 @@ public class UserContextRequestFilter extends OncePerRequestFilter {
                                     UserContextStore contextStore) {
         this.userIdResolver = userIdResolver;
         this.contextStore = contextStore;
+    }
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getRequestURI().substring(request.getContextPath().length());
+        boolean loginRequest = HttpMethod.POST.matches(request.getMethod()) && LOGIN_PATH.equals(path);
+        return loginRequest || DOCUMENTATION_PATHS.stream().anyMatch(path::startsWith);
     }
 
     @Override

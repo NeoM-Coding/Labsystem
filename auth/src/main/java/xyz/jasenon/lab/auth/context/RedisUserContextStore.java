@@ -7,7 +7,10 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import xyz.jasenon.lab.redis.core.RedisBus;
+import xyz.jasenon.lab.common.realtime.RealtimeChannels;
+import xyz.jasenon.lab.common.realtime.UserContextChangedEvent;
 
+import java.time.Instant;
 import java.util.Optional;
 
 public class RedisUserContextStore implements UserContextStore {
@@ -36,6 +39,7 @@ public class RedisUserContextStore implements UserContextStore {
         try {
             // UserContext 是登录会话的权限快照，按项目约定不设置 TTL，由权限变更或注销显式刷新。
             redis.set(key(context.getUserId()), objectMapper.writeValueAsString(context));
+            publishChange(context.getUserId(), UserContextChangedEvent.Operation.UPSERT);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("UserContext 序列化失败", e);
         }
@@ -55,7 +59,20 @@ public class RedisUserContextStore implements UserContextStore {
 
     @Override
     public void delete(String userId) {
-        if (hasText(userId)) redis.delete(key(userId));
+        if (hasText(userId)) {
+            redis.delete(key(userId));
+            publishChange(userId, UserContextChangedEvent.Operation.DELETE);
+        }
+    }
+
+    private void publishChange(String userId, UserContextChangedEvent.Operation operation) {
+        try {
+            redis.publish(RealtimeChannels.USER_CONTEXT_CHANGED, objectMapper.writeValueAsString(
+                    new UserContextChangedEvent(userId.trim(), operation, Instant.now())
+            ));
+        } catch (JsonProcessingException | RuntimeException ignored) {
+            // Redis 中的上下文已是事实来源；通知失败不能反向破坏登录或权限刷新。
+        }
     }
 
     private static String key(String userId) {

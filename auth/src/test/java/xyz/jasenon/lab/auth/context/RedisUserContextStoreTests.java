@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import xyz.jasenon.lab.common.realtime.RealtimeChannels;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -24,6 +25,7 @@ class RedisUserContextStoreTests {
         assertThat(redis.get("auth:user-context:user-1"))
                 .doesNotContain("buildingNames", "orgNames");
         assertThat(store.find("user-1")).contains(source);
+        assertThat(redis.published.get(RealtimeChannels.USER_CONTEXT_CHANGED)).contains("UPSERT");
     }
 
     @Test
@@ -66,6 +68,7 @@ class RedisUserContextStoreTests {
     private static final class InMemoryRedisBus extends RedisBus {
 
         private final Map<String, String> values = new HashMap<>();
+        private final Map<String, String> published = new HashMap<>();
 
         private InMemoryRedisBus() {
             super(new JedisPool(), "");
@@ -85,6 +88,12 @@ class RedisUserContextStoreTests {
         @Override
         public long delete(String key) {
             return values.remove(key) == null ? 0L : 1L;
+        }
+
+        @Override
+        public long publish(String channel, String message) {
+            published.put(channel, message);
+            return 1L;
         }
     }
 }

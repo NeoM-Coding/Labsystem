@@ -4,10 +4,13 @@ import cn.hutool.crypto.digest.BCrypt;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.apache.dubbo.config.annotation.DubboService;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import xyz.jasenon.lab.auth.annotation.ActionAuthorized;
 import xyz.jasenon.lab.auth.command.UserAuthorizationCommand;
 import xyz.jasenon.lab.auth.permission.RelationShip;
 import xyz.jasenon.lab.auth.service.Auth;
+import xyz.jasenon.lab.auth.service.LaboratoryAuthorization;
 import xyz.jasenon.lab.auth.context.UserContext;
 import xyz.jasenon.lab.auth.context.UserContextStore;
 import xyz.jasenon.lab.audit.api.annotation.Audited;
@@ -37,13 +40,16 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     private static final int INTERNAL_SERVER_ERROR = 500;
 
     private final Auth auth;
+    private final LaboratoryAuthorization laboratoryAuthorization;
     private final LaboratoryMapper laboratoryMapper;
     private final UserContextStore userContextStore;
 
     public UserServiceImpl(Auth auth,
+                           LaboratoryAuthorization laboratoryAuthorization,
                            LaboratoryMapper laboratoryMapper,
                            UserContextStore userContextStore) {
         this.auth = auth;
+        this.laboratoryAuthorization = laboratoryAuthorization;
         this.laboratoryMapper = laboratoryMapper;
         this.userContextStore = userContextStore;
     }
@@ -69,8 +75,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             throw new BusinessException(FORBIDDEN, "密码错误!");
         }
         userContextStore.save(buildUserContext(user));
-        SaTokenUtil.login(user.getId());
-        var token = SaTokenUtil.token();
+        var token = SaTokenUtil.login(user.getId());
         return new UserSession(user.mask(), token.f, token.s);
     }
 
@@ -162,8 +167,21 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         }
         synchronizeAuthorization(user.getId(), command.appRelations(), command.laboratoryIds());
         User updated = getById(user.getId());
-        userContextStore.save(buildUserContext(updated));
+        afterCommit(() -> userContextStore.save(buildUserContext(updated)));
         return user;
+    }
+
+    private static void afterCommit(Runnable action) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            action.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                action.run();
+            }
+        });
     }
 
     private void synchronizeAuthorization(String userId,
@@ -174,11 +192,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
     private UserContext buildUserContext(User user) {
         // 查询 can_view 而不是直接 viewer tuple，确保 super_admin 等 DSL 继承权限也进入 view scope。
-        Set<String> laboratoryIds = auth.visibleLaboratoryIds(user.getId());
+        Set<String> laboratoryIds = laboratoryAuthorization.visibleLaboratoryIds(user.getId());
         var laboratories = laboratoryIds.isEmpty()
                 ? java.util.List.<xyz.jasenon.lab.base.api.model.Laboratory>of()
                 : laboratoryMapper.selectByIds(laboratoryIds);
-        return UserContextFactory.fromIdsAndLaboratories(user, laboratoryIds, laboratories);
+        // 外部关系与数据库短暂不一致时，不把已不存在的实验室写入用户可见范围。
+        return UserContextFactory.from(user, laboratories);
     }
 
     private static boolean isBlank(String value) {

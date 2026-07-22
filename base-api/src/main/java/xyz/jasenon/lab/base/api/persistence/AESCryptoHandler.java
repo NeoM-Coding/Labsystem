@@ -9,6 +9,7 @@ import java.sql.CallableStatement;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Types;
 
 public class AESCryptoHandler implements TypeHandler<String> {
 
@@ -17,36 +18,36 @@ public class AESCryptoHandler implements TypeHandler<String> {
     @Override
     public void setParameter(PreparedStatement ps, int i, String parameter, JdbcType jdbcType) throws SQLException {
         if (parameter == null){
+            ps.setNull(i, Types.VARCHAR);
             return;
         }
-        byte[] encrypt = aes.encrypt(parameter);
-        ps.setString(i, new String(encrypt, StandardCharsets.UTF_8));
+        ps.setString(i, encrypt(parameter));
     }
 
     @Override
     public String getResult(ResultSet rs, String columnName) throws SQLException {
-        String encrypt = rs.getNString(columnName);
-        if (encrypt == null){
-            return "";
-        }
-        return new String(aes.decrypt(encrypt), StandardCharsets.UTF_8);
+        return decrypt(rs.getString(columnName));
     }
 
     @Override
     public String getResult(ResultSet rs, int columnIndex) throws SQLException {
-        String encrypt = rs.getNString(columnIndex);
-        if (encrypt == null){
-            return "";
-        }
-        return new String(aes.decrypt(encrypt), StandardCharsets.UTF_8);
+        return decrypt(rs.getString(columnIndex));
     }
 
     @Override
     public String getResult(CallableStatement cs, int columnIndex) throws SQLException {
-        String encrypt = cs.getNString(columnIndex);
-        if (encrypt == null){
-            return "";
+        return decrypt(cs.getString(columnIndex));
+    }
+
+    String encrypt(String plainText) {
+        // Binary ciphertext must use a text-safe encoding before it is stored in VARCHAR.
+        return aes.encryptBase64(plainText, StandardCharsets.UTF_8);
+    }
+
+    String decrypt(String cipherText) {
+        if (cipherText == null) {
+            return null;
         }
-        return new String(aes.decrypt(encrypt), StandardCharsets.UTF_8);
+        return aes.decryptStr(cipherText, StandardCharsets.UTF_8);
     }
 }

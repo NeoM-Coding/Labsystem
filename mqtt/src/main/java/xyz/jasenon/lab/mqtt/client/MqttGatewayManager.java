@@ -1,6 +1,7 @@
 package xyz.jasenon.lab.mqtt.client;
 
 import org.apache.dubbo.config.annotation.DubboService;
+import org.springframework.transaction.annotation.Transactional;
 import xyz.jasenon.lab.api.mqtt.MqttGatewayCRUD;
 import xyz.jasenon.lab.common.exception.BusinessException;
 import xyz.jasenon.lab.device.model.gateway.GatewayType;
@@ -33,14 +34,16 @@ public class MqttGatewayManager implements MqttGatewayCRUD {
     }
 
     @Override
+    @Transactional
     public RS485Gateway create(RS485Gateway gateway) {
         validate(gateway);
         gateway.setGatewayType(GatewayType.RS485);
         if (!gatewayHelper.addRS485Gateway(gateway)) {
             throw new BusinessException(INTERNAL_SERVER_ERROR, "mqtt gateway create failed");
         }
-        clientManager.registerGateway(gateway);
-        return required(gateway.getId());
+        RS485Gateway created = required(gateway.getId());
+        TransactionCallbacks.afterCommit(() -> clientManager.registerGateway(created));
+        return created;
     }
 
     @Override
@@ -54,6 +57,7 @@ public class MqttGatewayManager implements MqttGatewayCRUD {
     }
 
     @Override
+    @Transactional
     public RS485Gateway update(String gatewayId, RS485Gateway gateway) {
         required(gatewayId);
         validate(gateway);
@@ -62,12 +66,14 @@ public class MqttGatewayManager implements MqttGatewayCRUD {
         if (!gatewayHelper.updateRS485Gateway(gateway)) {
             throw new BusinessException(INTERNAL_SERVER_ERROR, "mqtt gateway update failed");
         }
-        // Topic 或连接身份可能变化，更新后必须替换旧 client，而不是等看门狗发现。
-        clientManager.registerGateway(gateway);
-        return required(gatewayId);
+        RS485Gateway updated = required(gatewayId);
+        // Topic 或连接身份可能变化，提交后立即替换旧 client。
+        TransactionCallbacks.afterCommit(() -> clientManager.registerGateway(updated));
+        return updated;
     }
 
     @Override
+    @Transactional
     public void delete(String gatewayId) {
         required(gatewayId);
         if (!deviceHelper.list(gatewayId, null).isEmpty()) {
@@ -76,7 +82,7 @@ public class MqttGatewayManager implements MqttGatewayCRUD {
         if (!gatewayHelper.removeRS485Gateway(gatewayId)) {
             throw new BusinessException(INTERNAL_SERVER_ERROR, "mqtt gateway delete failed");
         }
-        clientManager.unregisterGateway(gatewayId);
+        TransactionCallbacks.afterCommit(() -> clientManager.unregisterGateway(gatewayId));
     }
 
     private RS485Gateway required(String gatewayId) {

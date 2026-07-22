@@ -1,6 +1,7 @@
 package xyz.jasenon.lab.mqtt.client;
 
 import org.apache.dubbo.config.annotation.DubboService;
+import org.springframework.transaction.annotation.Transactional;
 import xyz.jasenon.lab.api.mqtt.MqttDeviceCRUD;
 import xyz.jasenon.lab.common.exception.BusinessException;
 import xyz.jasenon.lab.device.model.Address;
@@ -39,13 +40,15 @@ public class MqttDeviceManager implements MqttDeviceCRUD {
     }
 
     @Override
+    @Transactional
     public Device create(Device device) {
         validate(device);
         if (!deviceHelper.addDevice(device)) {
             throw new BusinessException(INTERNAL_SERVER_ERROR, "device create failed");
         }
-        pollingManager.synchronizeRuntime(null, device);
-        return required(device.getId());
+        Device created = required(device.getId());
+        TransactionCallbacks.afterCommit(() -> pollingManager.synchronizeRuntime(null, created));
+        return created;
     }
 
     @Override
@@ -59,6 +62,7 @@ public class MqttDeviceManager implements MqttDeviceCRUD {
     }
 
     @Override
+    @Transactional
     public Device update(String deviceId, Device device) {
         Device previous = required(deviceId);
         validate(device);
@@ -71,17 +75,19 @@ public class MqttDeviceManager implements MqttDeviceCRUD {
         if (!deviceHelper.updateDevice(device)) {
             throw new BusinessException(INTERNAL_SERVER_ERROR, "device update failed");
         }
-        pollingManager.synchronizeRuntime(previous, device);
-        return required(deviceId);
+        Device updated = required(deviceId);
+        TransactionCallbacks.afterCommit(() -> pollingManager.synchronizeRuntime(previous, updated));
+        return updated;
     }
 
     @Override
+    @Transactional
     public void delete(String deviceId) {
         Device previous = required(deviceId);
         if (!deviceHelper.removeDevice(deviceId)) {
             throw new BusinessException(INTERNAL_SERVER_ERROR, "device delete failed");
         }
-        pollingManager.synchronizeRuntime(previous, null);
+        TransactionCallbacks.afterCommit(() -> pollingManager.synchronizeRuntime(previous, null));
     }
 
     private Device required(String deviceId) {

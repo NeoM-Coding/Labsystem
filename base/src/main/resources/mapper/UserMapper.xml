@@ -10,6 +10,6 @@
     </select>
 
     <select id="getUserByUsername" resultType="xyz.jasenon.lab.base.api.model.User">
-        select * from user where username = ${username};
+        select * from user where username = #{username};
     </select>
 </mapper>

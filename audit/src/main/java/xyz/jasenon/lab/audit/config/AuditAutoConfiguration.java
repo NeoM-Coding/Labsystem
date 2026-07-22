@@ -15,7 +15,10 @@ import xyz.jasenon.lab.audit.persistence.mapper.AuditLogMapper;
 import java.util.List;
 
 @AutoConfiguration
-@MapperScan("xyz.jasenon.lab.audit.persistence.mapper")
+@MapperScan(
+        basePackages = "xyz.jasenon.lab.audit.persistence.mapper",
+        sqlSessionFactoryRef = "sqlSessionFactory"
+)
 @ConditionalOnProperty(prefix = "lab.audit", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class AuditAutoConfiguration {
 

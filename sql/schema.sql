@@ -248,7 +248,7 @@ CREATE TABLE IF NOT EXISTS `user` (
     `name` VARCHAR(128) NOT NULL COMMENT '用户昵称，系统内唯一',
     `username` VARCHAR(128) NOT NULL COMMENT '用户名/登录名',
     `password` VARCHAR(255) NOT NULL COMMENT '密码摘要',
-    `phone` VARCHAR(32) NULL COMMENT '手机号',
+    `phone` VARCHAR(255) NULL COMMENT '手机号 AES Base64 密文',
     `email` VARCHAR(255) NULL COMMENT '邮箱',
     `mark` VARCHAR(512) NULL COMMENT '备注',
     `create_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),

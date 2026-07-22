@@ -5,11 +5,15 @@ import lombok.NoArgsConstructor;
 import xyz.jasenon.lab.device.model.DeviceType;
 import xyz.jasenon.lab.mqtt.protocol.command.CommandLine;
 
+import java.io.Serial;
 import java.io.Serializable;
 
 @AllArgsConstructor
 @NoArgsConstructor
 public class MqttTaskDto implements Serializable {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
 
     private CommandLine commandLine;
     private int[] args;

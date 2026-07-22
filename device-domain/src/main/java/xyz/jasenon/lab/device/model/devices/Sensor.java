@@ -9,10 +9,16 @@ import xyz.jasenon.lab.device.model.DeviceType;
 import xyz.jasenon.lab.device.model.Device;
 import xyz.jasenon.lab.device.model.SelfId;
 
+import java.io.Serial;
+
 @Getter
 @Setter
 @TableName(value = "device",autoResultMap = true)
 public class Sensor extends Device implements Address, SelfId {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
+
     public Sensor() {
         this.deviceType = DeviceType.Sensor;
     }

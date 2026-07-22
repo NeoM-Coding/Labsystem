@@ -2,19 +2,28 @@ package xyz.jasenon.lab.base.api.model;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
 import xyz.jasenon.lab.persistence.model.BaseEntity;
 import xyz.jasenon.lab.base.api.validation.ValidationErrors;
 import xyz.jasenon.lab.base.api.persistence.AESCryptoHandler;
 import xyz.jasenon.lab.base.api.persistence.BCryptoHandler;
 
+import java.io.Serial;
+
 @EqualsAndHashCode(callSuper = true)
 @TableName(value = "user", autoResultMap = true)
 @Data
+@NoArgsConstructor
+@AllArgsConstructor
 @Builder(toBuilder = true)
 public class User extends BaseEntity {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
 
     // 用户昵称  要求系统内unique （业务需求）
     private String name;

@@ -5,6 +5,8 @@ import xyz.jasenon.lab.device.model.DeviceType;
 import xyz.jasenon.lab.engine.eval.LogicType;
 import xyz.jasenon.lab.engine.eval.Operator;
 
+import java.io.Serial;
+import java.io.Serializable;
 import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -23,7 +25,10 @@ public record RuntimeRevision(
         List<DeviceConditionGroupDefinition> deviceConditionGroups,
         List<TimeConditionGroupDefinition> timeConditionGroups,
         List<ActionGroupDefinition> actionGroups
-) {
+) implements Serializable {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
 
     public RuntimeRevision {
         enabled = enabled == null ? Boolean.TRUE : enabled;
@@ -56,7 +61,11 @@ public record RuntimeRevision(
     public record DeviceConditionGroupDefinition(
             String groupId,
             List<DeviceConditionDefinition> conditions
-    ) {
+    ) implements Serializable {
+
+        @Serial
+        private static final long serialVersionUID = 1L;
+
         public DeviceConditionGroupDefinition {
             conditions = immutableList(conditions);
         }
@@ -70,13 +79,20 @@ public record RuntimeRevision(
             Operator operator,
             String value,
             LogicType logicToPrevious
-    ) {
+    ) implements Serializable {
+
+        @Serial
+        private static final long serialVersionUID = 1L;
     }
 
     public record TimeConditionGroupDefinition(
             String groupId,
             List<TimeConditionDefinition> conditions
-    ) {
+    ) implements Serializable {
+
+        @Serial
+        private static final long serialVersionUID = 1L;
+
         public TimeConditionGroupDefinition {
             conditions = immutableList(conditions);
         }
@@ -92,7 +108,11 @@ public record RuntimeRevision(
             LocalTime startTime,
             LocalTime endTime,
             LocalTime timePoint
-    ) {
+    ) implements Serializable {
+
+        @Serial
+        private static final long serialVersionUID = 1L;
+
         public TimeConditionDefinition {
             weekdays = weekdays == null ? Set.of() : Set.copyOf(weekdays);
         }
@@ -108,7 +128,11 @@ public record RuntimeRevision(
             String deviceConditionGroupId,
             String timeConditionGroupId,
             List<ActionDefinition> actions
-    ) {
+    ) implements Serializable {
+
+        @Serial
+        private static final long serialVersionUID = 1L;
+
         public ActionGroupDefinition {
             actions = immutableList(actions);
         }
@@ -120,7 +144,11 @@ public record RuntimeRevision(
             List<String> userIds,
             Set<ReportType> reportTypes,
             String content
-    ) {
+    ) implements Serializable {
+
+        @Serial
+        private static final long serialVersionUID = 1L;
+
         public ActionDefinition {
             userIds = immutableList(userIds);
             reportTypes = reportTypes == null ? Set.of() : Set.copyOf(reportTypes);

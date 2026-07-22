@@ -6,6 +6,7 @@ import lombok.Setter;
 import xyz.jasenon.lab.device.model.gateway.Gateway;
 import xyz.jasenon.lab.device.model.gateway.GatewayType;
 
+import java.io.Serial;
 import java.util.List;
 import java.util.Objects;
 
@@ -13,6 +14,10 @@ import java.util.Objects;
 @Setter
 @TableName(value = "gateway",autoResultMap = true)
 public class RS485Gateway extends Gateway {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
+
     // 发送主题
     private String sendTopic;
     // 接收主题

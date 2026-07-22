@@ -11,6 +11,7 @@ import xyz.jasenon.lab.device.model.DeviceType;
 import xyz.jasenon.lab.device.model.Device;
 import xyz.jasenon.lab.device.model.SelfId;
 
+import java.io.Serial;
 import java.util.UUID;
 
 @Getter
@@ -18,6 +19,10 @@ import java.util.UUID;
 @AllArgsConstructor
 @TableName(value = "device",autoResultMap = true)
 public class AirCondition extends Device implements Address, SelfId {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
+
     public AirCondition() {
         this.deviceType = DeviceType.AirCondition;
     }

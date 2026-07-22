@@ -9,6 +9,7 @@ import xyz.jasenon.lab.device.model.devices.*;
 import xyz.jasenon.lab.device.model.gateway.gateways.RS485Gateway;
 import xyz.jasenon.lab.device.model.gateway.gateways.SocketGateway;
 
+import java.io.Serial;
 import java.util.List;
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "gatewayType", include = JsonTypeInfo.As.EXISTING_PROPERTY, visible = true)
@@ -17,6 +18,10 @@ import java.util.List;
         @JsonSubTypes.Type(value = SocketGateway.class, name = "Socket")
 })
 public class Gateway extends BaseEntity {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
+
     // 网关名称
     private String gatewayName;
     // 网关作用的实验室id

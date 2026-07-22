@@ -8,10 +8,16 @@ import xyz.jasenon.lab.device.model.Address;
 import xyz.jasenon.lab.device.model.DeviceType;
 import xyz.jasenon.lab.device.model.Device;
 
+import java.io.Serial;
+
 @Getter
 @Setter
 @TableName(value = "device",autoResultMap = true)
 public class CircuitBreak extends Device implements Address {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
+
     public CircuitBreak() {
         this.deviceType = DeviceType.CircuitBreak;
     }

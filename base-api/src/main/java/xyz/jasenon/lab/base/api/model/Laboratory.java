@@ -8,6 +8,7 @@ import lombok.EqualsAndHashCode;
 import xyz.jasenon.lab.persistence.model.BaseEntity;
 import xyz.jasenon.lab.base.api.validation.ValidationErrors;
 
+import java.io.Serial;
 import java.util.List;
 import java.util.Map;
 
@@ -15,6 +16,9 @@ import java.util.Map;
 @TableName(value = "laboratory", autoResultMap = true)
 @Data
 public class Laboratory extends BaseEntity {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
 
     // buildingName 所属楼栋名称  用来filter utf8
     private String buildingName;

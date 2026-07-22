@@ -9,6 +9,8 @@ import lombok.Setter;
 import xyz.jasenon.lab.persistence.model.BaseEntity;
 import xyz.jasenon.lab.device.model.devices.*;
 
+import java.io.Serial;
+
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "deviceType", include = JsonTypeInfo.As.EXISTING_PROPERTY, visible = true)
 @JsonSubTypes({
         @JsonSubTypes.Type(value = AirCondition.class, name = "AirCondition"),
@@ -22,6 +24,10 @@ import xyz.jasenon.lab.device.model.devices.*;
 @AllArgsConstructor
 @NoArgsConstructor
 public class Device extends BaseEntity {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
+
     // 设备名称
     private String deviceName;
     // 属于 laboratoryId

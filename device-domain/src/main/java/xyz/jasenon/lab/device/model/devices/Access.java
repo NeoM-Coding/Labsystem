@@ -7,9 +7,15 @@ import xyz.jasenon.lab.device.model.Address;
 import xyz.jasenon.lab.device.model.DeviceType;
 import xyz.jasenon.lab.device.model.Device;
 
+import java.io.Serial;
+
 @AllArgsConstructor
 @TableName(value = "device",autoResultMap = true)
 public class Access extends Device implements Address {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
+
     public Access() {
         this.deviceType = DeviceType.Access;
     }

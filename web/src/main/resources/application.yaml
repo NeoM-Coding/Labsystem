@@ -73,3 +73,9 @@ lab:
       max-argument-length: ${TRACING_MAX_ARGUMENT_LENGTH:2048}
       max-collection-size: ${TRACING_MAX_COLLECTION_SIZE:20}
       max-depth: ${TRACING_MAX_DEPTH:3}
+  websocket:
+    allowed-origins: ${WEBSOCKET_ALLOWED_ORIGINS:http://localhost:8989,http://127.0.0.1:8989}
+    send-time-limit-millis: ${WEBSOCKET_SEND_TIME_LIMIT_MILLIS:10000}
+    send-buffer-bytes: ${WEBSOCKET_SEND_BUFFER_BYTES:1048576}
+    ping-interval-millis: ${WEBSOCKET_PING_INTERVAL_MILLIS:25000}
+    idle-timeout-millis: ${WEBSOCKET_IDLE_TIMEOUT_MILLIS:60000}

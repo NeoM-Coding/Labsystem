@@ -1,8 +1,9 @@
+# persistence-core 是库模块，不向宿主应用注入 application.yml。
+# 使用该模块的可运行服务应按需将以下配置合并到自己的 application.yml。
 fun:
   uid:
     assigner-mode: db
     generator-mode: none
-    # 独立数据源配置（不与 spring.datasource 冲突）
     datasource:
       driver-class-name: com.mysql.cj.jdbc.Driver
       url: ${UID_DB_URL:jdbc:mysql://localhost:3306/fun_cloud_base?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai}
@@ -10,15 +11,6 @@ fun:
       password: ${MYSQL_PASSWORD:lab-system-local}
 
 mybatis-plus:
+  mapper-locations: classpath*:mapper/*.xml
   configuration:
     map-underscore-to-camel-case: true
-
-dubbo:
-  application:
-    logger: slf4j
-
-  registry:
-    address: nacos://${NACOS_HOST:localhost}:${NACOS_PORT:8848}
-
-  config-center:
-    address: nacos://${NACOS_HOST:localhost}:${NACOS_PORT:8848}

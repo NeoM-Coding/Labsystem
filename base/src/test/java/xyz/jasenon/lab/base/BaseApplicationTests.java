@@ -7,6 +7,7 @@ import org.springframework.boot.test.context.SpringBootTest;
         "dubbo.registry.address=N/A",
         "dubbo.config-center.address=N/A",
         "dubbo.provider.export=false",
+        "fun.uid.assigner-mode=none",
         "aes.key=0123456789abcdef"
 })
 class BaseApplicationTests {

@@ -6,6 +6,9 @@ ENV_FILE="${LAB_ENV_FILE:-$ROOT_DIR/.env}"
 ENV_EXAMPLE="$ROOT_DIR/.env.example"
 COMPOSE_FILE="$ROOT_DIR/compose.yml"
 COMMAND="${1:-deploy}"
+INFRA_SERVICES=(mysql redis emqx permify-postgres permify nacos loki alloy grafana)
+APP_SERVICES=(base-service mqtt-service rule-engine-service web-service)
+APP_MODULES="base,mqtt,rule-engine,web"
 
 log() {
     printf '[deploy] %s\n' "$*"
@@ -18,13 +21,17 @@ die() {
 
 usage() {
     cat <<'EOF'
-Usage: ./scripts/deploy.sh [deploy|bootstrap|status|logs|down]
+Usage: ./scripts/deploy.sh [deploy|infra|apps|build|hot-reload|bootstrap|status|logs|down]
 
-  deploy     Start the Docker stack, wait for health checks, then initialize data.
+  deploy     Start infrastructure, initialize data, build JARs and start all services.
+  infra      Start only infrastructure containers and initialize system data.
+  apps       Build JARs and idempotently start only the Java service containers.
+  build      Rebuild service JARs; running containers reload changed JARs automatically.
+  hot-reload Build and start applications, then rebuild JARs whenever application sources change.
   bootstrap  Reapply SQL schema, Permify DSL and the initial super administrator.
-  status     Show Compose service status.
-  logs       Follow Compose logs.
-  down       Stop the Docker stack without deleting volumes.
+  status     Show infrastructure and application container status.
+  logs       Follow infrastructure and application logs.
+  down       Stop all project containers without deleting volumes.
 
 Set LAB_ENV_FILE=/path/to/.env to use another environment file.
 EOF
@@ -64,6 +71,91 @@ compose() {
     docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"
 }
 
+compose_apps() {
+    compose --profile app "$@"
+}
+
+start_infrastructure() {
+    compose config --quiet
+    log "starting infrastructure containers"
+    # Explicit service names keep the app profile out of this phase. Repeated calls are idempotent.
+    compose up -d --wait --wait-timeout "$DEPLOY_WAIT_TIMEOUT" "${INFRA_SERVICES[@]}"
+    wait_for_loki
+}
+
+build_applications() {
+    [[ -x "$ROOT_DIR/mvnw" ]] || die "Maven wrapper is not executable: $ROOT_DIR/mvnw"
+    log "building application JARs: $APP_MODULES"
+    "$ROOT_DIR/mvnw" -f "$ROOT_DIR/pom.xml" -pl "$APP_MODULES" -am package -DskipTests
+    validate_application_jars
+}
+
+validate_application_jars() {
+    local artifact
+    for artifact in \
+        "$ROOT_DIR/base/target/base-0.0.1.jar" \
+        "$ROOT_DIR/mqtt/target/mqtt-0.0.1.jar" \
+        "$ROOT_DIR/rule-engine/target/rule-engine-0.0.1.jar" \
+        "$ROOT_DIR/web/target/web-0.0.1.jar"; do
+        [[ -f "$artifact" ]] || die "application JAR was not built: $artifact"
+    done
+}
+
+ensure_infrastructure_running() {
+    local service
+    for service in "${INFRA_SERVICES[@]}"; do
+        [[ -n "$(compose ps --status running -q "$service")" ]] \
+            || die "infrastructure service is not running: $service (run ./scripts/deploy.sh infra first)"
+    done
+}
+
+start_applications() {
+    validate_application_jars
+    compose_apps config --quiet
+    log "starting application containers without recreating infrastructure"
+    # Infrastructure is already healthy. --no-deps prevents this phase from touching its containers.
+    compose_apps up -d --no-deps --wait --wait-timeout "$DEPLOY_WAIT_TIMEOUT" "${APP_SERVICES[@]}"
+}
+
+application_source_signature() {
+    find "$ROOT_DIR" -type f \( \
+            -name 'pom.xml' -o \
+            -path '*/src/main/*' \
+        \) ! -path '*/target/*' -print \
+        | LC_ALL=C sort \
+        | while IFS= read -r source_file; do
+            cksum "$source_file"
+        done \
+        | cksum \
+        | awk '{print $1 ":" $2}'
+}
+
+watch_application_sources() {
+    local current_signature latest_signature
+    local interval="${HOT_RELOAD_SOURCE_INTERVAL_SECONDS:-2}"
+
+    [[ "$interval" =~ ^[0-9]+([.][0-9]+)?$ ]] \
+        || die "HOT_RELOAD_SOURCE_INTERVAL_SECONDS must be a positive number"
+    require_command cksum
+    require_command find
+
+    current_signature="$(application_source_signature)"
+    log "hot reload is watching pom.xml and src/main (poll interval: ${interval}s)"
+    log "press Ctrl+C to stop watching; application containers will keep running"
+
+    while sleep "$interval"; do
+        latest_signature="$(application_source_signature)"
+        [[ "$latest_signature" == "$current_signature" ]] && continue
+        current_signature="$latest_signature"
+        log "application source changed; rebuilding JARs"
+        if build_applications; then
+            log "JARs rebuilt; application containers are reloading"
+        else
+            log "build failed; waiting for the next source change"
+        fi
+    done
+}
+
 mysql_query() {
     compose exec -T -e MYSQL_PWD="$MYSQL_PASSWORD" mysql \
         mysql --default-character-set=utf8mb4 --batch --skip-column-names \
@@ -97,6 +189,18 @@ wait_for_permify() {
         (( SECONDS < deadline )) || die "Permify did not become ready in ${DEPLOY_WAIT_TIMEOUT}s"
         sleep 2
     done
+}
+
+wait_for_loki() {
+    local deadline=$((SECONDS + DEPLOY_WAIT_TIMEOUT))
+    local url="http://127.0.0.1:${LOKI_PORT:-3100}/ready"
+
+    require_command curl
+    until curl --fail --silent --show-error "$url" >/dev/null 2>&1; do
+        (( SECONDS < deadline )) || die "Loki did not become ready in ${DEPLOY_WAIT_TIMEOUT}s"
+        sleep 2
+    done
+    log "Loki is ready"
 }
 
 apply_database_schema() {
@@ -243,8 +347,8 @@ grant_permify_super_admin() {
     local read_response read_body write_body
 
     read_body="$(printf \
-        '{"filter":{"entity":{"type":"app","ids":["%s"]},"relation":"super_admin","subject":{"type":"user","ids":["%s"]}},"page_size":1,"continuous_token":""}' \
-        "$PERMIFY_APP_ID" "$BOOTSTRAP_USER_ID")"
+        '{"metadata":{"schema_version":"%s"},"filter":{"entity":{"type":"app","ids":["%s"]},"relation":"super_admin","subject":{"type":"user","ids":["%s"]}},"page_size":1,"continuous_token":""}' \
+        "$PERMIFY_SCHEMA_VERSION" "$PERMIFY_APP_ID" "$BOOTSTRAP_USER_ID")"
     read_response="$(curl --fail-with-body --silent --show-error \
         -X POST "http://127.0.0.1:${PERMIFY_HTTP_PORT}/v1/tenants/${PERMIFY_TENANT_ID}/data/relationships/read" \
         -H 'Content-Type: application/json' --data-binary "$read_body")"
@@ -298,7 +402,7 @@ case "$COMMAND" in
         usage
         exit 0
         ;;
-    deploy|bootstrap|status|logs|down)
+    deploy|infra|apps|build|hot-reload|bootstrap|status|logs|down)
         ;;
     *)
         usage >&2
@@ -306,33 +410,61 @@ case "$COMMAND" in
         ;;
 esac
 
-require_command docker
 ensure_environment
 DEPLOY_WAIT_TIMEOUT="${DEPLOY_WAIT_TIMEOUT:-180}"
 [[ "$DEPLOY_WAIT_TIMEOUT" =~ ^[0-9]+$ ]] || die "DEPLOY_WAIT_TIMEOUT must be an integer"
+
+if [[ "$COMMAND" == "build" ]]; then
+    build_applications
+    log "application JARs rebuilt; running containers will reload them automatically"
+    exit 0
+fi
+
+require_command docker
 
 case "$COMMAND" in
     deploy)
         log_path="${LOG_PATH:-logs}"
         [[ "$log_path" = /* ]] || log_path="$ROOT_DIR/${log_path#./}"
         mkdir -p "$log_path"
-        compose config --quiet
-        log "starting Docker services"
-        compose up -d --wait --wait-timeout "$DEPLOY_WAIT_TIMEOUT"
+        start_infrastructure
         bootstrap
-        compose ps
-        log "deployment and bootstrap completed"
+        build_applications
+        start_applications
+        compose_apps ps
+        log "infrastructure, bootstrap and application deployment completed"
+        ;;
+    infra)
+        log_path="${LOG_PATH:-logs}"
+        [[ "$log_path" = /* ]] || log_path="$ROOT_DIR/${log_path#./}"
+        mkdir -p "$log_path"
+        start_infrastructure
+        bootstrap
+        compose ps "${INFRA_SERVICES[@]}"
+        log "infrastructure deployment and bootstrap completed"
+        ;;
+    apps)
+        ensure_infrastructure_running
+        build_applications
+        start_applications
+        compose_apps ps "${APP_SERVICES[@]}"
+        ;;
+    hot-reload)
+        ensure_infrastructure_running
+        build_applications
+        start_applications
+        watch_application_sources
         ;;
     bootstrap)
         bootstrap
         ;;
     status)
-        compose ps
+        compose_apps ps
         ;;
     logs)
-        compose logs -f
+        compose_apps logs -f
         ;;
     down)
-        compose down
+        compose_apps down
         ;;
 esac

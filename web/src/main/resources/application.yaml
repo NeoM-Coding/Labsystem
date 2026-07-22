@@ -2,6 +2,42 @@ spring:
   application:
     name: lab-system-web
 
+server:
+  port: ${WEB_SERVER_PORT:8989}
+  shutdown: graceful
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: method
+
+dubbo:
+  application:
+    name: ${spring.application.name}
+    logger: slf4j
+    qos-enable: ${DUBBO_QOS_ENABLE:false}
+    qos-port: ${WEB_DUBBO_QOS_PORT:22224}
+  consumer:
+    check: false
+    timeout: ${DUBBO_CONSUMER_TIMEOUT:5000}
+    retries: 0
+  registry:
+    address: nacos://${NACOS_HOST:localhost}:${NACOS_PORT:8848}
+    username: ${NACOS_USERNAME:}
+    password: ${NACOS_PASSWORD:}
+    group: ${NACOS_REGISTRY_GROUP:LAB_SYSTEM}
+    parameters:
+      namespace: ${NACOS_NAMESPACE:public}
+  config-center:
+    address: nacos://${NACOS_HOST:localhost}:${NACOS_PORT:8848}
+    username: ${NACOS_USERNAME:}
+    password: ${NACOS_PASSWORD:}
+    namespace: ${NACOS_NAMESPACE:public}
+    group: ${NACOS_CONFIG_GROUP:LAB_SYSTEM}
+
 sa-token:
   alone-redis:
     host: ${REDIS_HOST:localhost}
@@ -10,15 +46,14 @@ sa-token:
     username: ${REDIS_USERNAME:}
     password: ${REDIS_PASSWORD:}
 
-server:
-  port: 8989
-
 fun:
   uid:
     assigner-mode: none
+    generator-mode: none
 
 lab:
   redis:
+    enabled: true
     host: ${REDIS_HOST:localhost}
     port: ${REDIS_PORT:6379}
     database: ${REDIS_DATABASE:0}
@@ -27,20 +62,14 @@ lab:
     key-prefix: lab
   auth:
     permify:
-      enabled: true
       base-url: http://${PERMIFY_HOST:localhost}:${PERMIFY_HTTP_PORT:3476}
       tenant-id: ${PERMIFY_TENANT_ID:t1}
-      schema-version: ""
-      depth: 20
-      lookup-page-size: 100
-
-dubbo:
-  application:
-    name: ${spring.application.name}
-    qos-port: 5555
-  consumer:
-    timeout: 5_000
-  registry:
-    address: nacos://${NACOS_HOST:localhost}:${NACOS_PORT:8848}
-  config-center:
-    address: nacos://${NACOS_HOST:localhost}:${NACOS_PORT:8848}
+      schema-version: ${PERMIFY_SCHEMA_VERSION:}
+      depth: ${PERMIFY_DEPTH:20}
+      lookup-page-size: ${PERMIFY_LOOKUP_PAGE_SIZE:100}
+  observability:
+    tracing:
+      enabled: ${TRACING_ENABLED:true}
+      max-argument-length: ${TRACING_MAX_ARGUMENT_LENGTH:2048}
+      max-collection-size: ${TRACING_MAX_COLLECTION_SIZE:20}
+      max-depth: ${TRACING_MAX_DEPTH:3}

@@ -225,7 +225,7 @@ Permify 实现和 Spring 自动配置模块：
 - [`ActionCommandHandlerRegistry`](../auth/src/main/java/xyz/jasenon/lab/auth/handler/ActionCommandHandlerRegistry.java) 将业务 Command 转换成 Permify Check。
 - [`schema`](../auth/schema) 保存 Permify DSL；当前业务基准是 `lab-system-v2.perm`。
 
-`lab.auth.permify.enabled=false` 时不会创建鉴权切面，属于显式的全局关闭开关。
+Permify 是业务授权的强制基础设施依赖，应用不提供关闭鉴权或降级放行的运行模式。
 
 ### 4.9 `observability`
 
@@ -378,8 +378,8 @@ Jedis 自动配置和共享 Redis 能力。`RedisBus` 提供 KV、Hash、TTL、P
   **Scope：** [`base/handler/authorization`](../base/src/main/java/xyz/jasenon/lab/base/handler/authorization)、[`SmartStrategyAuthorizationConfiguration`](../rule-engine/src/main/java/xyz/jasenon/lab/engine/authorization/SmartStrategyAuthorizationConfiguration.java)
 - [ ] Grant/Revoke 是否只能分配操作者有权分配的 relation，并禁止 `super_admin` 等黑名单关系。  
   **Scope：** [`AuthService`](../auth/src/main/java/xyz/jasenon/lab/auth/service/AuthService.java)、[`GrantCommand`](../auth/src/main/java/xyz/jasenon/lab/auth/command/GrantCommand.java)、[`RevokeCommand`](../auth/src/main/java/xyz/jasenon/lab/auth/command/RevokeCommand.java)、[`UserServiceImpl`](../base/src/main/java/xyz/jasenon/lab/base/service/impl/UserServiceImpl.java)
-- [ ] `lab.auth.permify.enabled=false` 时鉴权完全关闭是否符合当前环境预期，生产配置是否避免误关闭。  
-  **Scope：** [`PermifyAuthAutoConfiguration`](../auth/src/main/java/xyz/jasenon/lab/auth/config/PermifyAuthAutoConfiguration.java)、各服务 `application.yaml`
+- [ ] 所有运行环境是否配置并部署了可用的 Permify，且不存在绕过授权的降级实现。
+  **Scope：** [`PermifyAuthAutoConfiguration`](../auth/src/main/java/xyz/jasenon/lab/auth/config/PermifyAuthAutoConfiguration.java)、[`compose.yml`](../compose.yml)、各服务 `application.yaml`
 - [ ] Permify 不可用、超时或 schema version 不匹配时，是拒绝请求还是放行，策略是否明确。  
   **Scope：** [`AuthClient`](../auth/src/main/java/xyz/jasenon/lab/auth/client/AuthClient.java)、[`PermifyAuthProperties`](../auth/src/main/java/xyz/jasenon/lab/auth/config/PermifyAuthProperties.java)
 

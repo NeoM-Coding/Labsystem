@@ -1,57 +1,95 @@
 spring:
   application:
-    name: rule-engine
-
+    name: lab-system-rule-engine
   datasource:
     url: ${LAB_DB_URL:jdbc:mysql://localhost:3306/lab_sys?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai}
     username: ${MYSQL_USERNAME:root}
     password: ${MYSQL_PASSWORD:lab-system-local}
 
+# UID worker 节点使用 server.port 参与实例标识；非 Web provider 也需要保留该属性。
 server:
-  port: 3334
+  port: ${RULE_ENGINE_SERVER_PORT:3334}
+
+mybatis-plus:
+  mapper-locations: classpath*:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+
+fun:
+  uid:
+    assigner-mode: db
+    generator-mode: none
+    datasource:
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      url: ${UID_DB_URL:jdbc:mysql://localhost:3306/fun_cloud_base?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai}
+      username: ${MYSQL_USERNAME:root}
+      password: ${MYSQL_PASSWORD:lab-system-local}
 
 dubbo:
   application:
     name: ${spring.application.name}
-    qos-port: 4445
+    logger: slf4j
+    qos-enable: ${DUBBO_QOS_ENABLE:false}
+    qos-port: ${RULE_ENGINE_DUBBO_QOS_PORT:22223}
+  protocol:
+    name: tri
+    port: ${RULE_ENGINE_DUBBO_PORT:50053}
   provider:
-    timeout: 5_000
+    timeout: ${DUBBO_PROVIDER_TIMEOUT:5000}
+  consumer:
+    check: false
+    timeout: ${DUBBO_CONSUMER_TIMEOUT:5000}
+    retries: 0
   registry:
     address: nacos://${NACOS_HOST:localhost}:${NACOS_PORT:8848}
+    username: ${NACOS_USERNAME:}
+    password: ${NACOS_PASSWORD:}
+    group: ${NACOS_REGISTRY_GROUP:LAB_SYSTEM}
+    parameters:
+      namespace: ${NACOS_NAMESPACE:public}
   config-center:
     address: nacos://${NACOS_HOST:localhost}:${NACOS_PORT:8848}
+    username: ${NACOS_USERNAME:}
+    password: ${NACOS_PASSWORD:}
+    namespace: ${NACOS_NAMESPACE:public}
+    group: ${NACOS_CONFIG_GROUP:LAB_SYSTEM}
 
 lab:
   auth:
     permify:
-      enabled: ${PERMIFY_AUTH_ENABLED:true}
       base-url: http://${PERMIFY_HOST:localhost}:${PERMIFY_HTTP_PORT:3476}
       tenant-id: ${PERMIFY_TENANT_ID:t1}
-      schema-version: ""
-      depth: 20
+      schema-version: ${PERMIFY_SCHEMA_VERSION:}
+      depth: ${PERMIFY_DEPTH:20}
+      lookup-page-size: ${PERMIFY_LOOKUP_PAGE_SIZE:100}
   rule-engine:
     persistence:
-      enabled: true
+      enabled: ${RULE_ENGINE_PERSISTENCE_ENABLED:true}
     simple-test:
-      # 当前开启真实链路演示；生产环境不需要时应覆盖为 false。
-      enabled: false
+      enabled: ${RULE_ENGINE_SIMPLE_TEST_ENABLED:false}
       runtime-id: simple-real-chain-runtime
       source-device-id: 5
       temperature-threshold: 23
       control-device-id: 5
       time-point-delay-seconds: 30
       zone-id: Asia/Shanghai
-
   redis:
     enabled: true
     host: ${REDIS_HOST:localhost}
     port: ${REDIS_PORT:6379}
+    database: ${REDIS_DATABASE:0}
+    username: ${REDIS_USERNAME:}
     password: ${REDIS_PASSWORD:}
-    database: 0
-    timeout-millis: 15_000
+    timeout-millis: 15000
     pool:
       max-total: 16
       max-idle: 8
       min-idle: 0
-      max-wait-millis: 2_000
+      max-wait-millis: 2000
       test-on-borrow: true
+  observability:
+    tracing:
+      enabled: ${TRACING_ENABLED:true}
+      max-argument-length: ${TRACING_MAX_ARGUMENT_LENGTH:2048}
+      max-collection-size: ${TRACING_MAX_COLLECTION_SIZE:20}
+      max-depth: ${TRACING_MAX_DEPTH:3}

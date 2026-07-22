@@ -1,3 +1,6 @@
 spring:
   application:
-    name: edu
+    name: lab-system-edu
+  main:
+    # 教学模块目前没有 RPC 契约或常驻任务，先作为非 Web 占位应用运行。
+    web-application-type: none

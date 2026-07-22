@@ -45,12 +45,16 @@ lab-system-cloud
 - Grafana、Loki、Alloy 日志检索与采集链路。
 
 首次启动建议使用一键部署脚本。脚本会创建 `.env`、启动 Compose、导入数据库
-schema、上传 Permify DSL，并初始化默认 super admin 用户与关系：
+schema、上传 Permify DSL、初始化默认 super admin 用户与关系，并构建启动
+`base`、`mqtt`、`rule-engine`、`web` 四个 Java 微服务：
 
 ```bash
 cp .env.example .env
 ./scripts/deploy.sh
 ```
+
+应用容器挂载各模块的 `target/` 目录。执行 `./scripts/deploy.sh build` 或单独运行
+Maven package 后，容器会检测新 JAR 并在原容器内重启 JVM，无需重建容器。
 
 默认登录账号和预编译 BCrypt 密码位于 `.env`，非本地环境必须修改。
 完整说明见 [docs/一键部署与初始化.md](docs/一键部署与初始化.md)。

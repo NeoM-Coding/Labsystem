@@ -2,9 +2,6 @@ package xyz.jasenon.lab.auth.context;
 
 public final class UserContextHolder {
 
-    public static final String DUBBO_ATTACHMENT_KEY = "user-context";
-    public static final String LEGACY_DUBBO_ATTACHMENT_KEY = "user-conext";
-
     private static final ThreadLocal<UserContext> LOCAL = new ThreadLocal<>();
 
     private UserContextHolder() {

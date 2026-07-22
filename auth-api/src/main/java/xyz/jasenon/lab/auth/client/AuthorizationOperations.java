@@ -20,6 +20,8 @@ public interface AuthorizationOperations {
                    SourceType target,
                    String targetId);
 
+    boolean deleteEntityData(SourceType source, String sourceId);
+
     boolean check(SourceType source,
                   String sourceId,
                   Permission permission,
@@ -40,4 +42,9 @@ public interface AuthorizationOperations {
                                 Permission permission,
                                 SourceType subjectType,
                                 String subjectId);
+
+    Set<String> lookupSubjectIds(SourceType entityType,
+                                 String entityId,
+                                 Permission permission,
+                                 SourceType subjectType);
 }

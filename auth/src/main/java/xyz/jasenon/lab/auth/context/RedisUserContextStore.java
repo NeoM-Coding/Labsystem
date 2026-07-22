@@ -1,6 +1,9 @@
 package xyz.jasenon.lab.auth.context;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.PropertyAccessor;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import xyz.jasenon.lab.redis.core.RedisBus;
@@ -16,7 +19,13 @@ public class RedisUserContextStore implements UserContextStore {
 
     public RedisUserContextStore(RedisBus redis) {
         this.redis = redis;
-        this.objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
+        this.objectMapper = new ObjectMapper()
+                .registerModule(new JavaTimeModule())
+                // UserContext exposes computed getters for filtering; they are not persisted state.
+                .setVisibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.NONE)
+                .setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY)
+                // Existing Redis snapshots may still contain old computed properties.
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
     }
 
     @Override

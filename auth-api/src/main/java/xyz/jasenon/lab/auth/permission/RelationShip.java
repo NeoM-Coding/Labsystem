@@ -28,6 +28,7 @@ public interface RelationShip extends Permission {
     }
 
     enum Laboratory implements RelationShip {
+        app,
         viewer;
 
         @Override

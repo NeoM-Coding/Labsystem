@@ -140,9 +140,5 @@ class ActionAuthorizationAspectTests {
         public void synchronize(UserAuthorizationCommand command) {
         }
 
-        @Override
-        public Set<String> visibleLaboratoryIds(String userId) {
-            return Set.of();
-        }
     }
 }

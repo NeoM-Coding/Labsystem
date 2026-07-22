@@ -38,7 +38,9 @@ public class AuthClient implements AuthorizationOperations {
 
     public synchronized void updateSchemaVersion() {
         SchemaApi api = new SchemaApi(client);
-        var body = new SchemaListBody();
+        var body = new SchemaListBody()
+                .pageSize(100L)
+                .continuousToken("");
         try {
             var resp = api.schemasList(tenantId, body);
             if (resp.getSchemas() != null &&  !resp.getSchemas().isEmpty()){
@@ -87,6 +89,29 @@ public class AuthClient implements AuthorizationOperations {
     }
 
     @Override
+    public boolean deleteEntityData(SourceType source, String sourceId) {
+        DataApi api = new DataApi(client);
+        var body = dataDeleteBody(source, sourceId);
+        try {
+            api.dataDelete(tenantId, body);
+            return true;
+        } catch (ApiException e) {
+            log.error("delete entity data error args:{} {}", source, sourceId, e);
+            throw new IllegalStateException("清理资源授权数据失败", e);
+        }
+    }
+
+    static DataDeleteBody dataDeleteBody(SourceType source, String sourceId) {
+        EntityFilter entityFilter = new EntityFilter()
+                .type(source.name())
+                .ids(List.of(sourceId));
+        // Permify requires both embedded filters even when the entity has no attributes.
+        return new DataDeleteBody()
+                .tupleFilter(new TupleFilter().entity(entityFilter))
+                .attributeFilter(new AttributeFilter().entity(entityFilter));
+    }
+
+    @Override
     public boolean check(SourceType source, String sourceId, Permission permission, SourceType target, String targetId){
         PermissionApi api = new PermissionApi(client);
         var body = new CheckBody()
@@ -95,6 +120,7 @@ public class AuthClient implements AuthorizationOperations {
                 .permission(permission.str())
                 .metadata(new PermissionCheckRequestMetadata()
                         .schemaVersion(requireSchemaVersion())
+                        .depth(depth)
                 );
         try {
             var resp = api.permissionsCheck(tenantId, body);
@@ -203,6 +229,40 @@ public class AuthClient implements AuthorizationOperations {
             log.error("lookup permission entities error args:{} {} {} {}",
                     entityType, permission, subjectType, subjectId, e);
             throw new IllegalStateException("反向查询用户可访问资源失败", e);
+        }
+    }
+
+    @Override
+    public Set<String> lookupSubjectIds(SourceType entityType, String entityId,
+                                        Permission permission, SourceType subjectType) {
+        // LookupSubject 会展开 permission 表达式，结果包含间接获得权限的用户。
+        PermissionApi api = new PermissionApi(client);
+        Set<String> subjectIds = new LinkedHashSet<>();
+        String continuousToken = "";
+        try {
+            do {
+                var body = new LookupSubjectBody()
+                        .metadata(new PermissionLookupSubjectRequestMetadata()
+                                .schemaVersion(requireSchemaVersion())
+                                .depth(depth))
+                        .entity(entity(entityType, entityId))
+                        .permission(permission.str())
+                        .subjectReference(new RelationReference().type(subjectType.name()))
+                        .pageSize(lookupPageSize)
+                        .continuousToken(continuousToken);
+                var response = api.permissionsLookupSubject(tenantId, body);
+                if (response.getSubjectIds() != null) {
+                    response.getSubjectIds().stream()
+                            .filter(AuthClient::hasText)
+                            .forEach(subjectIds::add);
+                }
+                continuousToken = normalize(response.getContinuousToken());
+            } while (!continuousToken.isEmpty());
+            return Set.copyOf(subjectIds);
+        } catch (ApiException e) {
+            log.error("lookup permission subjects error args:{} {} {} {}",
+                    entityType, entityId, permission, subjectType, e);
+            throw new IllegalStateException("反向查询资源可访问用户失败", e);
         }
     }
 

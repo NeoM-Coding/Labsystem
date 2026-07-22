@@ -5,20 +5,11 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties("lab.auth.permify")
 public class PermifyAuthProperties {
 
-    private boolean enabled;
     private String baseUrl = "http://localhost:3476";
     private String tenantId = "t1";
     private String schemaVersion = "";
     private int depth = 20;
     private long lookupPageSize = 100;
-
-    public boolean isEnabled() {
-        return enabled;
-    }
-
-    public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
-    }
 
     public String getBaseUrl() {
         return baseUrl;
@@ -49,7 +40,8 @@ public class PermifyAuthProperties {
     }
 
     public void setDepth(int depth) {
-        this.depth = depth <= 0 ? 20 : depth;
+        // Permify rejects permission graph traversal depths below 3.
+        this.depth = depth < 3 ? 20 : depth;
     }
 
     public long getLookupPageSize() {

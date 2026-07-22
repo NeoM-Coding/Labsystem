@@ -95,19 +95,6 @@ public class AuthService implements Auth {
         ));
     }
 
-    @Override
-    public Set<String> visibleLaboratoryIds(String userId) {
-        if (userId == null || userId.isBlank()) {
-            throw new IllegalArgumentException("userId 不能为空");
-        }
-        return operations.lookupEntityIds(
-                SourceType.laboratory,
-                xyz.jasenon.lab.auth.permission.Action.Laboratory.can_view,
-                SourceType.user,
-                userId.trim()
-        );
-    }
-
     private static Set<RelationShip.App> knownMutableAppRelations(Set<String> relations) {
         EnumSet<RelationShip.App> result = EnumSet.noneOf(RelationShip.App.class);
         for (RelationShip.App relation : RelationShip.App.values()) {

@@ -7,7 +7,8 @@ import xyz.jasenon.lab.auth.aspect.ActionAuthorizationAspect;
 import xyz.jasenon.lab.auth.client.AuthClient;
 import xyz.jasenon.lab.auth.service.Auth;
 import xyz.jasenon.lab.auth.service.AuthService;
-import xyz.jasenon.lab.auth.service.DisabledAuthService;
+import xyz.jasenon.lab.auth.service.LaboratoryAuthorization;
+import xyz.jasenon.lab.auth.service.LaboratoryAuthorizationService;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -17,20 +18,21 @@ class PermifyAuthAutoConfigurationTests {
             .withConfiguration(AutoConfigurations.of(PermifyAuthAutoConfiguration.class));
 
     @Test
-    void disabledByDefault() {
+    void createsRequiredAuthorizationBeansByDefault() {
         contextRunner.run(context -> {
-            assertThat(context).doesNotHaveBean(AuthClient.class);
-            assertThat(context).doesNotHaveBean(ActionAuthorizationAspect.class);
+            assertThat(context).hasSingleBean(AuthClient.class);
+            assertThat(context).hasSingleBean(ActionAuthorizationAspect.class);
             assertThat(context).hasSingleBean(Auth.class);
-            assertThat(context).hasSingleBean(DisabledAuthService.class);
+            assertThat(context).hasSingleBean(AuthService.class);
+            assertThat(context).hasSingleBean(LaboratoryAuthorization.class);
+            assertThat(context).hasSingleBean(LaboratoryAuthorizationService.class);
         });
     }
 
     @Test
-    void enabledPropertyCreatesClientAndActionAspect() {
+    void appliesPermifyConnectionPropertiesWithoutEnableSwitch() {
         contextRunner
                 .withPropertyValues(
-                        "lab.auth.permify.enabled=true",
                         "lab.auth.permify.base-url=http://127.0.0.1:3476",
                         "lab.auth.permify.tenant-id=test"
                 )
@@ -38,6 +40,7 @@ class PermifyAuthAutoConfigurationTests {
                     assertThat(context).hasSingleBean(AuthClient.class);
                     assertThat(context).hasSingleBean(ActionAuthorizationAspect.class);
                     assertThat(context).hasSingleBean(AuthService.class);
+                    assertThat(context).hasSingleBean(LaboratoryAuthorizationService.class);
                 });
     }
 }

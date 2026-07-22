@@ -1,12 +1,15 @@
 package xyz.jasenon.lab.auth.exception;
 
-public class AuthorizationConfigurationException extends RuntimeException {
+import xyz.jasenon.lab.common.exception.BusinessException;
+
+public class AuthorizationConfigurationException extends BusinessException {
 
     public AuthorizationConfigurationException(String message) {
-        super(message);
+        super(500, message);
     }
 
     public AuthorizationConfigurationException(String message, Throwable cause) {
-        super(message, cause);
+        super(500, message);
+        initCause(cause);
     }
 }

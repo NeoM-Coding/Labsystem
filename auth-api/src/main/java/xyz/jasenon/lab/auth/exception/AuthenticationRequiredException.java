@@ -1,8 +1,10 @@
 package xyz.jasenon.lab.auth.exception;
 
-public class AuthenticationRequiredException extends RuntimeException {
+import xyz.jasenon.lab.common.exception.BusinessException;
+
+public class AuthenticationRequiredException extends BusinessException {
 
     public AuthenticationRequiredException(String message) {
-        super(message);
+        super(401, message);
     }
 }

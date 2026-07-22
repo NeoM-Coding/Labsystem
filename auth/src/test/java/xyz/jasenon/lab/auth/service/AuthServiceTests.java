@@ -123,14 +123,6 @@ class AuthServiceTests {
         assertTrue(operations.mutations.isEmpty());
     }
 
-    @Test
-    void visibleLaboratoryIdsUsesPermissionLookup() {
-        operations.visibleLaboratoryIds.addAll(Set.of("lab-1", "lab-2"));
-
-        assertEquals(Set.of("lab-1", "lab-2"), auth.visibleLaboratoryIds("target"));
-        assertEquals("laboratory#can_view@user:target", operations.lastLookup);
-    }
-
     private static GrantCommand appGrant(RelationShip.App relation) {
         return new GrantCommand(
                 SourceType.app, AuthService.GLOBAL_APP_ID, relation,
@@ -143,10 +135,8 @@ class AuthServiceTests {
         private final Set<String> ownedRelations = new HashSet<>();
         private final Set<String> targetRelations = new HashSet<>();
         private final Set<String> targetLaboratoryIds = new HashSet<>();
-        private final Set<String> visibleLaboratoryIds = new HashSet<>();
         private final Set<String> mutations = new HashSet<>();
         private String lastMutation;
-        private String lastLookup;
 
         @Override
         public boolean grant(SourceType source, String sourceId, RelationShip relation,
@@ -162,6 +152,13 @@ class AuthServiceTests {
                               SourceType target, String targetId) {
             lastMutation = "revoke:" + source + ":" + sourceId + "#" + relation.str()
                     + "@" + target + ":" + targetId;
+            mutations.add(lastMutation);
+            return true;
+        }
+
+        @Override
+        public boolean deleteEntityData(SourceType source, String sourceId) {
+            lastMutation = "delete:" + source + ":" + sourceId;
             mutations.add(lastMutation);
             return true;
         }
@@ -189,8 +186,13 @@ class AuthServiceTests {
         @Override
         public Set<String> lookupEntityIds(SourceType entityType, Permission permission,
                                            SourceType subjectType, String subjectId) {
-            lastLookup = entityType + "#" + permission.str() + "@" + subjectType + ":" + subjectId;
-            return Set.copyOf(visibleLaboratoryIds);
+            return Set.of();
+        }
+
+        @Override
+        public Set<String> lookupSubjectIds(SourceType entityType, String entityId,
+                                            Permission permission, SourceType subjectType) {
+            return Set.of();
         }
     }
 }

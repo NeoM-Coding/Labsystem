@@ -5,8 +5,6 @@ import xyz.jasenon.lab.auth.command.GrantCommand;
 import xyz.jasenon.lab.auth.command.RevokeCommand;
 import xyz.jasenon.lab.auth.command.UserAuthorizationCommand;
 
-import java.util.Set;
-
 public interface Auth {
 
     void grant(GrantCommand grantCommand);
@@ -16,7 +14,5 @@ public interface Auth {
     boolean check(ActionCommand actionCommand);
 
     void synchronize(UserAuthorizationCommand command);
-
-    Set<String> visibleLaboratoryIds(String userId);
 
 }

@@ -2,6 +2,7 @@
 <configuration>
     <springProperty scope="context" name="appName" source="spring.application.name" defaultValue="application"/>
     <property name="LOG_PATH" value="${LOG_PATH:-./logs}"/>
+    <property name="DUBBO_LOG_LEVEL" value="${DUBBO_LOG_LEVEL:-WARN}"/>
     <property name="LOG_PATTERN"
               value="ts=%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} level=%level service=${appName} trace_id=%X{trace_id:-none} request_id=%X{request_id:-none} user_id=%X{user_id:-anonymous} username=%X{username:-anonymous} thread=%thread logger=%logger{36} message=%msg%n%ex"/>
 
@@ -25,6 +26,9 @@
             <charset>UTF-8</charset>
         </encoder>
     </appender>
+
+    <!-- Keep RPC failures visible without flooding container logs with registry and lifecycle events. -->
+    <logger name="org.apache.dubbo" level="${DUBBO_LOG_LEVEL}"/>
 
     <root level="INFO">
         <appender-ref ref="CONSOLE"/>

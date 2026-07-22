@@ -1,0 +1,3 @@
+# Project-owned RPC payloads. Dubbo treats every line as a class-name prefix,
+# so DTO implementations and polymorphic subclasses are covered automatically.
+xyz.jasenon.lab

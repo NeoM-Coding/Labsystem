@@ -1,5 +1,6 @@
 package xyz.jasenon.lab.web.contract;
 
+import com.fasterxml.jackson.annotation.JsonSubTypes;
 import org.junit.jupiter.api.Test;
 import xyz.jasenon.lab.api.mqtt.MqttDeviceCRUD;
 import xyz.jasenon.lab.api.mqtt.MqttGatewayCRUD;
@@ -18,12 +19,19 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.lang.reflect.WildcardType;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class DubboSerializationContractTests {
+
+    private static final String PROJECT_PACKAGE_PREFIX = "xyz.jasenon.lab";
 
     private static final Set<Class<?>> DUBBO_CONTRACTS = Set.of(
             UserService.class,
@@ -47,6 +55,32 @@ class DubboSerializationContractTests {
                         inspect(parameter, contract.getSimpleName() + "." + method.getName(), inspected);
                     }
                 }));
+    }
+
+    @Test
+    void projectRpcPayloadsAreCoveredByDubboStrictAllowlist() throws Exception {
+        var resources = Thread.currentThread().getContextClassLoader()
+                .getResources("security/serialize.allowlist");
+        List<URL> allowlists = Collections.list(resources);
+
+        assertThat(allowlists)
+                .as("common must publish Dubbo's security/serialize.allowlist resource")
+                .isNotEmpty();
+
+        List<String> prefixes = new ArrayList<>();
+        for (URL allowlist : allowlists) {
+            try (var input = allowlist.openStream()) {
+                new String(input.readAllBytes(), StandardCharsets.UTF_8)
+                        .lines()
+                        .map(String::trim)
+                        .filter(line -> !line.isEmpty() && !line.startsWith("#"))
+                        .forEach(prefixes::add);
+            }
+        }
+
+        assertThat(prefixes)
+                .as("Dubbo STRICT mode must trust project-owned payloads and their subclasses")
+                .anyMatch(PROJECT_PACKAGE_PREFIX::startsWith);
     }
 
     private static void inspect(Type type, String location, Set<Type> inspected) {
@@ -83,7 +117,22 @@ class DubboSerializationContractTests {
                 .as("Dubbo payload %s used by %s must implement Serializable", payload.getName(), location)
                 .isTrue();
 
+        inspectPolymorphicSubtypes(payload, location, inspected);
         inspectFields(payload, location, inspected);
+    }
+
+    private static void inspectPolymorphicSubtypes(Class<?> payload, String location, Set<Type> inspected) {
+        JsonSubTypes jsonSubTypes = payload.getAnnotation(JsonSubTypes.class);
+        if (jsonSubTypes != null) {
+            for (JsonSubTypes.Type subtype : jsonSubTypes.value()) {
+                inspect(subtype.value(), location + " -> subtype of " + payload.getSimpleName(), inspected);
+            }
+        }
+        if (payload.isSealed()) {
+            for (Class<?> subtype : payload.getPermittedSubclasses()) {
+                inspect(subtype, location + " -> subtype of " + payload.getSimpleName(), inspected);
+            }
+        }
     }
 
     private static void inspectFields(Class<?> payload, String location, Set<Type> inspected) {

@@ -1,5 +1,7 @@
 package xyz.jasenon.lab.web.laboratory;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.apache.dubbo.config.annotation.DubboReference;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,12 +28,16 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/laboratories")
 @Traced
+@Tag(name = "实验室管理", description = "管理实验室资料以及当前用户可见的实验室范围")
 public class LaboratoryController {
 
     @DubboReference(check = false)
     private LaboratoryService laboratoryService;
 
+    // todo 修改这里 buildingName 应该是 buildingNames 接受 string[] 匹配所有命中的选项
+    // todo orgName 应该是 orgNames 接受 string[] 匹配所有命中的选项
     @GetMapping
+    @Operation(summary = "查询可见实验室", description = "根据当前用户的可见范围查询实验室，可按楼栋名称和所属单位名称筛选。")
     public DiyResponseEntity<R<List<LaboratoryVO>>> list(
             @RequestParam(required = false) String buildingName,
             @RequestParam(required = false) String orgName) {
@@ -39,21 +45,25 @@ public class LaboratoryController {
     }
 
     @GetMapping("/options/organizations")
+    @Operation(summary = "查询所属单位选项", description = "返回当前可见实验室中可用于筛选的所属单位选项。")
     public DiyResponseEntity<R<List<Pair<String, String>>>> organizations() {
         return DiyResponseEntity.of(R.success(laboratoryService.collectionOrgName()));
     }
 
     @GetMapping("/options/buildings")
+    @Operation(summary = "查询楼栋选项", description = "返回当前可见实验室中可用于筛选的楼栋选项。")
     public DiyResponseEntity<R<List<Pair<String, String>>>> buildings() {
         return DiyResponseEntity.of(R.success(laboratoryService.collectionBuildingName()));
     }
 
     @PostMapping
+    @Operation(summary = "创建实验室", description = "创建实验室资料并同步初始化相关授权关系和用户可见范围。")
     public DiyResponseEntity<R<Laboratory>> create(@RequestBody LaboratoryCreate command) {
         return DiyResponseEntity.of(R.success(laboratoryService.create(command)));
     }
 
     @PutMapping("/{laboratoryId}")
+    @Operation(summary = "修改实验室", description = "根据实验室 ID 更新楼栋、所属单位、名称和管理人员等资料。")
     public DiyResponseEntity<R<Laboratory>> update(@PathVariable String laboratoryId,
                                                    @RequestBody LaboratoryEdit command) {
         // 使用 path ID 重新组装下游 Command，同时保留已有授权 Handler 的 DTO 契约。
@@ -69,6 +79,7 @@ public class LaboratoryController {
     }
 
     @DeleteMapping("/{laboratoryId}")
+    @Operation(summary = "删除实验室", description = "删除指定实验室，并清理其授权数据及相关用户的可见范围。")
     public DiyResponseEntity<R<Void>> delete(@PathVariable String laboratoryId) {
         laboratoryService.delete(new LaboratoryDelete(laboratoryId, null));
         return DiyResponseEntity.of(R.success());

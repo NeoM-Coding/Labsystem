@@ -12,10 +12,20 @@
     <artifactId>web</artifactId>
     <name>web</name>
     <description>web</description>
+    <properties>
+        <springdoc.version>2.8.16</springdoc.version>
+        <springdoc-maven-plugin.version>1.5</springdoc-maven-plugin.version>
+        <api-docs.port>18989</api-docs.port>
+    </properties>
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>${springdoc.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.dubbo</groupId>
@@ -63,6 +73,11 @@
             <version>1.45.0</version>
         </dependency>
         <dependency>
+            <groupId>cn.dev33</groupId>
+            <artifactId>sa-token-redis-jackson</artifactId>
+            <version>1.45.0</version>
+        </dependency>
+        <dependency>
             <groupId>org.springframework.data</groupId>
             <artifactId>spring-data-redis</artifactId>
         </dependency>
@@ -88,5 +103,64 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>api-docs</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>start-for-api-docs</id>
+                                <phase>pre-integration-test</phase>
+                                <goals>
+                                    <goal>start</goal>
+                                </goals>
+                                <configuration>
+                                    <arguments>
+                                        <argument>--server.port=${api-docs.port}</argument>
+                                        <argument>--dubbo.registry.address=N/A</argument>
+                                        <argument>--dubbo.config-center.address=N/A</argument>
+                                        <argument>--dubbo.consumer.check=false</argument>
+                                        <argument>--dubbo.consumer.init=false</argument>
+                                        <argument>--dubbo.consumer.lazy=true</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>stop-after-api-docs</id>
+                                <phase>post-integration-test</phase>
+                                <goals>
+                                    <goal>stop</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.springdoc</groupId>
+                        <artifactId>springdoc-openapi-maven-plugin</artifactId>
+                        <version>${springdoc-maven-plugin.version}</version>
+                        <executions>
+                            <execution>
+                                <id>generate-api-docs</id>
+                                <phase>integration-test</phase>
+                                <goals>
+                                    <goal>generate</goal>
+                                </goals>
+                                <configuration>
+                                    <apiDocsUrl>http://localhost:${api-docs.port}/v3/api-docs.yaml</apiDocsUrl>
+                                    <outputDir>${project.build.directory}</outputDir>
+                                    <outputFileName>api.yaml</outputFileName>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
 </project>

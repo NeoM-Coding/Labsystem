@@ -37,6 +37,7 @@
         <module>audit-api</module>
         <module>audit</module>
         <module>base-api</module>
+        <module>edu-api</module>
         <module>redis</module>
         <module>mqtt</module>
         <module>auth</module>

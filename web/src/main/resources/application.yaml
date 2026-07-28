@@ -1,6 +1,10 @@
 spring:
   application:
     name: lab-system-web
+  servlet:
+    multipart:
+      max-file-size: ${EDU_IMPORT_MAX_BYTES:5MB}
+      max-request-size: ${EDU_IMPORT_MAX_REQUEST_BYTES:6MB}
 
 server:
   port: ${WEB_SERVER_PORT:8989}
@@ -52,6 +56,8 @@ fun:
     generator-mode: none
 
 lab:
+  edu:
+    import-max-bytes: ${EDU_IMPORT_MAX_BYTES_VALUE:5242880}
   session-cookie:
     secure: ${SESSION_COOKIE_SECURE:false}
   redis:

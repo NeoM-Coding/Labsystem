@@ -38,7 +38,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * 真实链路手工验证入口。
  *
  * <p>设备条件只接受 MQTT 模块经 Redis 发布的真实快照；控制动作通过 Dubbo
- * 调用真实 MqttIo。必须显式开启，避免普通启动误发设备控制指令。</p>
+ * 调用真实的规则引擎内部 MQTT RPC。必须显式开启，避免普通启动误发设备控制指令。</p>
  */
 @Component
 @ConditionalOnProperty(

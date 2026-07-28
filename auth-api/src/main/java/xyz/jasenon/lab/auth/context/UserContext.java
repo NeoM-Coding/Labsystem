@@ -99,6 +99,20 @@ public class UserContext implements Serializable {
                 .toList();
     }
 
+    public List<String> filterLaboratoryIds(String[] buildingNames, String[] orgNames) {
+        List<String> normalizedBuildingNames = normalizeFilterValues(buildingNames);
+        List<String> normalizedOrgNames = normalizeFilterValues(orgNames);
+        if (normalizedBuildingNames.isEmpty() && normalizedOrgNames.isEmpty()) {
+            return filterLaboratoryIds();
+        }
+        return scopeSnapshot().stream()
+                .filter(scope -> matchesAny(scope.getBuildingName(), normalizedBuildingNames)
+                        && matchesAny(scope.getOrgName(), normalizedOrgNames))
+                .map(LaboratoryScope::getLaboratoryId)
+                .distinct()
+                .toList();
+    }
+
     public List<String> filterLaboratoryIds(LaboratoryFilter filter) {
         return filter == null
                 ? filterLaboratoryIds()
@@ -151,6 +165,22 @@ public class UserContext implements Serializable {
 
     private static boolean matchesFilter(String actual, String expected) {
         return isBlank(expected) || Objects.equals(trimToEmpty(actual), expected.trim());
+    }
+
+    private static boolean matchesAny(String actual, List<String> expectedValues) {
+        return expectedValues.isEmpty() || expectedValues.contains(trimToEmpty(actual));
+    }
+
+    private static List<String> normalizeFilterValues(String[] values) {
+        if (values == null || values.length == 0) {
+            return List.of();
+        }
+        return java.util.Arrays.stream(values)
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .distinct()
+                .toList();
     }
 
     private static boolean isBlank(String value) {

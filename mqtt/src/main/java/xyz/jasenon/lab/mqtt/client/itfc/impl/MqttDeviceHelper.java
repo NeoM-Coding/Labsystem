@@ -30,6 +30,11 @@ public class MqttDeviceHelper implements DeviceHelper {
     }
 
     @Override
+    public List<Device> listByLaboratories(String gatewayId, List<String> laboratoryIds) {
+        return deviceMapper.listByLaboratories(gatewayId, laboratoryIds);
+    }
+
+    @Override
     public boolean addDevice(Device device) {
         return deviceMapper.addDevice(device);
     }

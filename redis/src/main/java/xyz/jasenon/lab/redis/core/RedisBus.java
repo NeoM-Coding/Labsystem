@@ -3,11 +3,13 @@ package xyz.jasenon.lab.redis.core;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPubSub;
+import redis.clients.jedis.Pipeline;
 import redis.clients.jedis.Response;
 import redis.clients.jedis.Transaction;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -156,6 +158,23 @@ public class RedisBus implements AutoCloseable {
     public Map<String, String> hgetAll(String key) {
         try (Jedis jedis = jedisPool.getResource()) {
             return jedis.hgetAll(namespaced(key));
+        }
+    }
+
+    public Map<String, Map<String, String>> hgetAllBatch(List<String> keys) {
+        if (keys == null || keys.isEmpty()) {
+            return Map.of();
+        }
+        try (Jedis jedis = jedisPool.getResource(); Pipeline pipeline = jedis.pipelined()) {
+            Map<String, Response<Map<String, String>>> pending = new LinkedHashMap<>();
+            keys.stream()
+                    .filter(key -> key != null && !key.isBlank())
+                    .distinct()
+                    .forEach(key -> pending.put(key, pipeline.hgetAll(namespaced(key))));
+            pipeline.sync();
+            Map<String, Map<String, String>> result = new LinkedHashMap<>();
+            pending.forEach((key, response) -> result.put(key, response.get()));
+            return result;
         }
     }
 

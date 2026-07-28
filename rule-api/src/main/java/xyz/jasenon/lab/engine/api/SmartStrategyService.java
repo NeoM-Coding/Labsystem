@@ -7,20 +7,21 @@ import xyz.jasenon.lab.engine.api.command.SmartStrategyGet;
 import xyz.jasenon.lab.engine.api.command.SmartStrategyListQuery;
 import xyz.jasenon.lab.engine.api.command.SmartStrategyStatusChange;
 import xyz.jasenon.lab.engine.api.command.SmartStrategyUpdate;
+import xyz.jasenon.lab.common.rpc.RpcResult;
 
 import java.util.List;
 
 public interface SmartStrategyService {
 
-    RuntimeRevision create(SmartStrategyCreate command);
+    RpcResult<RuntimeRevision> create(SmartStrategyCreate command);
 
-    RuntimeRevision update(SmartStrategyUpdate command);
+    RpcResult<RuntimeRevision> update(SmartStrategyUpdate command);
 
-    void delete(SmartStrategyDelete command);
+    RpcResult<Void> delete(SmartStrategyDelete command);
 
-    RuntimeRevision changeStatus(SmartStrategyStatusChange command);
+    RpcResult<RuntimeRevision> changeStatus(SmartStrategyStatusChange command);
 
-    RuntimeRevision get(SmartStrategyGet command);
+    RpcResult<RuntimeRevision> get(SmartStrategyGet command);
 
-    List<RuntimeRevision> list(SmartStrategyListQuery command);
+    RpcResult<List<RuntimeRevision>> list(SmartStrategyListQuery command);
 }

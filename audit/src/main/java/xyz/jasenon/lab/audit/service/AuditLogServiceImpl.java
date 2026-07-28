@@ -7,6 +7,7 @@ import xyz.jasenon.lab.audit.api.model.AuditLogView;
 import xyz.jasenon.lab.audit.api.service.AuditLogService;
 import xyz.jasenon.lab.audit.persistence.AuditLogEntity;
 import xyz.jasenon.lab.audit.persistence.mapper.AuditLogMapper;
+import xyz.jasenon.lab.common.rpc.RpcResult;
 
 import java.util.List;
 
@@ -20,7 +21,7 @@ public class AuditLogServiceImpl implements AuditLogService {
     }
 
     @Override
-    public List<AuditLogView> query(AuditLogQuery query) {
+    public RpcResult<List<AuditLogView>> query(AuditLogQuery query) {
         AuditLogQuery safeQuery = query == null ? new AuditLogQuery(null, null, null, 100) : query;
         LambdaQueryWrapper<AuditLogEntity> wrapper = new LambdaQueryWrapper<AuditLogEntity>()
                 .eq(hasText(safeQuery.subjectId()), AuditLogEntity::getSubjectId, safeQuery.subjectId())
@@ -28,7 +29,9 @@ public class AuditLogServiceImpl implements AuditLogService {
                 .like(hasText(safeQuery.objectType()), AuditLogEntity::getObjectTypes, safeQuery.objectType())
                 .orderByDesc(AuditLogEntity::getOccurredAt)
                 .last("LIMIT " + safeQuery.limit());
-        return mapper.selectList(wrapper).stream().map(AuditLogServiceImpl::toView).toList();
+        return RpcResult.success(
+                mapper.selectList(wrapper).stream().map(AuditLogServiceImpl::toView).toList()
+        );
     }
 
     private static AuditLogView toView(AuditLogEntity entity) {

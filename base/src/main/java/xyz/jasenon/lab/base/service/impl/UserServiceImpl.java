@@ -12,18 +12,19 @@ import xyz.jasenon.lab.auth.permission.RelationShip;
 import xyz.jasenon.lab.auth.service.Auth;
 import xyz.jasenon.lab.auth.service.LaboratoryAuthorization;
 import xyz.jasenon.lab.auth.context.UserContext;
+import xyz.jasenon.lab.auth.context.UserContextHolder;
 import xyz.jasenon.lab.auth.context.UserContextStore;
+import xyz.jasenon.lab.auth.exception.AuthenticationRequiredException;
 import xyz.jasenon.lab.audit.api.annotation.Audited;
 import xyz.jasenon.lab.base.api.dto.ContactUserCreate;
 import xyz.jasenon.lab.base.api.dto.UserCreate;
 import xyz.jasenon.lab.base.api.dto.UserAuthorizationUpdate;
-import xyz.jasenon.lab.base.api.dto.UserSession;
 import xyz.jasenon.lab.base.mapper.UserMapper;
 import xyz.jasenon.lab.base.mapper.LaboratoryMapper;
 import xyz.jasenon.lab.base.context.UserContextFactory;
 import xyz.jasenon.lab.base.api.service.UserService;
-import xyz.jasenon.lab.base.util.SaTokenUtil;
 import xyz.jasenon.lab.common.exception.BusinessException;
+import xyz.jasenon.lab.common.rpc.RpcResult;
 import xyz.jasenon.lab.base.api.validation.ValidationErrors;
 import xyz.jasenon.lab.base.api.model.User;
 import xyz.jasenon.lab.observability.annotation.Traced;
@@ -55,13 +56,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     }
 
     @Override
-    public boolean existsByName(String name) {
-        return this.baseMapper.isNameExsist(name);
+    public RpcResult<Boolean> existsByName(String name) {
+        return RpcResult.success(nameExists(name));
     }
 
     @Override
-    @Traced(value = "user-service.login", recordArgs = false)
-    public UserSession login(String username, String pwd) {
+    @Traced(value = "user-service.authenticate", recordArgs = false)
+    public RpcResult<User> authenticate(String username, String pwd) {
         User user = this.baseMapper.getUserByUsername(username);
         if (user == null){
             throw new BusinessException(NOT_FOUND, "用户不存在!");
@@ -75,15 +76,41 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             throw new BusinessException(FORBIDDEN, "密码错误!");
         }
         userContextStore.save(buildUserContext(user));
-        var token = SaTokenUtil.login(user.getId());
-        return new UserSession(user.mask(), token.f, token.s);
+        return RpcResult.success(user.mask());
+    }
+
+    @Override
+    @Traced("user-service.current")
+    public RpcResult<User> current() {
+        UserContext context = requireUserContext();
+        User user = getById(context.getUserId());
+        if (user == null) {
+            throw new BusinessException(NOT_FOUND, "用户不存在");
+        }
+        return RpcResult.success(user.mask());
+    }
+
+    @Override
+    @Traced(value = "user-service.logout", recordArgs = false)
+    public RpcResult<Void> logout() {
+        UserContext context = requireUserContext();
+        userContextStore.delete(context.getUserId());
+        return RpcResult.success();
+    }
+
+    private UserContext requireUserContext() {
+        UserContext context = UserContextHolder.get();
+        if (context == null || context.getUserId() == null || context.getUserId().isBlank()) {
+            throw new AuthenticationRequiredException("登陆已过期");
+        }
+        return context;
     }
 
     @Override
     @ActionAuthorized
     @Audited("user.create")
     @Transactional
-    public User registerNormalUser(UserCreate command) {
+    public RpcResult<User> registerNormalUser(UserCreate command) {
         User normalUser = User.builder()
                 .name(command.name())
                 .username(command.username())
@@ -99,7 +126,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         }
 
         synchronized (normalUser.getName().intern()){
-            boolean exsist = existsByName(normalUser.getName());
+            boolean exsist = nameExists(normalUser.getName());
             if (exsist) {
                 throw new BusinessException(FORBIDDEN, "该姓名已被使用");
             }
@@ -112,14 +139,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         synchronizeAuthorization(
                 normalUser.getId(), command.appRelations(), command.laboratoryIds()
         );
-        return normalUser;
+        return RpcResult.success(normalUser);
     }
 
     @Override
     @ActionAuthorized
     @Audited("contact.create")
     @Transactional
-    public User registerContactUser(ContactUserCreate command) {
+    public RpcResult<User> registerContactUser(ContactUserCreate command) {
         User contactUser = User.builder()
                 .name(command.name())
                 .phone(command.phone())
@@ -133,7 +160,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         }
 
         synchronized (contactUser.getName().intern()){
-            boolean exsist = existsByName(contactUser.getName());
+            boolean exsist = nameExists(contactUser.getName());
             if (exsist){
                 throw new BusinessException(FORBIDDEN, "该姓名已被使用");
             }
@@ -143,14 +170,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
                 throw new BusinessException(INTERNAL_SERVER_ERROR, "插入失败");
             }
         }
-        return contactUser;
+        return RpcResult.success(contactUser);
     }
 
     @Override
     @ActionAuthorized
     @Audited("user.update")
     @Transactional
-    public User updateUser(UserAuthorizationUpdate command) {
+    public RpcResult<User> updateUser(UserAuthorizationUpdate command) {
         User user = command.user();
         if (user == null || user.getId() == null || user.getId().isBlank()) {
             throw new BusinessException(BAD_REQUEST, "用户 ID 不能为空");
@@ -168,7 +195,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         synchronizeAuthorization(user.getId(), command.appRelations(), command.laboratoryIds());
         User updated = getById(user.getId());
         afterCommit(() -> userContextStore.save(buildUserContext(updated)));
-        return user;
+        return RpcResult.success(user);
+    }
+
+    private boolean nameExists(String name) {
+        return this.baseMapper.isNameExsist(name);
     }
 
     private static void afterCommit(Runnable action) {

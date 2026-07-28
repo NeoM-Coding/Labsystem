@@ -7,7 +7,7 @@ import lombok.Setter;
 import xyz.jasenon.lab.api.mqtt.dto.MqttTaskDto;
 
 /**
- * 通过 MqttIo.asyncSend 异步发送一次设备控制任务。
+ * 通过规则引擎内部 MQTT RPC 异步发送一次设备控制任务。
  */
 @Getter
 @Setter

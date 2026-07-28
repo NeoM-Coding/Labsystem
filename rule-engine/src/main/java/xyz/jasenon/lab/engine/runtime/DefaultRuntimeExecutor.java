@@ -5,10 +5,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-import xyz.jasenon.lab.api.mqtt.MqttIo;
+import xyz.jasenon.lab.api.mqtt.MqttRuleIo;
 import xyz.jasenon.lab.api.mqtt.dto.MqttResponseDto;
 import xyz.jasenon.lab.api.mqtt.dto.MqttTaskDto;
 import xyz.jasenon.lab.engine.action.*;
+import xyz.jasenon.lab.common.rpc.RpcResult;
+import xyz.jasenon.lab.observability.rpc.RpcClient;
 
 import java.time.Instant;
 import java.util.Objects;
@@ -30,15 +32,20 @@ public class DefaultRuntimeExecutor implements RuntimeExecutor {
     private final ActionExecutionTracker tracker;
 
     // 延迟到首次控制动作再初始化远程引用，纯规则启动不要求 MQTT provider 在线。
-    @DubboReference(check = false, init = false, lazy = true)
-    private MqttIo mqttIo;
+    @DubboReference(
+            check = false,
+            init = false,
+            lazy = true,
+            group = MqttRuleIo.DUBBO_GROUP
+    )
+    private MqttRuleIo mqttIo;
 
     @Autowired
     public DefaultRuntimeExecutor(ActionExecutionTracker tracker) {
         this.tracker = Objects.requireNonNull(tracker, "tracker");
     }
 
-    DefaultRuntimeExecutor(ActionExecutionTracker tracker, MqttIo mqttIo) {
+    DefaultRuntimeExecutor(ActionExecutionTracker tracker, MqttRuleIo mqttIo) {
         this(tracker);
         this.mqttIo = Objects.requireNonNull(mqttIo, "mqttIo");
     }
@@ -84,7 +91,7 @@ public class DefaultRuntimeExecutor implements RuntimeExecutor {
             ));
         }
 
-        CompletableFuture<MqttResponseDto> future;
+        CompletableFuture<RpcResult<MqttResponseDto>> future;
         try {
             future = Objects.requireNonNull(mqttIo, "mqttIo").asyncSend(task);
             if (future == null) {
@@ -101,7 +108,7 @@ public class DefaultRuntimeExecutor implements RuntimeExecutor {
         }
 
         // 将正常和异常完成都转换为结构化结果，避免异常 Future 打断 Runtime mailbox。
-        return future.handle((response, throwable) -> {
+        return future.handle((rpcResult, throwable) -> {
             if (throwable != null) {
                 return failure(
                         runtime,
@@ -109,6 +116,19 @@ public class DefaultRuntimeExecutor implements RuntimeExecutor {
                         action,
                         task.getDeviceId(),
                         unwrap(throwable)
+                );
+            }
+
+            final MqttResponseDto response;
+            try {
+                response = RpcClient.require(rpcResult);
+            } catch (RuntimeException exception) {
+                return failure(
+                        runtime,
+                        actionGroup,
+                        action,
+                        task.getDeviceId(),
+                        exception
                 );
             }
 

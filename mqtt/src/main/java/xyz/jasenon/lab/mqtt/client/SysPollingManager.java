@@ -9,6 +9,7 @@ import xyz.jasenon.lab.mqtt.protocol.command.CommandLine;
 import xyz.jasenon.lab.device.model.Device;
 import xyz.jasenon.lab.device.model.DeviceType;
 import xyz.jasenon.lab.common.util.Pair;
+import xyz.jasenon.lab.common.rpc.RpcResult;
 import xyz.jasenon.lab.mqtt.client.common.Poll;
 import xyz.jasenon.lab.mqtt.client.event.GatewayClientReadyEvent;
 import xyz.jasenon.lab.mqtt.client.event.GatewayClientsInitialRebuildCompletedEvent;
@@ -64,49 +65,49 @@ public class SysPollingManager implements MqttPollCo {
     }
 
     @Override
-    public Pair<Boolean, String> enable(String deviceId) {
+    public RpcResult<Pair<Boolean, String>> enable(String deviceId) {
         Device device = dhelper.getDeviceById(deviceId);
         if (device == null) {
-            return Pair.of(false, "device doesn't exist");
+            return RpcResult.success(Pair.of(false, "device doesn't exist"));
         }
 
         Poll<MqttTask> poll = pollOf(device);
         if (poll == null) {
-            return Pair.of(false, "poll task can't be created");
+            return RpcResult.success(Pair.of(false, "poll task can't be created"));
         }
 
         device.setPolling(true);
         if (!dhelper.updateDevice(device)) {
-            return Pair.of(false, "device polling status update failed");
+            return RpcResult.success(Pair.of(false, "device polling status update failed"));
         }
 
         if (!SysClientManager.clientIds().contains(device.getGatewayId())) {
-            return Pair.of(true, "poll target enabled, but gateway client isn't ready");
+            return RpcResult.success(Pair.of(true, "poll target enabled, but gateway client isn't ready"));
         }
 
         AbstractSysClient<MqttTask> client = pollClient(device.getGatewayId());
         boolean offered = client != null && client.offer(poll);
         if (offered) {
-            return Pair.of(true, "poll enabled");
+            return RpcResult.success(Pair.of(true, "poll enabled"));
         }
 
         if (client == null) {
-            return Pair.of(true, "poll target enabled, but gateway client isn't ready");
+            return RpcResult.success(Pair.of(true, "poll target enabled, but gateway client isn't ready"));
         }
-        return Pair.of(true, "poll already enabled");
+        return RpcResult.success(Pair.of(true, "poll already enabled"));
     }
 
     @Override
-    public Pair<Boolean, String> disable(String deviceId) {
+    public RpcResult<Pair<Boolean, String>> disable(String deviceId) {
         Device device = dhelper.getDeviceById(deviceId);
         if (device == null) {
-            return Pair.of(false, "device doesn't exist");
+            return RpcResult.success(Pair.of(false, "device doesn't exist"));
         }
 
         Poll<MqttTask> poll = pollOf(device);
         device.setPolling(false);
         if (!dhelper.updateDevice(device)) {
-            return Pair.of(false, "device polling status update failed");
+            return RpcResult.success(Pair.of(false, "device polling status update failed"));
         }
 
         if (poll != null) {
@@ -115,7 +116,7 @@ public class SysPollingManager implements MqttPollCo {
                 client.remove(poll);
             }
         }
-        return Pair.of(true, "poll disabled");
+        return RpcResult.success(Pair.of(true, "poll disabled"));
     }
 
     /**

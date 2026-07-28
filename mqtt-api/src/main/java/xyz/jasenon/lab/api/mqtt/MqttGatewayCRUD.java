@@ -1,6 +1,7 @@
 package xyz.jasenon.lab.api.mqtt;
 
 import xyz.jasenon.lab.device.model.gateway.gateways.RS485Gateway;
+import xyz.jasenon.lab.common.rpc.RpcResult;
 
 import java.util.List;
 
@@ -9,13 +10,15 @@ import java.util.List;
  */
 public interface MqttGatewayCRUD {
 
-    RS485Gateway create(RS485Gateway gateway);
+    RpcResult<RS485Gateway> create(RS485Gateway gateway);
 
-    RS485Gateway get(String gatewayId);
+    RpcResult<RS485Gateway> get(String gatewayId);
 
-    List<RS485Gateway> list();
+    RpcResult<List<RS485Gateway>> list();
 
-    RS485Gateway update(String gatewayId, RS485Gateway gateway);
+    RpcResult<List<RS485Gateway>> listByLaboratories(List<String> laboratoryIds);
 
-    void delete(String gatewayId);
+    RpcResult<RS485Gateway> update(String gatewayId, RS485Gateway gateway);
+
+    RpcResult<Void> delete(String gatewayId);
 }

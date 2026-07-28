@@ -15,6 +15,7 @@ import xyz.jasenon.lab.base.api.model.User;
 import xyz.jasenon.lab.base.api.service.UserService;
 import xyz.jasenon.lab.common.util.R;
 import xyz.jasenon.lab.observability.annotation.Traced;
+import xyz.jasenon.lab.observability.rpc.RpcClient;
 import xyz.jasenon.lab.web.response.DiyResponseEntity;
 
 @RestController
@@ -29,7 +30,8 @@ public class UserController {
     @PostMapping
     @Operation(summary = "创建系统用户", description = "创建可登录的系统用户，并为其分配应用权限和实验室访问范围。")
     public DiyResponseEntity<R<User>> create(@RequestBody UserCreate command) {
-        return DiyResponseEntity.of(R.success(userService.registerNormalUser(command).mask()));
+        User user = RpcClient.call(() -> userService.registerNormalUser(command));
+        return DiyResponseEntity.of(R.success(user.mask()));
     }
 
     @PutMapping("/{userId}")
@@ -44,6 +46,7 @@ public class UserController {
         UserAuthorizationUpdate downstream = new UserAuthorizationUpdate(
                 user, command.appRelations(), command.laboratoryIds()
         );
-        return DiyResponseEntity.of(R.success(userService.updateUser(downstream).mask()));
+        User updated = RpcClient.call(() -> userService.updateUser(downstream));
+        return DiyResponseEntity.of(R.success(updated.mask()));
     }
 }

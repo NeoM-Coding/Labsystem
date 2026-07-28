@@ -17,6 +17,9 @@ public interface DeviceMapper extends BaseMapper<Device> {
     List<Device> list(@Param("gateway_id") String gatewayId,
                       @Param("laboratory_id") String laboratoryId);
 
+    List<Device> listByLaboratories(@Param("gateway_id") String gatewayId,
+                                    @Param("laboratory_ids") List<String> laboratoryIds);
+
     boolean addDevice(@Param("device") Device device);
 
     boolean updateDevice(@Param("device") Device device);

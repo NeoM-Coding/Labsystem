@@ -59,6 +59,19 @@
         ORDER BY `create_at` DESC;
     </select>
 
+    <select id="listByLaboratories" resultMap="DeviceResultMap">
+        SELECT * FROM `device`
+        WHERE `delete_at` IS NULL
+        AND `belong_to` IN
+        <foreach collection="laboratory_ids" item="laboratory_id" open="(" separator="," close=")">
+            #{laboratory_id}
+        </foreach>
+        <if test="gateway_id != null and gateway_id != ''">
+            AND `gateway_id` = #{gateway_id}
+        </if>
+        ORDER BY `create_at` DESC;
+    </select>
+
     <insert id="addDevice">
         INSERT INTO `device` (
             `id`, `device_name`, `belong_to`, `device_type`, `polling`, `gateway_id`,

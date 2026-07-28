@@ -10,8 +10,8 @@
     </parent>
 
     <artifactId>rule-engine</artifactId>
-    <name>quartz</name>
-    <description>quartz</description>
+    <name>rule-engine</name>
+    <description>rule-engine 规则引擎</description>
 
     <dependencies>
         <dependency>

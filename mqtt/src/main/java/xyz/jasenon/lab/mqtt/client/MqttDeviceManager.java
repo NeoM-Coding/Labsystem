@@ -1,9 +1,11 @@
 package xyz.jasenon.lab.mqtt.client;
 
 import org.apache.dubbo.config.annotation.DubboService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import xyz.jasenon.lab.api.mqtt.MqttDeviceCRUD;
 import xyz.jasenon.lab.common.exception.BusinessException;
+import xyz.jasenon.lab.common.rpc.RpcResult;
 import xyz.jasenon.lab.device.model.Address;
 import xyz.jasenon.lab.device.model.Device;
 import xyz.jasenon.lab.device.model.DeviceType;
@@ -30,40 +32,58 @@ public class MqttDeviceManager implements MqttDeviceCRUD {
     private final DeviceHelper deviceHelper;
     private final GatewayHelper gatewayHelper;
     private final SysPollingManager pollingManager;
+    private final VisibleLaboratoryScope visibleLaboratoryScope;
 
+    @Autowired
     public MqttDeviceManager(DeviceHelper deviceHelper,
                              GatewayHelper gatewayHelper,
-                             SysPollingManager pollingManager) {
+                             SysPollingManager pollingManager,
+                             VisibleLaboratoryScope visibleLaboratoryScope) {
         this.deviceHelper = deviceHelper;
         this.gatewayHelper = gatewayHelper;
         this.pollingManager = pollingManager;
+        this.visibleLaboratoryScope = visibleLaboratoryScope;
+    }
+
+    MqttDeviceManager(DeviceHelper deviceHelper,
+                      GatewayHelper gatewayHelper,
+                      SysPollingManager pollingManager) {
+        this(deviceHelper, gatewayHelper, pollingManager, new VisibleLaboratoryScope());
     }
 
     @Override
     @Transactional
-    public Device create(Device device) {
+    public RpcResult<Device> create(Device device) {
         validate(device);
         if (!deviceHelper.addDevice(device)) {
             throw new BusinessException(INTERNAL_SERVER_ERROR, "device create failed");
         }
         Device created = required(device.getId());
         TransactionCallbacks.afterCommit(() -> pollingManager.synchronizeRuntime(null, created));
-        return created;
+        return RpcResult.success(created);
     }
 
     @Override
-    public Device get(String deviceId) {
-        return required(deviceId);
+    public RpcResult<Device> get(String deviceId) {
+        return RpcResult.success(required(deviceId));
     }
 
     @Override
-    public List<Device> list(String gatewayId, String laboratoryId) {
-        return deviceHelper.list(gatewayId, laboratoryId);
+    public RpcResult<List<Device>> list(String gatewayId, String laboratoryId) {
+        return RpcResult.success(deviceHelper.list(gatewayId, laboratoryId));
+    }
+
+    @Override
+    public RpcResult<List<Device>> listByLaboratories(String gatewayId, List<String> laboratoryIds) {
+        List<String> visibleIds = visibleLaboratoryScope.resolve(laboratoryIds);
+        return RpcResult.success(visibleIds.isEmpty()
+                ? List.of()
+                : deviceHelper.listByLaboratories(gatewayId, visibleIds));
     }
 
     @Override
     @Transactional
-    public Device update(String deviceId, Device device) {
+    public RpcResult<Device> update(String deviceId, Device device) {
         Device previous = required(deviceId);
         validate(device);
         if (previous.getDeviceType() != device.getDeviceType()) {
@@ -77,17 +97,18 @@ public class MqttDeviceManager implements MqttDeviceCRUD {
         }
         Device updated = required(deviceId);
         TransactionCallbacks.afterCommit(() -> pollingManager.synchronizeRuntime(previous, updated));
-        return updated;
+        return RpcResult.success(updated);
     }
 
     @Override
     @Transactional
-    public void delete(String deviceId) {
+    public RpcResult<Void> delete(String deviceId) {
         Device previous = required(deviceId);
         if (!deviceHelper.removeDevice(deviceId)) {
             throw new BusinessException(INTERNAL_SERVER_ERROR, "device delete failed");
         }
         TransactionCallbacks.afterCommit(() -> pollingManager.synchronizeRuntime(previous, null));
+        return RpcResult.success();
     }
 
     private Device required(String deviceId) {

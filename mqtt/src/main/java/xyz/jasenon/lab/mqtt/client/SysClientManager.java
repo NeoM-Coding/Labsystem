@@ -9,10 +9,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import xyz.jasenon.lab.api.mqtt.MqttIo;
+import xyz.jasenon.lab.api.mqtt.dto.MqttMultiTaskDto;
 import xyz.jasenon.lab.api.mqtt.dto.MqttResponseDto;
 import xyz.jasenon.lab.api.mqtt.dto.MqttTaskDto;
+import xyz.jasenon.lab.api.mqtt.dto.MqttTaskResultDto;
 import xyz.jasenon.lab.mqtt.protocol.command.Task;
 import xyz.jasenon.lab.common.exception.BusinessException;
+import xyz.jasenon.lab.common.rpc.RpcResult;
 import xyz.jasenon.lab.device.model.gateway.gateways.RS485Gateway;
 import xyz.jasenon.lab.mqtt.client.common.PendingRequest;
 import xyz.jasenon.lab.mqtt.client.event.GatewayClientReadyEvent;
@@ -40,24 +43,30 @@ public class SysClientManager implements MqttIo {
 
     private static final Logger log = LoggerFactory.getLogger(SysClientManager.class);
     private static final int NOT_FOUND = 404;
+    private static final int BAD_REQUEST = 400;
+    private static final int FORBIDDEN = 403;
     private static final int INTERNAL_SERVER_ERROR = 500;
+    private static final int MAX_MULTI_TARGETS = 20;
 
     private final TaskHelper thelper;
     private final GatewayHelper ghelper;
     private final ApplicationEventPublisher eventPublisher;
     private final Thread watchdog;
     private final MqttOptions options;
+    private final VisibleLaboratoryScope visibleLaboratoryScope;
 
     public SysClientManager(
             TaskHelper thelper,
             GatewayHelper ghelper,
             ApplicationEventPublisher eventPublisher,
-            MqttOptions options
+            MqttOptions options,
+            VisibleLaboratoryScope visibleLaboratoryScope
     ) {
         this.thelper = thelper;
         this.ghelper = ghelper;
         this.eventPublisher = eventPublisher;
         this.options = options;
+        this.visibleLaboratoryScope = visibleLaboratoryScope;
         watchdog = new Thread(this::watchdog);
         watchdog.setDaemon(true);
         watchdog.setName(this.getClass().getName() + "-" + "watchdog");
@@ -73,9 +82,26 @@ public class SysClientManager implements MqttIo {
         watchdog.interrupt();
     }
 
-    public MqttResponseDto syncSend(MqttTaskDto dto) throws ExecutionException, InterruptedException, TimeoutException {
+    public RpcResult<MqttResponseDto> syncSend(MqttTaskDto dto) {
         MqttTask userTask = thelper.help(dto);
         if (userTask == null) throw new BusinessException(NOT_FOUND, "device doesn't exist!");
+        assertVisible(userTask);
+        try {
+            return RpcResult.success(syncSendPrepared(userTask));
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new BusinessException(INTERNAL_SERVER_ERROR, "mqtt request was interrupted");
+        } catch (TimeoutException exception) {
+            throw new BusinessException(504, "mqtt request timed out");
+        } catch (ExecutionException exception) {
+            Throwable cause = rootCause(exception);
+            throw new BusinessException(INTERNAL_SERVER_ERROR,
+                    cause.getMessage() == null ? "mqtt request failed" : cause.getMessage());
+        }
+    }
+
+    private MqttResponseDto syncSendPrepared(MqttTask userTask)
+            throws ExecutionException, InterruptedException, TimeoutException {
         var client = (AbstractSysClient<MqttTask>) ClientsRuntime.client(userTask.getGatewayId());
         if (client != null){
             PendingRequest<MqttTask> task = userTask.decorate();
@@ -85,16 +111,86 @@ public class SysClientManager implements MqttIo {
         throw new BusinessException(NOT_FOUND, "gateway doesn't exist!");
     }
 
-    public CompletableFuture<MqttResponseDto> asyncSend(MqttTaskDto dto) {
+    public CompletableFuture<RpcResult<MqttResponseDto>> asyncSend(MqttTaskDto dto) {
+        return asyncSend(dto, true);
+    }
+
+    CompletableFuture<RpcResult<MqttResponseDto>> asyncSendFromRuleEngine(MqttTaskDto dto) {
+        return asyncSend(dto, false);
+    }
+
+    private CompletableFuture<RpcResult<MqttResponseDto>> asyncSend(
+            MqttTaskDto dto,
+            boolean requireUserVisibility
+    ) {
         MqttTask userTask = thelper.help(dto);
         if (userTask == null) throw new BusinessException(NOT_FOUND, "device doesn't exist!");
+        if (requireUserVisibility) {
+            assertVisible(userTask);
+        }
         var client = (AbstractSysClient<MqttTask>) ClientsRuntime.client(userTask.getGatewayId());
         if (client != null){
             PendingRequest<MqttTask> task = userTask.decorate();
             client.offer(task);
-            return task.getFuture().thenApply(this::toResponseDto);
+            return task.getFuture().thenApply(response -> RpcResult.success(toResponseDto(response)));
         }
         throw new BusinessException(NOT_FOUND, "gateway doesn't exist!");
+    }
+
+    @Override
+    public RpcResult<List<MqttTaskResultDto>> multiSend(MqttMultiTaskDto task) {
+        if (task == null || task.deviceIds() == null || task.deviceIds().isEmpty()) {
+            throw new BusinessException(BAD_REQUEST, "至少需要选择一台设备");
+        }
+        List<String> deviceIds = task.deviceIds().stream()
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(id -> !id.isEmpty())
+                .distinct()
+                .toList();
+        if (deviceIds.isEmpty()) {
+            throw new BusinessException(BAD_REQUEST, "至少需要选择一台设备");
+        }
+        if (deviceIds.size() > MAX_MULTI_TARGETS) {
+            throw new BusinessException(BAD_REQUEST, "单次批量控制最多支持 20 台设备");
+        }
+        List<MqttTask> preparedTasks = deviceIds.stream().map(deviceId -> {
+            MqttTaskDto single = MqttTaskDto.of(
+                    task.commandLine(),
+                    task.args() == null ? new int[0] : task.args().clone(),
+                    task.type(),
+                    deviceId
+            );
+            MqttTask prepared = thelper.help(single);
+            if (prepared == null) {
+                throw new BusinessException(NOT_FOUND, "设备不存在: " + deviceId);
+            }
+            assertVisible(prepared);
+            return prepared;
+        }).toList();
+
+        return RpcResult.success(preparedTasks.stream().map(prepared -> {
+            try {
+                return MqttTaskResultDto.success(prepared.getDeviceId(), syncSendPrepared(prepared));
+            } catch (Exception error) {
+                return MqttTaskResultDto.failure(prepared.getDeviceId(), rootCause(error));
+            }
+        }).toList());
+    }
+
+    private void assertVisible(MqttTask task) {
+        if (task.getLaboratoryId() == null
+                || visibleLaboratoryScope.resolve(List.of(task.getLaboratoryId())).isEmpty()) {
+            throw new BusinessException(FORBIDDEN, "无权控制该实验室设备");
+        }
+    }
+
+    private static Throwable rootCause(Throwable error) {
+        Throwable current = error;
+        while (current.getCause() != null && current.getCause() != current) {
+            current = current.getCause();
+        }
+        return current;
     }
 
     private MqttResponseDto toResponseDto(Object resp) {

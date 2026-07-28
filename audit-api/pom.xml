@@ -13,4 +13,12 @@
     <artifactId>audit-api</artifactId>
     <name>audit-api</name>
     <description>Administrator-facing audit contracts</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>xyz.jasenon.lab</groupId>
+            <artifactId>common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+    </dependencies>
 </project>

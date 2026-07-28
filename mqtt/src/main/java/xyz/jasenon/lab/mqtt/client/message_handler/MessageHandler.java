@@ -16,6 +16,7 @@ import xyz.jasenon.lab.redis.core.RedisBus;
 import java.time.Instant;
 import java.time.Duration;
 import java.util.Map;
+import java.util.LinkedHashMap;
 
 public abstract class MessageHandler<R extends BaseRecord> {
 
@@ -60,9 +61,12 @@ public abstract class MessageHandler<R extends BaseRecord> {
 
         // 刷 redis hash 用于快速获取对应字段 统计用
         // 同时 redis 数据 expire 也可以作为设备在线判断
-        Map<String, String> rmap = ObjectMapUtil.toStringMap(r);
-        jedis.hsetex(DeviceRecordKeys.recordKey(deviceType, deviceId), rmap, Duration.ofSeconds(15));
-        publishSnapshot(deviceId, rmap);
+        Instant occurredAt = Instant.now();
+        Map<String, String> recordFields = ObjectMapUtil.toStringMap(r);
+        Map<String, String> redisFields = new LinkedHashMap<>(recordFields);
+        redisFields.put("__occurredAt", occurredAt.toString());
+        jedis.hsetex(DeviceRecordKeys.recordKey(deviceType, deviceId), redisFields, Duration.ofSeconds(15));
+        publishSnapshot(deviceId, recordFields, occurredAt);
 
         // 落库
         persistent.persist(r);
@@ -79,12 +83,12 @@ public abstract class MessageHandler<R extends BaseRecord> {
         }
     }
 
-    private void publishSnapshot(String deviceId, Map<String, String> recordFields) {
+    private void publishSnapshot(String deviceId, Map<String, String> recordFields, Instant occurredAt) {
         DeviceRecordSnapshotEvent event = new DeviceRecordSnapshotEvent(
                 deviceType,
                 deviceId,
                 recordFields,
-                Instant.now()
+                occurredAt
         );
         try {
             jedis.publish(RuleEngineChannels.DEVICE_RECORD_CHANGE, OBJECT_MAPPER.writeValueAsString(event));

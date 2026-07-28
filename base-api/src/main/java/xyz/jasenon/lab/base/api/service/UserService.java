@@ -3,19 +3,23 @@ package xyz.jasenon.lab.base.api.service;
 import xyz.jasenon.lab.base.api.dto.ContactUserCreate;
 import xyz.jasenon.lab.base.api.dto.UserCreate;
 import xyz.jasenon.lab.base.api.dto.UserAuthorizationUpdate;
-import xyz.jasenon.lab.base.api.dto.UserSession;
 import xyz.jasenon.lab.base.api.model.User;
+import xyz.jasenon.lab.common.rpc.RpcResult;
 
 public interface UserService {
 
-    boolean existsByName(String name);
+    RpcResult<Boolean> existsByName(String name);
 
-    UserSession login(String username, String pwd);
+    RpcResult<User> authenticate(String username, String pwd);
 
-    User registerNormalUser(UserCreate command);
+    RpcResult<User> current();
 
-    User registerContactUser(ContactUserCreate command);
+    RpcResult<Void> logout();
 
-    User updateUser(UserAuthorizationUpdate command);
+    RpcResult<User> registerNormalUser(UserCreate command);
+
+    RpcResult<User> registerContactUser(ContactUserCreate command);
+
+    RpcResult<User> updateUser(UserAuthorizationUpdate command);
 
 }

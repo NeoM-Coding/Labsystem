@@ -12,6 +12,8 @@ public interface DeviceHelper {
 
     List<Device> list(String gatewayId, String laboratoryId);
 
+    List<Device> listByLaboratories(String gatewayId, List<String> laboratoryIds);
+
     boolean addDevice(Device device);
 
     boolean updateDevice(Device device);

@@ -12,6 +12,7 @@ import xyz.jasenon.lab.base.api.model.User;
 import xyz.jasenon.lab.base.api.service.UserService;
 import xyz.jasenon.lab.common.util.R;
 import xyz.jasenon.lab.observability.annotation.Traced;
+import xyz.jasenon.lab.observability.rpc.RpcClient;
 import xyz.jasenon.lab.web.response.DiyResponseEntity;
 
 @RestController
@@ -26,6 +27,7 @@ public class ContactController {
     @PostMapping
     @Operation(summary = "创建联系人", description = "创建没有登录密码和系统权限的联系人资料。")
     public DiyResponseEntity<R<User>> create(@RequestBody ContactUserCreate command) {
-        return DiyResponseEntity.of(R.success(userService.registerContactUser(command).mask()));
+        User user = RpcClient.call(() -> userService.registerContactUser(command));
+        return DiyResponseEntity.of(R.success(user.mask()));
     }
 }

@@ -1,6 +1,7 @@
 package xyz.jasenon.lab.api.mqtt;
 
 import xyz.jasenon.lab.device.model.Device;
+import xyz.jasenon.lab.common.rpc.RpcResult;
 
 import java.util.List;
 
@@ -9,13 +10,15 @@ import java.util.List;
  */
 public interface MqttDeviceCRUD {
 
-    Device create(Device device);
+    RpcResult<Device> create(Device device);
 
-    Device get(String deviceId);
+    RpcResult<Device> get(String deviceId);
 
-    List<Device> list(String gatewayId, String laboratoryId);
+    RpcResult<List<Device>> list(String gatewayId, String laboratoryId);
 
-    Device update(String deviceId, Device device);
+    RpcResult<List<Device>> listByLaboratories(String gatewayId, List<String> laboratoryIds);
 
-    void delete(String deviceId);
+    RpcResult<Device> update(String deviceId, Device device);
+
+    RpcResult<Void> delete(String deviceId);
 }

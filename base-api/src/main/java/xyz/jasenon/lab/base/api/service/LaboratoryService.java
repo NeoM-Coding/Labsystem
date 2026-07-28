@@ -6,21 +6,22 @@ import xyz.jasenon.lab.base.api.dto.LaboratoryEdit;
 import xyz.jasenon.lab.base.api.model.Laboratory;
 import xyz.jasenon.lab.base.api.vo.LaboratoryVO;
 import xyz.jasenon.lab.common.util.Pair;
+import xyz.jasenon.lab.common.rpc.RpcResult;
 
 import java.util.List;
 
 public interface LaboratoryService {
 
-    List<Pair<String,String>> collectionOrgName();
+    RpcResult<List<Pair<String,String>>> collectionOrgName();
 
-    List<Pair<String,String>> collectionBuildingName();
+    RpcResult<List<Pair<String,String>>> collectionBuildingName();
 
-    List<LaboratoryVO> list(String buildingName, String orgName);
+    RpcResult<List<LaboratoryVO>> list(String[] buildingNames, String[] orgNames);
 
-    Laboratory create(LaboratoryCreate command);
+    RpcResult<Laboratory> create(LaboratoryCreate command);
 
-    Laboratory update(LaboratoryEdit command);
+    RpcResult<Laboratory> update(LaboratoryEdit command);
 
-    void delete(LaboratoryDelete command);
+    RpcResult<Void> delete(LaboratoryDelete command);
 
 }

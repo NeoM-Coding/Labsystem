@@ -4,6 +4,7 @@ import org.apache.dubbo.config.annotation.DubboService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import xyz.jasenon.lab.auth.annotation.ActionAuthorized;
 import xyz.jasenon.lab.common.exception.BusinessException;
+import xyz.jasenon.lab.common.rpc.RpcResult;
 import xyz.jasenon.lab.engine.api.SmartStrategyService;
 import xyz.jasenon.lab.engine.api.command.SmartStrategyCreate;
 import xyz.jasenon.lab.engine.api.command.SmartStrategyDelete;
@@ -37,52 +38,53 @@ public class SmartStrategyServiceImpl implements SmartStrategyService {
 
     @Override
     @ActionAuthorized
-    public RuntimeRevision create(SmartStrategyCreate command) {
+    public RpcResult<RuntimeRevision> create(SmartStrategyCreate command) {
         if (!runtimePersist.register(command.revision())) {
             throw new BusinessException(CONFLICT, "smart strategy already exists");
         }
-        return required(command.revision().runtimeId());
+        return RpcResult.success(required(command.revision().runtimeId()));
     }
 
     @Override
     @ActionAuthorized
-    public RuntimeRevision update(SmartStrategyUpdate command) {
+    public RpcResult<RuntimeRevision> update(SmartStrategyUpdate command) {
         if (!runtimePersist.update(command.runtimeId(), command.revision())) {
             throw new BusinessException(NOT_FOUND, "smart strategy doesn't exist");
         }
-        return required(command.runtimeId());
+        return RpcResult.success(required(command.runtimeId()));
     }
 
     @Override
     @ActionAuthorized
-    public void delete(SmartStrategyDelete command) {
+    public RpcResult<Void> delete(SmartStrategyDelete command) {
         if (!runtimePersist.remove(command.runtimeId())) {
             throw new BusinessException(NOT_FOUND, "smart strategy doesn't exist");
         }
+        return RpcResult.success();
     }
 
     @Override
     @ActionAuthorized
-    public RuntimeRevision changeStatus(SmartStrategyStatusChange command) {
+    public RpcResult<RuntimeRevision> changeStatus(SmartStrategyStatusChange command) {
         boolean changed = command.enabled()
                 ? runtimePersist.enable(command.runtimeId())
                 : runtimePersist.disable(command.runtimeId());
         if (!changed) {
             throw new BusinessException(NOT_FOUND, "smart strategy doesn't exist");
         }
-        return required(command.runtimeId());
+        return RpcResult.success(required(command.runtimeId()));
     }
 
     @Override
     @ActionAuthorized
-    public RuntimeRevision get(SmartStrategyGet command) {
-        return required(command.runtimeId());
+    public RpcResult<RuntimeRevision> get(SmartStrategyGet command) {
+        return RpcResult.success(required(command.runtimeId()));
     }
 
     @Override
     @ActionAuthorized
-    public List<RuntimeRevision> list(SmartStrategyListQuery command) {
-        return runtimePersist.fetch();
+    public RpcResult<List<RuntimeRevision>> list(SmartStrategyListQuery command) {
+        return RpcResult.success(runtimePersist.fetch());
     }
 
     private RuntimeRevision required(String runtimeId) {

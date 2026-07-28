@@ -22,6 +22,7 @@ import xyz.jasenon.lab.base.context.UserContextFactory;
 import xyz.jasenon.lab.base.mapper.LaboratoryMapper;
 import xyz.jasenon.lab.base.mapper.UserMapper;
 import xyz.jasenon.lab.common.exception.BusinessException;
+import xyz.jasenon.lab.common.rpc.RpcResult;
 import xyz.jasenon.lab.common.util.Pair;
 import xyz.jasenon.lab.observability.annotation.Traced;
 
@@ -49,36 +50,36 @@ public class LaboratoryServiceImpl extends ServiceImpl<LaboratoryMapper, Laborat
     }
 
     @Override
-    public List<Pair<String, String>> collectionOrgName() {
-        return this.baseMapper.collectionOrgName();
+    public RpcResult<List<Pair<String, String>>> collectionOrgName() {
+        return RpcResult.success(this.baseMapper.collectionOrgName());
     }
 
     @Override
-    public List<Pair<String, String>> collectionBuildingName() {
-        return this.baseMapper.collectionBuildingName();
+    public RpcResult<List<Pair<String, String>>> collectionBuildingName() {
+        return RpcResult.success(this.baseMapper.collectionBuildingName());
     }
 
     @Override
-    public List<LaboratoryVO> list(String buildingName, String orgName) {
+    public RpcResult<List<LaboratoryVO>> list(String[] buildingNames, String[] orgNames) {
         var context = UserContextHolder.get();
         if (context == null) {
             throw new BusinessException(UNAUTHORIZED, "登陆已过期");
         }
         // 楼栋与组织过滤只能在当前用户的可见范围内继续收窄，不能扩大数据边界。
-        List<String> laboratoryIds = context.filterLaboratoryIds(buildingName, orgName);
+        List<String> laboratoryIds = context.filterLaboratoryIds(buildingNames, orgNames);
         if (laboratoryIds.isEmpty()) {
-            return List.of();
+            return RpcResult.success(List.of());
         }
-        return this.baseMapper.selectByIds(laboratoryIds).stream()
+        return RpcResult.success(this.baseMapper.selectByIds(laboratoryIds).stream()
                 .map(LaboratoryVO::from)
-                .toList();
+                .toList());
     }
 
     @Override
     @Audited("laboratory.create")
     @ActionAuthorized
     @Transactional
-    public Laboratory create(LaboratoryCreate command) {
+    public RpcResult<Laboratory> create(LaboratoryCreate command) {
         UserContext context = requireUserContext();
         Laboratory laboratory = from(command);
         ValidationErrors errors = laboratory.validate();
@@ -90,14 +91,14 @@ public class LaboratoryServiceImpl extends ServiceImpl<LaboratoryMapper, Laborat
         laboratoryAuthorization.initialize(laboratory.getId(), context.getUserId());
         Set<String> affectedUserIds = laboratoryAuthorization.usersWhoCanView(laboratory.getId());
         afterCommit(() -> refreshUserContexts(affectedUserIds));
-        return laboratory;
+        return RpcResult.success(laboratory);
     }
 
     @Override
     @Audited("laboratory.edit")
     @ActionAuthorized
     @Transactional
-    public Laboratory update(LaboratoryEdit command) {
+    public RpcResult<Laboratory> update(LaboratoryEdit command) {
         String laboratoryId = command.laboratoryId();
         requireUserContext();
         Laboratory laboratory = from(command);
@@ -110,14 +111,14 @@ public class LaboratoryServiceImpl extends ServiceImpl<LaboratoryMapper, Laborat
         // Context 缓存了名称、楼栋和组织，实验室信息变化后需要同步所有可见用户。
         Set<String> affectedUserIds = laboratoryAuthorization.usersWhoCanView(laboratoryId);
         afterCommit(() -> refreshUserContexts(affectedUserIds));
-        return laboratory;
+        return RpcResult.success(laboratory);
     }
 
     @Override
     @Audited("laboratory.delete")
     @ActionAuthorized
     @Transactional
-    public void delete(LaboratoryDelete command) {
+    public RpcResult<Void> delete(LaboratoryDelete command) {
         String laboratoryId = command.laboratoryId();
         // 写权限由 app:global#manage_laboratory 决定，view scope 仅用于查询范围。
         requireUserContext();
@@ -129,6 +130,7 @@ public class LaboratoryServiceImpl extends ServiceImpl<LaboratoryMapper, Laborat
         laboratoryAuthorization.remove(laboratoryId);
         // Redis 不参与数据库事务，只能在提交成功后刷新。
         afterCommit(() -> refreshUserContexts(affectedUserIds));
+        return RpcResult.success();
     }
 
     private static void afterCommit(Runnable action) {

@@ -21,6 +21,7 @@ import xyz.jasenon.lab.engine.api.command.SmartStrategyStatusChange;
 import xyz.jasenon.lab.engine.api.command.SmartStrategyUpdate;
 import xyz.jasenon.lab.engine.definition.RuntimeRevision;
 import xyz.jasenon.lab.observability.annotation.Traced;
+import xyz.jasenon.lab.observability.rpc.RpcClient;
 import xyz.jasenon.lab.web.response.DiyResponseEntity;
 
 import java.util.List;
@@ -38,7 +39,7 @@ public class SmartStrategyController {
     @Operation(summary = "查询智能策略", description = "返回当前用户有权查看的智能策略版本列表。")
     public DiyResponseEntity<R<List<RuntimeRevision>>> list() {
         return DiyResponseEntity.of(R.success(
-                smartStrategyService.list(new SmartStrategyListQuery())
+                RpcClient.call(() -> smartStrategyService.list(new SmartStrategyListQuery()))
         ));
     }
 
@@ -46,7 +47,7 @@ public class SmartStrategyController {
     @Operation(summary = "查询智能策略详情", description = "根据运行时 ID 查询智能策略的当前版本和配置。")
     public DiyResponseEntity<R<RuntimeRevision>> get(@PathVariable String runtimeId) {
         return DiyResponseEntity.of(R.success(
-                smartStrategyService.get(new SmartStrategyGet(runtimeId))
+                RpcClient.call(() -> smartStrategyService.get(new SmartStrategyGet(runtimeId)))
         ));
     }
 
@@ -54,7 +55,7 @@ public class SmartStrategyController {
     @Operation(summary = "创建智能策略", description = "创建新的规则运行时和首个智能策略版本。")
     public DiyResponseEntity<R<RuntimeRevision>> create(@RequestBody RuntimeRevision revision) {
         return DiyResponseEntity.of(R.success(
-                smartStrategyService.create(new SmartStrategyCreate(revision))
+                RpcClient.call(() -> smartStrategyService.create(new SmartStrategyCreate(revision)))
         ));
     }
 
@@ -65,14 +66,14 @@ public class SmartStrategyController {
             @RequestBody RuntimeRevision revision) {
         // path ID 是资源身份，规则服务会再次校验它与 revision.runtimeId 一致。
         return DiyResponseEntity.of(R.success(
-                smartStrategyService.update(new SmartStrategyUpdate(runtimeId, revision))
+                RpcClient.call(() -> smartStrategyService.update(new SmartStrategyUpdate(runtimeId, revision)))
         ));
     }
 
     @DeleteMapping("/{runtimeId}")
     @Operation(summary = "删除智能策略", description = "删除指定规则运行时及其持久化策略数据。")
     public DiyResponseEntity<R<Void>> delete(@PathVariable String runtimeId) {
-        smartStrategyService.delete(new SmartStrategyDelete(runtimeId));
+        RpcClient.run(() -> smartStrategyService.delete(new SmartStrategyDelete(runtimeId)));
         return DiyResponseEntity.of(R.success());
     }
 
@@ -80,7 +81,8 @@ public class SmartStrategyController {
     @Operation(summary = "启用智能策略", description = "启用指定规则运行时，使智能策略开始参与事件处理。")
     public DiyResponseEntity<R<RuntimeRevision>> enable(@PathVariable String runtimeId) {
         return DiyResponseEntity.of(R.success(
-                smartStrategyService.changeStatus(new SmartStrategyStatusChange(runtimeId, true))
+                RpcClient.call(() -> smartStrategyService.changeStatus(
+                        new SmartStrategyStatusChange(runtimeId, true)))
         ));
     }
 
@@ -88,7 +90,8 @@ public class SmartStrategyController {
     @Operation(summary = "停用智能策略", description = "停用指定规则运行时，同时保留其策略配置和版本数据。")
     public DiyResponseEntity<R<RuntimeRevision>> disable(@PathVariable String runtimeId) {
         return DiyResponseEntity.of(R.success(
-                smartStrategyService.changeStatus(new SmartStrategyStatusChange(runtimeId, false))
+                RpcClient.call(() -> smartStrategyService.changeStatus(
+                        new SmartStrategyStatusChange(runtimeId, false)))
         ));
     }
 }

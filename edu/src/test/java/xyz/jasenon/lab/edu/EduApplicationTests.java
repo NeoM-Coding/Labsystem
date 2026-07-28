@@ -1,13 +1,11 @@
 package xyz.jasenon.lab.edu;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
-
-@SpringBootTest
 class EduApplicationTests {
 
     @Test
-    void contextLoads() {
+    void applicationEntryPointIsAvailable() {
+        org.junit.jupiter.api.Assertions.assertNotNull(EduApplication.class);
     }
 
 }

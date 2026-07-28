@@ -34,13 +34,11 @@ import xyz.jasenon.lab.edu.model.Timetable;
 import xyz.jasenon.lab.observability.annotation.Traced;
 
 import java.io.ByteArrayInputStream;
-import java.time.Duration;
 import java.time.LocalTime;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -346,7 +344,7 @@ public class TimetableServiceImpl extends ServiceImpl<TimetableMapper, Timetable
                 @Override
                 public void doAfterAllAnalysed(AnalysisContext context) {
                 }
-            }).sheet().doRead();
+            }).sheet().headRowNumber(0).doRead();
         } catch (RuntimeException exception) {
             throw new BusinessException(400, "Excel 文件无法解析");
         }

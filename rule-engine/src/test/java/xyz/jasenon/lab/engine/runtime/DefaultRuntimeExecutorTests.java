@@ -7,9 +7,10 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
-import xyz.jasenon.lab.api.mqtt.MqttIo;
+import xyz.jasenon.lab.api.mqtt.MqttRuleIo;
 import xyz.jasenon.lab.api.mqtt.dto.MqttResponseDto;
 import xyz.jasenon.lab.api.mqtt.dto.MqttTaskDto;
+import xyz.jasenon.lab.common.rpc.RpcResult;
 import xyz.jasenon.lab.device.model.DeviceType;
 import xyz.jasenon.lab.engine.Engine;
 import xyz.jasenon.lab.engine.RuleEngineApplication;
@@ -25,10 +26,8 @@ import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.BooleanSupplier;
 
@@ -42,7 +41,7 @@ class DefaultRuntimeExecutorTests {
 
     @Test
     void controlActionUsesAsyncMqttAndRecordsSuccess() {
-        MqttIo mqttIo = mock(MqttIo.class);
+        MqttRuleIo mqttIo = mock(MqttRuleIo.class);
         ActionExecutionTracker tracker = new ActionExecutionTracker();
         DefaultRuntimeExecutor executor = new DefaultRuntimeExecutor(tracker, mqttIo);
         Runtime runtime = new Runtime("runtime-1");
@@ -50,7 +49,8 @@ class DefaultRuntimeExecutorTests {
         MqttTaskDto task = task("ac-1");
         MqttResponseDto response = new MqttResponseDto();
         response.setGatewayId("gateway-1");
-        when(mqttIo.asyncSend(task)).thenReturn(CompletableFuture.completedFuture(response));
+        when(mqttIo.asyncSend(task))
+                .thenReturn(CompletableFuture.completedFuture(RpcResult.success(response)));
 
         ActionExecutionResult result = executor.execute(
                 runtime,
@@ -66,7 +66,7 @@ class DefaultRuntimeExecutorTests {
 
     @Test
     void controlActionRecordsFailureDetails() {
-        MqttIo mqttIo = mock(MqttIo.class);
+        MqttRuleIo mqttIo = mock(MqttRuleIo.class);
         ActionExecutionTracker tracker = new ActionExecutionTracker();
         DefaultRuntimeExecutor executor = new DefaultRuntimeExecutor(tracker, mqttIo);
         Runtime runtime = new Runtime("runtime-1");
@@ -94,7 +94,7 @@ class DefaultRuntimeExecutorTests {
 
     @Test
     void reportActionKeepsNotificationSkeleton() {
-        MqttIo mqttIo = mock(MqttIo.class);
+        MqttRuleIo mqttIo = mock(MqttRuleIo.class);
         ActionExecutionTracker tracker = new ActionExecutionTracker();
         DefaultRuntimeExecutor executor = new DefaultRuntimeExecutor(tracker, mqttIo);
         ReportAction action = new ReportAction(
@@ -254,7 +254,7 @@ class DefaultRuntimeExecutorTests {
      * CI-safe MQTT boundary: it performs real asynchronous work without requiring
      * a broker, registry or separately deployed MQTT application.
      */
-    static class InProcessMqttIo implements MqttIo, AutoCloseable {
+    static class InProcessMqttIo implements MqttRuleIo, AutoCloseable {
 
         private final Queue<String> receivedDeviceIds = new ConcurrentLinkedQueue<>();
         private final Queue<String> executionThreadNames = new ConcurrentLinkedQueue<>();
@@ -265,13 +265,7 @@ class DefaultRuntimeExecutorTests {
         });
 
         @Override
-        public MqttResponseDto syncSend(MqttTaskDto task)
-                throws ExecutionException, InterruptedException, TimeoutException {
-            return asyncSend(task).get(2, TimeUnit.SECONDS);
-        }
-
-        @Override
-        public CompletableFuture<MqttResponseDto> asyncSend(MqttTaskDto task) {
+        public CompletableFuture<RpcResult<MqttResponseDto>> asyncSend(MqttTaskDto task) {
             return CompletableFuture.supplyAsync(() -> {
                 receivedDeviceIds.add(task.getDeviceId());
                 executionThreadNames.add(Thread.currentThread().getName());
@@ -282,7 +276,7 @@ class DefaultRuntimeExecutorTests {
                 MqttResponseDto response = new MqttResponseDto();
                 response.setGatewayId("test-gateway");
                 response.setPayload(new int[]{1});
-                return response;
+                return RpcResult.success(response);
             }, executor);
         }
 

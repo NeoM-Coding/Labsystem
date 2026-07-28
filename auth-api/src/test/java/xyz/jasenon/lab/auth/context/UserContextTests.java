@@ -45,6 +45,39 @@ class UserContextTests {
     }
 
     @Test
+    void supportsMultipleValuesWithinEachFilterDimension() {
+        assertEquals(
+                List.of("lab-1", "lab-2", "lab-3"),
+                context.filterLaboratoryIds(
+                        new String[]{"16号楼", "18号楼"},
+                        new String[]{"计算机科学学院", "人工智能学院"}
+                )
+        );
+        assertEquals(
+                List.of("lab-1", "lab-3"),
+                context.filterLaboratoryIds(
+                        new String[]{"16号楼", "18号楼"},
+                        new String[]{"计算机科学学院"}
+                )
+        );
+    }
+
+    @Test
+    void ignoresBlankAndDuplicateFilterValues() {
+        assertEquals(
+                List.of("lab-1", "lab-2"),
+                context.filterLaboratoryIds(
+                        new String[]{" 16号楼 ", "", "16号楼"},
+                        null
+                )
+        );
+        assertEquals(
+                List.of("lab-1", "lab-2", "lab-3"),
+                context.filterLaboratoryIds(new String[]{" "}, new String[0])
+        );
+    }
+
+    @Test
     void exposesDistinctFilterOptions() {
         assertEquals(List.of("16号楼", "18号楼"), context.getBuildingNames());
         assertEquals(List.of("计算机科学学院", "人工智能学院"), context.getOrgNames());

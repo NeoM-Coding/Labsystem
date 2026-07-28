@@ -38,7 +38,7 @@ class MqttDeviceManagerTests {
         });
         when(deviceHelper.getDeviceById("1001")).thenReturn(device);
 
-        Device created = manager.create(device);
+        Device created = manager.create(device).data();
 
         assertEquals("1001", created.getId());
         verify(pollingManager).synchronizeRuntime(null, device);

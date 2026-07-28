@@ -20,7 +20,7 @@ class SmartStrategyServiceImplTests {
         InMemoryRuntimePersist persist = new InMemoryRuntimePersist();
         SmartStrategyServiceImpl service = new SmartStrategyServiceImpl(persist);
 
-        RuntimeRevision created = service.create(new SmartStrategyCreate(revision(true)));
+        RuntimeRevision created = service.create(new SmartStrategyCreate(revision(true))).data();
 
         assertTrue(created.isEnabled());
         assertTrue(persist.values.containsKey("runtime-1"));
@@ -34,7 +34,7 @@ class SmartStrategyServiceImplTests {
 
         RuntimeRevision disabled = service.changeStatus(
                 new SmartStrategyStatusChange("runtime-1", false)
-        );
+        ).data();
 
         assertFalse(disabled.isEnabled());
     }

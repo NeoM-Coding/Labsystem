@@ -41,7 +41,7 @@ class MqttGatewayManagerTests {
         });
         when(gatewayHelper.getById("2001")).thenReturn(gateway);
 
-        RS485Gateway created = manager.create(gateway);
+        RS485Gateway created = manager.create(gateway).data();
 
         assertEquals("2001", created.getId());
         verify(clientManager).registerGateway(gateway);

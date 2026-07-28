@@ -6,9 +6,12 @@ import xyz.jasenon.lab.api.mqtt.MqttDeviceCRUD;
 import xyz.jasenon.lab.api.mqtt.MqttGatewayCRUD;
 import xyz.jasenon.lab.api.mqtt.MqttIo;
 import xyz.jasenon.lab.api.mqtt.MqttPollCo;
+import xyz.jasenon.lab.api.mqtt.MqttRuleIo;
+import xyz.jasenon.lab.api.mqtt.MqttTelemetryQuery;
 import xyz.jasenon.lab.audit.api.service.AuditLogService;
 import xyz.jasenon.lab.base.api.service.LaboratoryService;
 import xyz.jasenon.lab.base.api.service.UserService;
+import xyz.jasenon.lab.common.rpc.RpcResult;
 import xyz.jasenon.lab.engine.api.SmartStrategyService;
 
 import java.io.Serializable;
@@ -26,6 +29,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -37,12 +41,25 @@ class DubboSerializationContractTests {
             UserService.class,
             LaboratoryService.class,
             MqttIo.class,
+            MqttRuleIo.class,
             MqttPollCo.class,
             MqttDeviceCRUD.class,
             MqttGatewayCRUD.class,
+            MqttTelemetryQuery.class,
             SmartStrategyService.class,
             AuditLogService.class
     );
+
+    @Test
+    void allDubboMethodsReturnRpcResultInsteadOfTransportingExceptions() {
+        DUBBO_CONTRACTS.forEach(contract ->
+                java.util.Arrays.stream(contract.getMethods()).forEach(method ->
+                        assertThat(isRpcResult(method.getGenericReturnType()))
+                                .as("%s.%s must return RpcResult<T> or CompletableFuture<RpcResult<T>>",
+                                        contract.getSimpleName(), method.getName())
+                                .isTrue()
+                ));
+    }
 
     @Test
     void allDubboPayloadTypesAreSerializable() {
@@ -151,5 +168,20 @@ class DubboSerializationContractTests {
                 || type.isEnum()
                 || type == Object.class
                 || type.getPackageName().startsWith("java.");
+    }
+
+    private static boolean isRpcResult(Type type) {
+        if (!(type instanceof ParameterizedType parameterized)
+                || !(parameterized.getRawType() instanceof Class<?> rawType)) {
+            return false;
+        }
+        if (rawType == RpcResult.class) {
+            return true;
+        }
+        if (rawType != CompletableFuture.class) {
+            return false;
+        }
+        Type[] arguments = parameterized.getActualTypeArguments();
+        return arguments.length == 1 && isRpcResult(arguments[0]);
     }
 }

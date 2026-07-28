@@ -1,6 +1,76 @@
 spring:
   application:
     name: lab-system-edu
+  datasource:
+    url: ${LAB_DB_URL:jdbc:mysql://localhost:3306/lab_sys?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai}
+    username: ${MYSQL_USERNAME:root}
+    password: ${MYSQL_PASSWORD:lab-system-local}
   main:
-    # 教学模块目前没有 RPC 契约或常驻任务，先作为非 Web 占位应用运行。
     web-application-type: none
+
+server:
+  port: ${EDU_SERVER_PORT:3334}
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+
+fun:
+  uid:
+    assigner-mode: db
+    generator-mode: none
+    datasource:
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      url: ${UID_DB_URL:jdbc:mysql://localhost:3306/fun_cloud_base?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai}
+      username: ${MYSQL_USERNAME:root}
+      password: ${MYSQL_PASSWORD:lab-system-local}
+
+dubbo:
+  application:
+    name: ${spring.application.name}
+    logger: slf4j
+    qos-enable: ${DUBBO_QOS_ENABLE:false}
+    qos-port: ${EDU_DUBBO_QOS_PORT:22225}
+  protocol:
+    name: tri
+    port: ${EDU_DUBBO_PORT:50054}
+  provider:
+    timeout: ${DUBBO_PROVIDER_TIMEOUT:30000}
+  registry:
+    address: nacos://${NACOS_HOST:localhost}:${NACOS_PORT:8848}
+    username: ${NACOS_USERNAME:}
+    password: ${NACOS_PASSWORD:}
+    group: ${NACOS_REGISTRY_GROUP:LAB_SYSTEM}
+    parameters:
+      namespace: ${NACOS_NAMESPACE:public}
+  config-center:
+    address: nacos://${NACOS_HOST:localhost}:${NACOS_PORT:8848}
+    username: ${NACOS_USERNAME:}
+    password: ${NACOS_PASSWORD:}
+    namespace: ${NACOS_NAMESPACE:public}
+    group: ${NACOS_CONFIG_GROUP:LAB_SYSTEM}
+
+lab:
+  edu:
+    import-max-bytes: ${EDU_IMPORT_MAX_BYTES:5242880}
+  redis:
+    enabled: true
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+    database: ${REDIS_DATABASE:0}
+    username: ${REDIS_USERNAME:}
+    password: ${REDIS_PASSWORD:}
+    key-prefix: lab
+  auth:
+    permify:
+      base-url: http://${PERMIFY_HOST:localhost}:${PERMIFY_HTTP_PORT:3476}
+      tenant-id: ${PERMIFY_TENANT_ID:t1}
+      schema-version: ${PERMIFY_SCHEMA_VERSION:}
+      depth: ${PERMIFY_DEPTH:20}
+      lookup-page-size: ${PERMIFY_LOOKUP_PAGE_SIZE:100}
+  observability:
+    tracing:
+      enabled: ${TRACING_ENABLED:true}
+      max-argument-length: ${TRACING_MAX_ARGUMENT_LENGTH:2048}
+      max-collection-size: ${TRACING_MAX_COLLECTION_SIZE:20}
+      max-depth: ${TRACING_MAX_DEPTH:3}

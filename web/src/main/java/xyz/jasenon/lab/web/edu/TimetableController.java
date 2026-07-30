@@ -88,6 +88,8 @@ public class TimetableController {
                 command.weekType(),
                 command.startWeek(),
                 command.endWeek(),
+                command.startSection(),
+                command.endSection(),
                 command.startTime(),
                 command.endTime(),
                 command.weekday()

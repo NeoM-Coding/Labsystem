@@ -36,9 +36,15 @@ class TimetableExcelImportTests {
 
         Object first = entries.get(0);
         assertEquals(1, (int) component(first, "weekday"));
+        assertEquals(1, (int) component(first, "startSection"));
+        assertEquals(2, (int) component(first, "endSection"));
         assertEquals(LocalTime.of(8, 0), component(first, "startTime"));
         assertEquals(LocalTime.of(9, 40), component(first, "endTime"));
         assertEquals("软件工程", component(first, "courseName"));
+
+        Object second = entries.get(1);
+        assertEquals(3, (int) component(second, "startSection"));
+        assertEquals(3, (int) component(second, "endSection"));
     }
 
     @SuppressWarnings("unchecked")

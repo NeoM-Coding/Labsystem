@@ -49,6 +49,18 @@ public class Timetable extends BaseEntity {
     private Integer endWeek;
 
     /**
+     * 课表展示的开始节次
+     */
+    @TableField("start_section")
+    private Integer startSection;
+
+    /**
+     * 课表展示的结束节次
+     */
+    @TableField("end_section")
+    private Integer endSection;
+
+    /**
      * 开始时间
      */
     private LocalTime startTime;

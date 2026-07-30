@@ -48,6 +48,7 @@ class EduControllerTests {
         TimetableView view = new TimetableView(
                 "path-id", "semester-1", null, "lab-1", "实验室一",
                 "软件工程", "张三", WeekType.Both, 1, 16,
+                1, 2,
                 LocalTime.of(8, 0), LocalTime.of(9, 40), 1
         );
         when(service.update(org.mockito.ArgumentMatchers.any())).thenReturn(RpcResult.success(view));
@@ -55,7 +56,8 @@ class EduControllerTests {
         ReflectionTestUtils.setField(controller, "timetableService", service);
         TimetableUpdate body = new TimetableUpdate(
                 "body-id", "semester-1", "lab-1", "软件工程", "张三",
-                WeekType.Both, 1, 16, LocalTime.of(8, 0), LocalTime.of(9, 40), 1
+                WeekType.Both, 1, 16, 1, 2,
+                LocalTime.of(8, 0), LocalTime.of(9, 40), 1
         );
         controller.update("path-id", body);
         verify(service).update(argThat(command -> command.timetableId().equals("path-id")));

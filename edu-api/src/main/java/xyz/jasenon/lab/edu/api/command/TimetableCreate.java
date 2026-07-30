@@ -14,6 +14,8 @@ public record TimetableCreate(
         WeekType weekType,
         Integer startWeek,
         Integer endWeek,
+        Integer startSection,
+        Integer endSection,
         LocalTime startTime,
         LocalTime endTime,
         Integer weekday

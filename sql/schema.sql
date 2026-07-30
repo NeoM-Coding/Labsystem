@@ -316,6 +316,8 @@ CREATE TABLE IF NOT EXISTS `timetable` (
     `week_type` VARCHAR(16) NOT NULL COMMENT 'Single, Double, Both',
     `start_week` INT NOT NULL COMMENT '起始周，包含',
     `end_week` INT NOT NULL COMMENT '结束周，包含',
+    `start_section` TINYINT NOT NULL COMMENT '课表展示开始节次',
+    `end_section` TINYINT NOT NULL COMMENT '课表展示结束节次',
     `start_time` TIME NOT NULL COMMENT '开始时间，包含',
     `end_time` TIME NOT NULL COMMENT '结束时间，不包含',
     `weekday` TINYINT NOT NULL COMMENT '星期，1为周一，7为周日',
@@ -327,6 +329,7 @@ CREATE TABLE IF NOT EXISTS `timetable` (
     KEY `idx_timetable_semester_teacher` (`semester_id`, `teacher_name`, `weekday`, `start_time`),
     CONSTRAINT `chk_timetable_week_type` CHECK (`week_type` IN ('Single', 'Double', 'Both')),
     CONSTRAINT `chk_timetable_weeks` CHECK (`start_week` >= 1 AND `end_week` >= `start_week`),
+    CONSTRAINT `chk_timetable_sections` CHECK (`start_section` BETWEEN 1 AND 11 AND `end_section` BETWEEN `start_section` AND 11),
     CONSTRAINT `chk_timetable_time` CHECK (`start_time` < `end_time`),
     CONSTRAINT `chk_timetable_weekday` CHECK (`weekday` BETWEEN 1 AND 7)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='课表表';

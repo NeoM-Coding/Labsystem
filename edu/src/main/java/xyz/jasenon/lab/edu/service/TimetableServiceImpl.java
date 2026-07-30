@@ -108,6 +108,7 @@ public class TimetableServiceImpl extends ServiceImpl<TimetableMapper, Timetable
                 .in(Timetable::getLaboratoryId, effective)
                 .orderByAsc(Timetable::getLaboratoryId)
                 .orderByAsc(Timetable::getWeekday)
+                .orderByAsc(Timetable::getStartSection)
                 .orderByAsc(Timetable::getStartTime)
                 .list()
                 .stream()
@@ -141,6 +142,7 @@ public class TimetableServiceImpl extends ServiceImpl<TimetableMapper, Timetable
         Timetable replacement = createEntity(
                 command.semesterId(), command.laboratoryId(), command.courseName(), command.teacherName(),
                 command.weekType(), command.startWeek(), command.endWeek(),
+                command.startSection(), command.endSection(),
                 command.startTime(), command.endTime(), command.weekday()
         );
         Semester semester = lockSemester(replacement.getSemesterId());
@@ -201,6 +203,7 @@ public class TimetableServiceImpl extends ServiceImpl<TimetableMapper, Timetable
                     TimetableCreate create = new TimetableCreate(
                             command.semesterId(), command.laboratoryId(), entry.courseName(), entry.teacherName(),
                             entry.weekType(), entry.startWeek(), entry.endWeek(),
+                            entry.startSection(), entry.endSection(),
                             entry.startTime(), entry.endTime(), entry.weekday()
                     );
                     createLocked(create, null);
@@ -232,6 +235,7 @@ public class TimetableServiceImpl extends ServiceImpl<TimetableMapper, Timetable
         Timetable timetable = createEntity(
                 command.semesterId(), command.laboratoryId(), command.courseName(), command.teacherName(),
                 command.weekType(), command.startWeek(), command.endWeek(),
+                command.startSection(), command.endSection(),
                 command.startTime(), command.endTime(), command.weekday()
         );
         Semester semester = lockSemester(timetable.getSemesterId());
@@ -251,6 +255,8 @@ public class TimetableServiceImpl extends ServiceImpl<TimetableMapper, Timetable
             WeekType weekType,
             Integer startWeek,
             Integer endWeek,
+            Integer startSection,
+            Integer endSection,
             LocalTime startTime,
             LocalTime endTime,
             Integer weekday
@@ -262,6 +268,10 @@ public class TimetableServiceImpl extends ServiceImpl<TimetableMapper, Timetable
         if (weekType == null) throw new BusinessException(400, "周次类型不能为空");
         if (startWeek == null || endWeek == null || startWeek < 1 || endWeek < startWeek) {
             throw new BusinessException(400, "周次范围不合法");
+        }
+        if (startSection == null || endSection == null
+                || startSection < 1 || endSection < startSection || endSection > SECTIONS.size()) {
+            throw new BusinessException(400, "节次范围必须在 1 到 " + SECTIONS.size() + " 之间");
         }
         if (startTime == null || endTime == null || !startTime.isBefore(endTime)) {
             throw new BusinessException(400, "上课开始时间必须早于结束时间");
@@ -277,6 +287,8 @@ public class TimetableServiceImpl extends ServiceImpl<TimetableMapper, Timetable
         timetable.setWeekType(weekType);
         timetable.setStartWeek(startWeek);
         timetable.setEndWeek(endWeek);
+        timetable.setStartSection(startSection);
+        timetable.setEndSection(endSection);
         timetable.setStartTime(startTime);
         timetable.setEndTime(endTime);
         timetable.setWeekday(weekday);
@@ -408,7 +420,8 @@ public class TimetableServiceImpl extends ServiceImpl<TimetableMapper, Timetable
         TimeRange range = parseTimeRange(week.group(4).trim());
         return new ParsedEntry(
                 rowIndex, columnIndex, raw, course, teacher, weekType,
-                startWeek, endWeek, range.start(), range.end(), columnIndex + 1
+                startWeek, endWeek, range.startSection(), range.endSection(),
+                range.start(), range.end(), columnIndex + 1
         );
     }
 
@@ -420,7 +433,12 @@ public class TimetableServiceImpl extends ServiceImpl<TimetableMapper, Timetable
             if (start < 1 || end < start || end > SECTIONS.size()) {
                 throw new BusinessException(400, "节次范围必须在 1 到 " + SECTIONS.size() + " 之间");
             }
-            return new TimeRange(SECTIONS.get(start - 1).start(), SECTIONS.get(end - 1).end());
+            return new TimeRange(
+                    SECTIONS.get(start - 1).start(),
+                    SECTIONS.get(end - 1).end(),
+                    start,
+                    end
+            );
         }
         Matcher time = TIME_PATTERN.matcher(detail);
         if (time.matches()) {
@@ -428,12 +446,30 @@ public class TimetableServiceImpl extends ServiceImpl<TimetableMapper, Timetable
                 LocalTime start = LocalTime.of(Integer.parseInt(time.group(1)), Integer.parseInt(time.group(2)));
                 LocalTime end = LocalTime.of(Integer.parseInt(time.group(3)), Integer.parseInt(time.group(4)));
                 if (!start.isBefore(end)) throw new BusinessException(400, "开始时间必须早于结束时间");
-                return new TimeRange(start, end);
+                SectionRange sections = sectionsForTime(start, end);
+                return new TimeRange(start, end, sections.start(), sections.end());
             } catch (java.time.DateTimeException exception) {
                 throw new BusinessException(400, "时间值不合法");
             }
         }
         throw new BusinessException(400, "时间详情应为 X-Y节 或 HH:mm-HH:mm");
+    }
+
+    private static SectionRange sectionsForTime(LocalTime startTime, LocalTime endTime) {
+        int startSection = SECTIONS.get(SECTIONS.size() - 1).section();
+        for (SectionInfo section : SECTIONS) {
+            if (section.end().isAfter(startTime)) {
+                startSection = section.section();
+                break;
+            }
+        }
+        int endSection = SECTIONS.get(0).section();
+        for (SectionInfo section : SECTIONS) {
+            if (section.start().isBefore(endTime)) {
+                endSection = section.section();
+            }
+        }
+        return new SectionRange(startSection, Math.max(startSection, endSection));
     }
 
     private void validateFile(String filename, byte[] content) {
@@ -469,6 +505,8 @@ public class TimetableServiceImpl extends ServiceImpl<TimetableMapper, Timetable
                 timetable.getWeekType(),
                 timetable.getStartWeek(),
                 timetable.getEndWeek(),
+                timetable.getStartSection(),
+                timetable.getEndSection(),
                 timetable.getStartTime(),
                 timetable.getEndTime(),
                 timetable.getWeekday()
@@ -525,7 +563,9 @@ public class TimetableServiceImpl extends ServiceImpl<TimetableMapper, Timetable
 
     private record SectionInfo(int section, LocalTime start, LocalTime end) {
     }
-    private record TimeRange(LocalTime start, LocalTime end) {
+    private record SectionRange(int start, int end) {
+    }
+    private record TimeRange(LocalTime start, LocalTime end, int startSection, int endSection) {
     }
     private record ParsedEntry(
             int rowIndex,
@@ -536,6 +576,8 @@ public class TimetableServiceImpl extends ServiceImpl<TimetableMapper, Timetable
             WeekType weekType,
             int startWeek,
             int endWeek,
+            int startSection,
+            int endSection,
             LocalTime startTime,
             LocalTime endTime,
             int weekday

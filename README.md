@@ -217,6 +217,32 @@ uid-springboot-starter 和 MyBatis-Plus `ASSIGN_ID` 自动生成，`runtime_id`
 mqtt/src/test/resources/db/uid-generator-schema.sql
 ```
 
+## 测试分层
+
+默认验证只执行不依赖外部服务的单元测试和进程内测试：
+
+```bash
+./mvnw clean verify
+```
+
+需要真实 MQTT Broker 等外部基础设施的测试采用 Maven Failsafe 的 `*IT`
+命名约定，默认不会执行。准备好对应外部服务后显式启用：
+
+```bash
+./mvnw clean verify -Pexternal-tests
+```
+
+Jenkins 的 `RUN_EXTERNAL_TESTS` 参数与该 Profile 对应，默认关闭。常规构建不会
+因为缺少真实 Broker 而失败，但普通单元测试仍然是强制执行的。
+
+Jenkins 任务支持通过 **Build with Parameters** 直接指定代码来源：
+
+- `GIT_BRANCH`：需要拉取并构建的远程分支，默认为 `main`。
+- `GITHUB_SHA`：可选的精确提交 SHA；填写后优先于 `GIT_BRANCH`。
+
+前后端流水线都不依赖 GitHub Release。Release workflow 仅保留为可选自动触发
+入口；直接在 Jenkins 指定分支即可完成拉取、验证和构建。
+
 ## 配置
 
 默认配置文件：
@@ -321,10 +347,11 @@ MQTT_REPLY_TOPIC_TEMPLATE=gateway/${gatewayId}/send
 运行 MQTT 真实链路集成测试：
 
 ```bash
-./mvnw -pl mqtt -am -Dtest=MqttClientSendIntegrationTests -Dsurefire.failIfNoSpecifiedTests=false test
+./mvnw -pl mqtt -am -Pexternal-tests -Dit.test=MqttClientSendIT \
+  -Dfailsafe.failIfNoSpecifiedTests=false verify
 ```
 
-注意：`MqttClientSendIntegrationTests` 依赖真实 MQTT Broker、真实 topic 配置以及可回复的 mock/设备。
+注意：`MqttClientSendIT` 依赖真实 MQTT Broker、真实 topic 配置以及可回复的 mock/设备。
 
 ## 启动服务
 

@@ -378,7 +378,8 @@ mqtt:
 - `MqttTaskTest`：验证命令模板到 payload 的转换。
 - `MqttClientMatchTests`：验证请求和响应序列匹配逻辑。
 - `DeviceProtocolContractTests`：验证 `MqttTask.convert -> mock response -> MessageHandler.decode` 的端到端协议契约。
-- `MqttClientSendIntegrationTests`：依赖真实 broker 和真实 client 的发送链路集成测试。
+- `MqttClientSendIT`：依赖真实 broker 和真实 client 的发送链路集成测试，仅在
+  Maven `external-tests` Profile 中由 Failsafe 执行。
 - `UidGeneratorDataSourceIsolationTests`：验证 uid-generator 主键生成和数据源隔离。
 
 `tools/mqtt-mock` 是 Node.js + TypeScript 设备 mock。它订阅类似：

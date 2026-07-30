@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
-class MqttClientSendIntegrationTests {
+class MqttClientSendIT {
 
     private static final String SERVER_URI = "tcp://localhost:1883";
     private static final String SEND_TOPIC = "test/accept/1";
@@ -49,7 +49,7 @@ class MqttClientSendIntegrationTests {
     private static final long SERIAL_USER_TIMEOUT_MILLIS = 1_000L;
     private static final long SERIAL_POLL_TIMEOUT_MILLIS = 1_000L;
     private static final long SERIAL_POLL_INTERVAL_MILLIS = 2000L;
-    private static final Logger log = LoggerFactory.getLogger(MqttClientSendIntegrationTests.class);
+    private static final Logger log = LoggerFactory.getLogger(MqttClientSendIT.class);
 
     private ProbeMqttClient client;
 

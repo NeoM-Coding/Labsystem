@@ -31,15 +31,10 @@ build/
 
 ### VS Code ###
 .vscode/
-.mvn
 
 ### docs
 docs/device_docs
 .DS_Store
-
-### maven
-mvnw
-mvnw.cmd
 
 ### env
 .env

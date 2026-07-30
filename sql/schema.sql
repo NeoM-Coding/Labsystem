@@ -80,6 +80,7 @@ CREATE TABLE IF NOT EXISTS `access_record` (
     `delete_at` DATETIME(3) NULL,
     PRIMARY KEY (`id`),
     KEY `idx_access_record_device_time` (`device_id`, `create_at`),
+    KEY `idx_access_record_latest` (`device_id`, `delete_at`, `create_at` DESC, `id` DESC),
     KEY `idx_access_record_address_time` (`address`, `create_at`),
     KEY `idx_access_record_delete` (`delete_at`),
     CONSTRAINT `chk_access_record_bool`
@@ -104,6 +105,7 @@ CREATE TABLE IF NOT EXISTS `air_condition_record` (
     `delete_at` DATETIME(3) NULL,
     PRIMARY KEY (`id`),
     KEY `idx_air_condition_record_device_time` (`device_id`, `create_at`),
+    KEY `idx_air_condition_record_latest` (`device_id`, `delete_at`, `create_at` DESC, `id` DESC),
     KEY `idx_air_condition_record_addr_time` (`address`, `self_id`, `create_at`),
     KEY `idx_air_condition_record_delete` (`delete_at`),
     CONSTRAINT `chk_air_condition_record_bool`
@@ -134,6 +136,7 @@ CREATE TABLE IF NOT EXISTS `circuit_break_record` (
     `delete_at` DATETIME(3) NULL,
     PRIMARY KEY (`id`),
     KEY `idx_circuit_break_record_device_time` (`device_id`, `create_at`),
+    KEY `idx_circuit_break_record_latest` (`device_id`, `delete_at`, `create_at` DESC, `id` DESC),
     KEY `idx_circuit_break_record_addr_time` (`address`, `create_at`),
     KEY `idx_circuit_break_record_delete` (`delete_at`),
     CONSTRAINT `chk_circuit_break_record_bool`
@@ -161,6 +164,7 @@ CREATE TABLE IF NOT EXISTS `light_record` (
     `delete_at` DATETIME(3) NULL,
     PRIMARY KEY (`id`),
     KEY `idx_light_record_device_time` (`device_id`, `create_at`),
+    KEY `idx_light_record_latest` (`device_id`, `delete_at`, `create_at` DESC, `id` DESC),
     KEY `idx_light_record_addr_time` (`address`, `self_id`, `create_at`),
     KEY `idx_light_record_delete` (`delete_at`),
     CONSTRAINT `chk_light_record_bool`
@@ -183,6 +187,7 @@ CREATE TABLE IF NOT EXISTS `sensor_record` (
     `delete_at` DATETIME(3) NULL,
     PRIMARY KEY (`id`),
     KEY `idx_sensor_record_device_time` (`device_id`, `create_at`),
+    KEY `idx_sensor_record_latest` (`device_id`, `delete_at`, `create_at` DESC, `id` DESC),
     KEY `idx_sensor_record_addr_time` (`address`, `self_id`, `create_at`),
     KEY `idx_sensor_record_delete` (`delete_at`),
     CONSTRAINT `chk_sensor_record_value`

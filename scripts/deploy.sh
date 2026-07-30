@@ -11,6 +11,7 @@ APP_SERVICES=(base-service mqtt-service rule-engine-service edu-service web-serv
 APP_MODULES="base,mqtt,rule-engine,edu,web"
 DATABASE_MIGRATIONS=(
     "$ROOT_DIR/sql/migrations/20260729_add_timetable_sections.sql"
+    "$ROOT_DIR/sql/migrations/20260730_add_latest_telemetry_indexes.sql"
 )
 
 log() {

@@ -298,6 +298,31 @@ services:
       nacos:
         condition: service_healthy
 
+  edu-service:
+    <<: *java-service
+    environment:
+      <<: *java-environment
+      APP_JAR: /app/artifacts/edu-0.0.1.jar
+      # Edu is a non-web Dubbo provider, so its Dubbo port is the process health port.
+      APP_HEALTH_PORT: ${EDU_DUBBO_PORT:-50054}
+      EDU_SERVER_PORT: ${EDU_SERVER_PORT:-3335}
+      EDU_DUBBO_PORT: ${EDU_DUBBO_PORT:-50054}
+      EDU_DUBBO_QOS_PORT: ${EDU_DUBBO_QOS_PORT:-22225}
+      EDU_IMPORT_MAX_BYTES: ${EDU_IMPORT_MAX_BYTES:-5242880}
+    volumes:
+      - ./infra/java/hot-reload.sh:/opt/lab/hot-reload.sh:ro
+      - ./edu/target:/app/artifacts:ro
+      - ${LOG_PATH:-./logs}:/app/logs
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      permify:
+        condition: service_started
+      nacos:
+        condition: service_healthy
+
   web-service:
     <<: *java-service
     environment:

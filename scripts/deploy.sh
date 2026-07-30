@@ -7,8 +7,11 @@ ENV_EXAMPLE="$ROOT_DIR/.env.example"
 COMPOSE_FILE="$ROOT_DIR/compose.yml"
 COMMAND="${1:-deploy}"
 INFRA_SERVICES=(mysql redis emqx permify-postgres permify nacos loki alloy grafana)
-APP_SERVICES=(base-service mqtt-service rule-engine-service web-service)
-APP_MODULES="base,mqtt,rule-engine,web"
+APP_SERVICES=(base-service mqtt-service rule-engine-service edu-service web-service)
+APP_MODULES="base,mqtt,rule-engine,edu,web"
+DATABASE_MIGRATIONS=(
+    "$ROOT_DIR/sql/migrations/20260729_add_timetable_sections.sql"
+)
 
 log() {
     printf '[deploy] %s\n' "$*"
@@ -96,6 +99,7 @@ validate_application_jars() {
         "$ROOT_DIR/base/target/base-0.0.1.jar" \
         "$ROOT_DIR/mqtt/target/mqtt-0.0.1.jar" \
         "$ROOT_DIR/rule-engine/target/rule-engine-0.0.1.jar" \
+        "$ROOT_DIR/edu/target/edu-0.0.1.jar" \
         "$ROOT_DIR/web/target/web-0.0.1.jar"; do
         [[ -f "$artifact" ]] || die "application JAR was not built: $artifact"
     done
@@ -211,6 +215,16 @@ CREATE DATABASE IF NOT EXISTS \`${MYSQL_DATABASE}\`
     CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
 SQL
     mysql_query < "$ROOT_DIR/sql/schema.sql"
+    apply_database_migrations
+}
+
+apply_database_migrations() {
+    local migration
+    for migration in "${DATABASE_MIGRATIONS[@]}"; do
+        [[ -f "$migration" ]] || die "database migration not found: $migration"
+        log "applying repeatable MySQL migration: ${migration#"$ROOT_DIR/"}"
+        mysql_query < "$migration"
+    done
 }
 
 bootstrap_super_admin_user() {

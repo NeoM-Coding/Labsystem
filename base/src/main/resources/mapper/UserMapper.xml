@@ -12,4 +12,20 @@
     <select id="getUserByUsername" resultType="xyz.jasenon.lab.base.api.model.User">
         select * from user where username = #{username};
     </select>
+
+    <select id="listUsers" resultType="xyz.jasenon.lab.base.api.model.User">
+        SELECT *
+        FROM `user`
+        WHERE delete_at IS NULL
+          AND username IS NOT NULL
+          AND username &lt;&gt; ''
+        <if test="keyword != null and keyword != ''">
+            AND (
+                name LIKE CONCAT('%', #{keyword}, '%')
+                OR username LIKE CONCAT('%', #{keyword}, '%')
+                OR email LIKE CONCAT('%', #{keyword}, '%')
+            )
+        </if>
+        ORDER BY create_at DESC
+    </select>
 </mapper>

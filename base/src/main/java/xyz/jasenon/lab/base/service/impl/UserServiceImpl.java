@@ -19,6 +19,7 @@ import xyz.jasenon.lab.audit.api.annotation.Audited;
 import xyz.jasenon.lab.base.api.dto.ContactUserCreate;
 import xyz.jasenon.lab.base.api.dto.UserCreate;
 import xyz.jasenon.lab.base.api.dto.UserAuthorizationUpdate;
+import xyz.jasenon.lab.base.api.dto.UserListQuery;
 import xyz.jasenon.lab.base.mapper.UserMapper;
 import xyz.jasenon.lab.base.mapper.LaboratoryMapper;
 import xyz.jasenon.lab.base.context.UserContextFactory;
@@ -30,6 +31,7 @@ import xyz.jasenon.lab.base.api.model.User;
 import xyz.jasenon.lab.observability.annotation.Traced;
 
 import java.util.Set;
+import java.util.List;
 
 @DubboService
 @Traced("user-service")
@@ -88,6 +90,19 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             throw new BusinessException(NOT_FOUND, "用户不存在");
         }
         return RpcResult.success(user.mask());
+    }
+
+    @Override
+    @ActionAuthorized
+    @Traced("user-service.list")
+    public RpcResult<List<User>> list(UserListQuery query) {
+        String keyword = query == null || query.keyword() == null
+                ? ""
+                : query.keyword().trim();
+        return RpcResult.success(baseMapper.listUsers(keyword)
+                .stream()
+                .map(User::mask)
+                .toList());
     }
 
     @Override

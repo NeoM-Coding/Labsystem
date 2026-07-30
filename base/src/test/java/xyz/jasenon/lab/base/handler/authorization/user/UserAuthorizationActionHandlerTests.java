@@ -7,6 +7,7 @@ import xyz.jasenon.lab.auth.permission.RelationShip;
 import xyz.jasenon.lab.base.api.dto.ContactUserCreate;
 import xyz.jasenon.lab.base.api.dto.UserAuthorizationUpdate;
 import xyz.jasenon.lab.base.api.dto.UserCreate;
+import xyz.jasenon.lab.base.api.dto.UserListQuery;
 import xyz.jasenon.lab.base.api.model.User;
 
 import java.util.Set;
@@ -45,6 +46,15 @@ class UserAuthorizationActionHandlerTests {
         var command = new UserUpdateActionHandler().handle(dto, context);
 
         assertEquals(Action.App.edit_user, command.action());
+        assertEquals("operator", command.subjectId());
+    }
+
+    @Test
+    void listDtoRequiresGlobalListUserAction() {
+        var command = new UserListActionHandler().handle(new UserListQuery("张三"), context);
+
+        assertEquals(Action.App.list_user, command.action());
+        assertEquals("global", command.entityId());
         assertEquals("operator", command.subjectId());
     }
 }

@@ -54,6 +54,8 @@ mqtt:
   connect:
     url: tcp://${MQTT_HOST:localhost}:${MQTT_PORT:1883}
     qos: at_least_once
+    username: ${MQTT_USERNAME:""}
+    password: ${MQTT_PASSWORD:""}
   poll:
     interval-millis: ${MQTT_POLL_INTERVAL_MILLIS:10000}
     timeout-millis: ${MQTT_POLL_TIMEOUT_MILLIS:15000}

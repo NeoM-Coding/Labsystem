@@ -250,9 +250,9 @@ CREATE TABLE IF NOT EXISTS `rule_runtime_revision` (
 
 CREATE TABLE IF NOT EXISTS `user` (
     `id` VARCHAR(64) NOT NULL COMMENT '用户ID',
-    `name` VARCHAR(128) NOT NULL COMMENT '用户昵称，系统内唯一',
-    `username` VARCHAR(128) NOT NULL COMMENT '用户名/登录名',
-    `password` VARCHAR(255) NOT NULL COMMENT '密码摘要',
+    `name` VARCHAR(128) NOT NULL COMMENT '用户或联系人姓名，系统内唯一',
+    `username` VARCHAR(128) NULL COMMENT '系统用户登录名，联系人为空',
+    `password` VARCHAR(255) NULL COMMENT '系统用户密码摘要，联系人为空',
     `phone` VARCHAR(255) NULL COMMENT '手机号 AES Base64 密文',
     `email` VARCHAR(255) NULL COMMENT '邮箱',
     `mark` VARCHAR(512) NULL COMMENT '备注',
@@ -269,14 +269,19 @@ CREATE TABLE IF NOT EXISTS `user` (
     CONSTRAINT `chk_user_name_not_blank`
         CHECK (CHAR_LENGTH(TRIM(`name`)) > 0),
     CONSTRAINT `chk_user_username_not_blank`
-        CHECK (CHAR_LENGTH(TRIM(`username`)) > 0),
+        CHECK (`username` IS NULL OR CHAR_LENGTH(TRIM(`username`)) > 0),
     CONSTRAINT `chk_user_password_not_blank`
-        CHECK (CHAR_LENGTH(TRIM(`password`)) > 0),
+        CHECK (`password` IS NULL OR CHAR_LENGTH(TRIM(`password`)) > 0),
+    CONSTRAINT `chk_user_credentials_complete`
+        CHECK (
+            (`username` IS NULL AND `password` IS NULL)
+            OR (`username` IS NOT NULL AND `password` IS NOT NULL)
+        ),
     CONSTRAINT `chk_user_phone_not_blank`
         CHECK (`phone` IS NULL OR CHAR_LENGTH(TRIM(`phone`)) > 0),
     CONSTRAINT `chk_user_email_not_blank`
         CHECK (`email` IS NULL OR CHAR_LENGTH(TRIM(`email`)) > 0)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='用户表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='系统用户与联系人表';
 
 CREATE TABLE IF NOT EXISTS `laboratory` (
     `id` VARCHAR(64) NOT NULL COMMENT '实验室ID',

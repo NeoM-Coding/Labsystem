@@ -26,7 +26,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/users")
 @Traced
-@Tag(name = "用户管理", description = "管理能够登录系统的用户及其应用和实验室权限")
+@Tag(name = "用户管理", description = "管理系统用户、联系人及其应用和实验室权限")
 public class UserController {
 
     @DubboReference(check = false)
@@ -34,8 +34,8 @@ public class UserController {
 
     @GetMapping
     @Operation(
-            summary = "查询系统用户",
-            description = "查询未删除且可登录的系统用户，可按姓名、用户名或邮箱模糊搜索。"
+            summary = "查询用户与联系人",
+            description = "查询未删除的系统用户和联系人，可按姓名、用户名或邮箱模糊搜索。"
                     + "需要 app:global 的 list_user 权限，该权限由 user_manager、user_viewer 或 super_admin 授予。"
                     + "响应不会包含密码。"
     )

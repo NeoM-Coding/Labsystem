@@ -247,7 +247,6 @@ flowchart LR
 
 状态事件可合并，但合并时必须保留候选 ActionGroup ID 的并集；TimePoint 仍按 `occurrenceId` 去重并进入 FIFO，不能被状态合并吞掉。
 
-已存在旧表的数据库需要执行
-`sql/migrations/20260705_add_rule_runtime_enabled.sql` 和
-`sql/migrations/20260706_separate_runtime_primary_key.sql`；全新数据库直接使用
-`sql/schema.sql`。
+Runtime 历史结构迁移已合并进 `sql/schema.sql`。部署入口统一使用
+`scripts/deploy.sh`：主结构创建完成后，仅继续执行脚本中
+`DATABASE_MIGRATIONS` 白名单列出的、仍需兼容已有数据卷的可重复迁移。

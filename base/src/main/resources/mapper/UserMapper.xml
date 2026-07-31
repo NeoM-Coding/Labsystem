@@ -3,22 +3,35 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="xyz.jasenon.lab.base.mapper.UserMapper">
-    <!-- 在此处添加SQL映射语句 -->
+    <resultMap id="userResultMap" type="xyz.jasenon.lab.base.api.model.User">
+        <id property="id" column="id"/>
+        <result property="name" column="name"/>
+        <result property="username" column="username"/>
+        <result property="password"
+                column="password"
+                typeHandler="xyz.jasenon.lab.base.api.persistence.BCryptoHandler"/>
+        <result property="phone"
+                column="phone"
+                typeHandler="xyz.jasenon.lab.base.api.persistence.AESCryptoHandler"/>
+        <result property="email" column="email"/>
+        <result property="mark" column="mark"/>
+        <result property="createAt" column="create_at"/>
+        <result property="updateAt" column="update_at"/>
+        <result property="deleteAt" column="delete_at"/>
+    </resultMap>
 
     <select id="isNameExsist" resultType="boolean">
         select count(name) from user where name = #{name};
     </select>
 
-    <select id="getUserByUsername" resultType="xyz.jasenon.lab.base.api.model.User">
+    <select id="getUserByUsername" resultMap="userResultMap">
         select * from user where username = #{username};
     </select>
 
-    <select id="listUsers" resultType="xyz.jasenon.lab.base.api.model.User">
+    <select id="listUsers" resultMap="userResultMap">
         SELECT *
         FROM `user`
         WHERE delete_at IS NULL
-          AND username IS NOT NULL
-          AND username &lt;&gt; ''
         <if test="keyword != null and keyword != ''">
             AND (
                 name LIKE CONCAT('%', #{keyword}, '%')

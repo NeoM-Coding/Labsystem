@@ -7,6 +7,8 @@ import java.io.StringReader;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class SeqRuleLoaderTests {
@@ -42,6 +44,24 @@ class SeqRuleLoaderTests {
                 "address=01|function_code=0A02",
                 SeqGeneratorManager.get(SeqType.AccessResp).generate(new byte[]{1, 10, 2, (byte) 255, 13})
         );
+    }
+
+    @Test
+    void loadsDefaultRulesWhenContextClassLoaderCannotSeeThem() {
+        Thread thread = Thread.currentThread();
+        ClassLoader originalClassLoader = thread.getContextClassLoader();
+        thread.setContextClassLoader(new ClassLoader(null) {
+        });
+        try {
+            SeqGeneratorManager.clear();
+
+            List<SeqRule> rules = SeqRuleLoader.loadDefault();
+
+            assertFalse(rules.isEmpty());
+            assertNotNull(SeqGeneratorManager.get(SeqType.AccessReq));
+        } finally {
+            thread.setContextClassLoader(originalClassLoader);
+        }
     }
 
     @Test

@@ -8,7 +8,7 @@ COMPOSE_FILE="$ROOT_DIR/compose.yml"
 COMMAND="${1:-deploy}"
 INFRA_SERVICES=(mysql redis emqx permify-postgres permify nacos loki alloy grafana)
 APP_SERVICES=(base-service mqtt-service rule-engine-service edu-service web-service)
-APP_MODULES="base,mqtt,rule-engine,edu,web"
+APP_MODULES="domains/base/service,domains/mqtt/service,domains/rule/engine,domains/edu/service,web"
 DATABASE_MIGRATIONS=(
     "$ROOT_DIR/sql/migrations/20260729_add_timetable_sections.sql"
     "$ROOT_DIR/sql/migrations/20260730_add_latest_telemetry_indexes.sql"
@@ -98,10 +98,10 @@ build_applications() {
 validate_application_jars() {
     local artifact
     for artifact in \
-        "$ROOT_DIR/base/target/base-0.0.1.jar" \
-        "$ROOT_DIR/mqtt/target/mqtt-0.0.1.jar" \
-        "$ROOT_DIR/rule-engine/target/rule-engine-0.0.1.jar" \
-        "$ROOT_DIR/edu/target/edu-0.0.1.jar" \
+        "$ROOT_DIR/domains/base/service/target/base-0.0.1.jar" \
+        "$ROOT_DIR/domains/mqtt/service/target/mqtt-0.0.1.jar" \
+        "$ROOT_DIR/domains/rule/engine/target/rule-engine-0.0.1.jar" \
+        "$ROOT_DIR/domains/edu/service/target/edu-0.0.1.jar" \
         "$ROOT_DIR/web/target/web-0.0.1.jar"; do
         [[ -f "$artifact" ]] || die "application JAR was not built: $artifact"
     done

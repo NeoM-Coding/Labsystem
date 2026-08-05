@@ -45,25 +45,25 @@
         </profile>
     </profiles>
     <modules>
-        <module>uid-springboot-starter</module>
-        <module>common</module>
-        <module>persistence-core</module>
-        <module>device-domain</module>
-        <module>mqtt-api</module>
-        <module>rule-api</module>
-        <module>auth-api</module>
-        <module>observability</module>
-        <module>audit-api</module>
-        <module>audit</module>
-        <module>base-api</module>
-        <module>edu-api</module>
-        <module>redis</module>
-        <module>mqtt</module>
-        <module>auth</module>
+        <module>shared/uid-springboot-starter</module>
+        <module>shared/common</module>
+        <module>shared/persistence-core</module>
+        <module>shared/observability</module>
+        <module>shared/redis</module>
+        <module>domains/device/domain</module>
+        <module>domains/mqtt/api</module>
+        <module>domains/rule/api</module>
+        <module>domains/auth/api</module>
+        <module>domains/audit/api</module>
+        <module>domains/audit/service</module>
+        <module>domains/base/api</module>
+        <module>domains/edu/api</module>
+        <module>domains/mqtt/service</module>
+        <module>domains/auth/service</module>
         <module>web</module>
-        <module>base</module>
-        <module>edu</module>
-        <module>rule-engine</module>
+        <module>domains/base/service</module>
+        <module>domains/edu/service</module>
+        <module>domains/rule/engine</module>
     </modules>
     <packaging>pom</packaging>
 

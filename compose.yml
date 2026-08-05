@@ -80,7 +80,7 @@ services:
       - "${MYSQL_PORT:-3306}:3306"
     volumes:
       - mysql-data:/var/lib/mysql
-      - ./infra/mysql/init/00-databases.sh:/docker-entrypoint-initdb.d/00-databases.sh:ro
+      - ./tools/infra/mysql/init/00-databases.sh:/docker-entrypoint-initdb.d/00-databases.sh:ro
       - ./sql/schema.sql:/docker-entrypoint-initdb.d/10-lab-schema.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
@@ -196,7 +196,7 @@ services:
     ports:
       - "${LOKI_PORT:-3100}:3100"
     volumes:
-      - ./observability/docker/loki.yml:/etc/loki/config.yml:ro
+      - ./shared/observability/docker/loki.yml:/etc/loki/config.yml:ro
       - loki-data:/loki
 
   alloy:
@@ -206,7 +206,7 @@ services:
     ports:
       - "${ALLOY_PORT:-12345}:12345"
     volumes:
-      - ./observability/docker/config.alloy:/etc/alloy/config.alloy:ro
+      - ./shared/observability/docker/config.alloy:/etc/alloy/config.alloy:ro
       - ${LOG_PATH:-./logs}:/var/log/lab-system:ro
       - alloy-data:/var/lib/alloy/data
     depends_on:
@@ -223,7 +223,7 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
       GF_USERS_ALLOW_SIGN_UP: "false"
     volumes:
-      - ./observability/docker/grafana-datasources.yml:/etc/grafana/provisioning/datasources/loki.yml:ro
+      - ./shared/observability/docker/grafana-datasources.yml:/etc/grafana/provisioning/datasources/loki.yml:ro
       - grafana-data:/var/lib/grafana
     depends_on:
       loki:
@@ -239,8 +239,8 @@ services:
       BASE_DUBBO_PORT: ${BASE_DUBBO_PORT:-50051}
       BASE_DUBBO_QOS_PORT: ${BASE_DUBBO_QOS_PORT:-22221}
     volumes:
-      - ./infra/java/hot-reload.sh:/opt/lab/hot-reload.sh:ro
-      - ./base/target:/app/artifacts:ro
+      - ./tools/infra/java/hot-reload.sh:/opt/lab/hot-reload.sh:ro
+      - ./domains/base/service/target:/app/artifacts:ro
       - ${LOG_PATH:-./logs}:/app/logs
     depends_on:
       mysql:
@@ -262,8 +262,8 @@ services:
       MQTT_DUBBO_PORT: ${MQTT_DUBBO_PORT:-50052}
       MQTT_DUBBO_QOS_PORT: ${MQTT_DUBBO_QOS_PORT:-22222}
     volumes:
-      - ./infra/java/hot-reload.sh:/opt/lab/hot-reload.sh:ro
-      - ./mqtt/target:/app/artifacts:ro
+      - ./tools/infra/java/hot-reload.sh:/opt/lab/hot-reload.sh:ro
+      - ./domains/mqtt/service/target:/app/artifacts:ro
       - ${LOG_PATH:-./logs}:/app/logs
     depends_on:
       mysql:
@@ -287,8 +287,8 @@ services:
       RULE_ENGINE_PERSISTENCE_ENABLED: ${RULE_ENGINE_PERSISTENCE_ENABLED:-true}
       RULE_ENGINE_SIMPLE_TEST_ENABLED: ${RULE_ENGINE_SIMPLE_TEST_ENABLED:-false}
     volumes:
-      - ./infra/java/hot-reload.sh:/opt/lab/hot-reload.sh:ro
-      - ./rule-engine/target:/app/artifacts:ro
+      - ./tools/infra/java/hot-reload.sh:/opt/lab/hot-reload.sh:ro
+      - ./domains/rule/engine/target:/app/artifacts:ro
       - ${LOG_PATH:-./logs}:/app/logs
     depends_on:
       mysql:
@@ -312,8 +312,8 @@ services:
       EDU_DUBBO_QOS_PORT: ${EDU_DUBBO_QOS_PORT:-22225}
       EDU_IMPORT_MAX_BYTES: ${EDU_IMPORT_MAX_BYTES:-5242880}
     volumes:
-      - ./infra/java/hot-reload.sh:/opt/lab/hot-reload.sh:ro
-      - ./edu/target:/app/artifacts:ro
+      - ./tools/infra/java/hot-reload.sh:/opt/lab/hot-reload.sh:ro
+      - ./domains/edu/service/target:/app/artifacts:ro
       - ${LOG_PATH:-./logs}:/app/logs
     depends_on:
       mysql:
@@ -336,7 +336,7 @@ services:
     ports:
       - "${WEB_SERVER_PORT:-8989}:${WEB_SERVER_PORT:-8989}"
     volumes:
-      - ./infra/java/hot-reload.sh:/opt/lab/hot-reload.sh:ro
+      - ./tools/infra/java/hot-reload.sh:/opt/lab/hot-reload.sh:ro
       - ./web/target:/app/artifacts:ro
       - ${LOG_PATH:-./logs}:/app/logs
     depends_on:

@@ -6,14 +6,21 @@
 
 ```text
 lab-system-cloud
-├── uid-springboot-starter  # 本地 uid-generator starter，支持独立数据源分配 workerId
-├── common                  # 轻量通用类型、异常、队列和工具
-├── mqtt-api                # MQTT Dubbo 契约、DTO 和二进制命令协议
-├── mqtt                    # MQTT 网关客户端、轮询调度、任务队列、设备/网关 Mapper
-├── redis                   # Jedis 自动配置、RedisBus、Pub/Sub 和 hash 能力
-├── rule-engine             # 事件驱动规则引擎，基于设备字段事件增量推演 runtime/action group
-├── web                     # Web 服务入口
-├── edu                     # 教学业务服务占位模块
+├── domains                 # 业务域模块，按 api/service/engine/domain 二级收敛
+│   ├── audit               # audit/api + audit/service
+│   ├── auth                # auth/api + auth/service
+│   ├── base                # base/api + base/service
+│   ├── device              # device/domain
+│   ├── edu                 # edu/api + edu/service
+│   ├── mqtt                # mqtt/api + mqtt/service
+│   └── rule                # rule/api + rule/engine
+├── shared                  # 跨域共享模块
+│   ├── common              # 轻量通用类型、异常、队列和工具
+│   ├── observability       # 链路追踪、日志平台配置
+│   ├── persistence-core    # MyBatis-Plus、UID 接入等持久化基础设施
+│   ├── redis               # Jedis 自动配置、RedisBus、Pub/Sub 和 hash 能力
+│   └── uid-springboot-starter
+├── web                     # Web 服务入口，保留顶层便于定位
 ├── tools/mqtt-mock         # Node.js + TypeScript MQTT 下位机 mock
 ├── sql                     # MySQL schema
 └── docs                    # 架构、MQTT、规则引擎和设备请求/响应协议文档
@@ -46,7 +53,7 @@ lab-system-cloud
 
 首次启动建议使用一键部署脚本。脚本会创建 `.env`、启动 Compose、导入数据库
 schema、上传 Permify DSL、初始化默认 super admin 用户与关系，并构建启动
-`base`、`mqtt`、`rule-engine`、`web` 四个 Java 微服务：
+`base`、`mqtt`、`rule-engine`、`edu`、`web` 五个 Java 微服务：
 
 ```bash
 cp .env.example .env
@@ -81,8 +88,8 @@ MySQL 用户和 Permify schema/relation bootstrap。
 项目不使用 OpenFeign。MQTT 分布式接口契约和命令协议统一放在 `mqtt-api` 模块，例如：
 
 ```text
-mqtt-api/src/main/java/xyz/jasenon/lab/api/mqtt/MqttIo.java
-mqtt-api/src/main/java/xyz/jasenon/lab/api/mqtt/dto/MqttTaskDto.java
+domains/mqtt/api/src/main/java/xyz/jasenon/lab/api/mqtt/MqttIo.java
+domains/mqtt/api/src/main/java/xyz/jasenon/lab/api/mqtt/dto/MqttTaskDto.java
 ```
 
 服务实现模块依赖 `mqtt-api`，由 Dubbo 负责服务暴露、发现和治理。
@@ -108,25 +115,51 @@ fun:
 业务数据源仍使用 `spring.datasource`。这两个数据源需要保持隔离，相关测试位于：
 
 ```text
-mqtt/src/test/java/xyz/jasenon/lab/mqtt/db/UidGeneratorDataSourceIsolationTests.java
+domains/mqtt/service/src/test/java/xyz/jasenon/lab/mqtt/db/UidGeneratorDataSourceIsolationTests.java
 ```
 
 ### MQTT 通信
 
-MQTT 模块围绕 `AbstractSysClient`、`MqttClient`、`MqttCallback`、`SysClientMananger` 和 `SysPollingManager` 构建。
+`mqtt` 是设备接入与实时数据中心：上层通过 `mqtt-api` 下发控制，模块负责网关连接、协议编解码、串行调度、自动轮询、响应匹配以及设备状态分发。
 
-当前设计要点：
+```mermaid
+flowchart LR
+    Web["Web / Rule Engine"] --> API["mqtt-api<br/>MqttIo / MqttRuleIo"]
+    API --> Manager["SysClientManager"]
+    PollManager["SysPollingManager"] --> PollQueue["ActiveQueue + DelayQueue"]
+    Manager --> UserQueue["User Queue"]
+    UserQueue --> Worker["单网关 Worker"]
+    PollQueue --> Worker
+    Worker --> Broker["MQTT Broker"]
+    Broker --> Device["RS485 网关 / 设备"]
+    Device --> Callback["MqttCallback"]
+    Callback --> Seq["Seq 匹配"]
+    Seq --> Future["完成 Future"]
+    Callback --> Handler["MessageHandler"]
+    Handler --> Redis["Redis 快照 / PubSub"]
+    Handler --> MySQL["MySQL 历史记录"]
+    Redis --> Realtime["规则引擎 / WebSocket"]
+```
 
-- 一个 RS485 网关对应一个 MQTT client。
-- 每个 client 内部串行处理请求，保证同一网关链路不会并发发送。
-- `userQueue` 处理用户主动请求。
-- `pollQueue` 处理后台轮询请求。
-- `userQueue` 优先级高于 `pollQueue`。
-- `pollQueue` 使用 `ActiveQueue<Poll<MqttTask>>`，防止同一设备重复轮询，并保留 poll 任务 active 状态。
-- `PendingRequest` 代表当前正在等待响应的请求。
-- `MqttCallback.messageArrived` 收到响应后交给 client 匹配当前请求并完成 future。
+已实现：
 
-更完整的说明见 [docs/mqtt部分设计.md](docs/mqtt部分设计.md)。
+- 每个 RS485 网关维护一个 Paho Client；CRUD 提交后即时同步运行态，watchdog 负责断线和状态漂移修复。
+- 提供同步、异步及最多 20 台设备的批量控制；用户请求优先于后台轮询，同一网关严格串行发送。
+- `CommandLine + MqttTask` 完成二进制报文构建及 CRC/累加和校验，Seq 规则按地址、功能码和自编号关联请求与响应。
+- `ActiveQueue<Poll>` 配合 `DelayQueue` 实现轮询到期调度、执行期去重、动态启停和完成后回填。
+- 支持门禁、空调、断路器、灯光和传感器解码，状态写入 Redis、MySQL，并发布给规则引擎和 WebSocket。
+- 遥测查询优先读取 Redis，缺失时回退 MySQL；设备控制和查询均受实验室数据范围约束。
+
+设计参考：
+
+| 能力 | 思想来源 | 项目实现 |
+|---|---|---|
+| 同步发送与 Seq | [T-io `Tio.synSend()`](https://github.com/tywo45/t-io) 的请求—响应关联 | Paho `publish` + `PendingRequest` + `CompletableFuture` + 自研 Seq DSL |
+| 活跃轮询去重 | InnoDB [`INNODB_TRX.TRX_ID`](https://dev.mysql.com/doc/refman/8.4/en/information-schema-innodb-trx-table.html) 的活跃对象视角 | `activeIndex` 跟踪完整生命周期，`queuedIndex` 跟踪物理排队状态 |
+| 到期轮询 | JDK `Delayed` / `DelayQueue` | `Poll.nextTime` 排序，执行完成后刷新并回填 |
+| 运行态一致性 | Transaction after-commit 与 reconciliation loop | 事务提交后即时更新 Client/Poll，watchdog 最终兜底 |
+
+代码入口：[发送与 Client 生命周期](domains/mqtt/service/src/main/java/xyz/jasenon/lab/mqtt/client/SysClientManager.java)、[单网关调度](domains/mqtt/service/src/main/java/xyz/jasenon/lab/mqtt/client/AbstractSysClient.java)、[Seq 匹配](domains/mqtt/api/src/main/java/xyz/jasenon/lab/mqtt/protocol/command/seq/RuleBasedSeqGenerator.java)、[ActiveQueue](shared/common/src/main/java/xyz/jasenon/lab/common/ActiveQueue.java)、[轮询管理](domains/mqtt/service/src/main/java/xyz/jasenon/lab/mqtt/client/SysPollingManager.java)、[状态处理](domains/mqtt/service/src/main/java/xyz/jasenon/lab/mqtt/client/message_handler/MessageHandler.java)。完整说明见 [MQTT 设计文档](docs/mqtt部分设计.md)。
 
 ### 规则引擎
 
@@ -180,16 +213,16 @@ MQTT 模块围绕 `AbstractSysClient`、`MqttClient`、`MqttCallback`、`SysClie
 命令模型和校验能力主要在：
 
 ```text
-common/src/main/java/xyz/jasenon/lab/common/command/
-common/src/main/java/xyz/jasenon/lab/common/command/checker/
+domains/mqtt/api/src/main/java/xyz/jasenon/lab/mqtt/protocol/command/
+domains/mqtt/api/src/main/java/xyz/jasenon/lab/mqtt/protocol/command/checker/
 ```
 
 序列匹配规则文件：
 
 ```text
-common/src/main/resources/seq-rules.seq
-mqtt/src/main/resources/seq-rules.seq
-mqtt/src/test/resources/seq-rules.seq
+domains/mqtt/api/src/main/resources/seq-rules.seq
+domains/mqtt/service/src/main/resources/seq-rules.seq
+domains/mqtt/service/src/test/resources/seq-rules.seq
 ```
 
 ## 数据库
@@ -214,7 +247,7 @@ uid-springboot-starter 和 MyBatis-Plus `ASSIGN_ID` 自动生成，`runtime_id`
 注意：uid-generator 的 worker 表属于独立 uid 数据源，不属于业务库。H2 测试使用：
 
 ```text
-mqtt/src/test/resources/db/uid-generator-schema.sql
+domains/mqtt/service/src/test/resources/db/uid-generator-schema.sql
 ```
 
 ## 测试分层
@@ -248,9 +281,9 @@ Jenkins 任务支持通过 **Build with Parameters** 直接指定代码来源：
 默认配置文件：
 
 ```text
-common/src/main/resources/application-local.yml
-mqtt/src/main/resources/application.yaml
-rule-engine/src/main/resources/application.yaml
+shared/common/src/main/resources/application-local.yml
+domains/mqtt/service/src/main/resources/application.yaml
+domains/rule/engine/src/main/resources/application.yaml
 web/src/main/resources/application.yaml
 ```
 
@@ -329,25 +362,25 @@ MQTT_REPLY_TOPIC_TEMPLATE=gateway/${gatewayId}/send
 运行 MQTT 模块测试：
 
 ```bash
-./mvnw -pl mqtt -am test
+./mvnw -pl domains/mqtt/service -am test
 ```
 
 运行 rule-engine 模块测试：
 
 ```bash
-./mvnw -pl rule-engine -am test
+./mvnw -pl domains/rule/engine -am test
 ```
 
 运行 uid-generator 数据源隔离测试：
 
 ```bash
-./mvnw -pl mqtt -am -Dtest=UidGeneratorDataSourceIsolationTests -Dsurefire.failIfNoSpecifiedTests=false test
+./mvnw -pl domains/mqtt/service -am -Dtest=UidGeneratorDataSourceIsolationTests -Dsurefire.failIfNoSpecifiedTests=false test
 ```
 
 运行 MQTT 真实链路集成测试：
 
 ```bash
-./mvnw -pl mqtt -am -Pexternal-tests -Dit.test=MqttClientSendIT \
+./mvnw -pl domains/mqtt/service -am -Pexternal-tests -Dit.test=MqttClientSendIT \
   -Dfailsafe.failIfNoSpecifiedTests=false verify
 ```
 
@@ -358,7 +391,7 @@ MQTT_REPLY_TOPIC_TEMPLATE=gateway/${gatewayId}/send
 启动 MQTT 模块：
 
 ```bash
-./mvnw spring-boot:run -pl mqtt -am
+./mvnw spring-boot:run -pl domains/mqtt/service -am
 ```
 
 启动 Web 模块：
@@ -370,13 +403,13 @@ MQTT_REPLY_TOPIC_TEMPLATE=gateway/${gatewayId}/send
 启动 rule-engine 模块：
 
 ```bash
-./mvnw spring-boot:run -pl rule-engine -am
+./mvnw spring-boot:run -pl domains/rule/engine -am
 ```
 
 启动 edu 占位模块：
 
 ```bash
-./mvnw spring-boot:run -pl edu -am
+./mvnw spring-boot:run -pl domains/edu/service -am
 ```
 
 ## Git 忽略约定

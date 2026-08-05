@@ -1,0 +1,305 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 1600 1200"
+     role="img"
+     aria-labelledby="title description">
+  <title id="title">Lab System Permify v2 权限关系图</title>
+  <desc id="description">由 domains/auth/service/schema/lab-system-v2.perm 对齐生成，展示 user、app、laboratory 实体及全部关系和权限表达式。</desc>
+  <metadata>Graphical documentation for lab-system-v2.perm</metadata>
+
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f7faf9"/>
+      <stop offset="1" stop-color="#eef5f2"/>
+    </linearGradient>
+    <linearGradient id="appHeader" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#075f46"/>
+      <stop offset="1" stop-color="#0f8a62"/>
+    </linearGradient>
+    <linearGradient id="labHeader" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#315eab"/>
+      <stop offset="1" stop-color="#4b78c7"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#16342a" flood-opacity=".12"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#6d847c"/>
+    </marker>
+    <style>
+      text {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+          "Microsoft YaHei", sans-serif;
+      }
+      .eyebrow { font-size: 13px; font-weight: 700; letter-spacing: 2px; fill: #0f8a62; }
+      .title { font-size: 30px; font-weight: 750; fill: #17241f; }
+      .subtitle { font-size: 14px; fill: #71827b; }
+      .entity-title { font-size: 20px; font-weight: 750; fill: white; }
+      .entity-note { font-size: 11px; fill: rgba(255, 255, 255, .78); }
+      .section-title { font-size: 14px; font-weight: 750; fill: #28483c; }
+      .group-title { font-size: 12px; font-weight: 700; fill: #638078; letter-spacing: .5px; }
+      .identifier { font-size: 12px; font-weight: 650; fill: #20352d; }
+      .expression { font-size: 10.5px; fill: #6b7d76; }
+      .relation-target { font-size: 10px; font-weight: 700; fill: #0f8a62; }
+      .lab-identifier { font-size: 12px; font-weight: 650; fill: #263c67; }
+      .lab-expression { font-size: 10.5px; fill: #69758c; }
+      .legend { font-size: 11px; fill: #65756e; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="1200" fill="url(#background)"/>
+
+  <text x="52" y="46" class="eyebrow">AUTHORIZATION MODEL · V2</text>
+  <text x="52" y="82" class="title">实验室管理系统权限关系图</text>
+  <text x="52" y="108" class="subtitle">严格对齐 domains/auth/service/schema/lab-system-v2.perm · 12 个应用角色 · 15 个应用动作</text>
+  <g transform="translate(1298 38)">
+    <rect width="250" height="42" rx="21" fill="#e3f3ed" stroke="#b9dfd0"/>
+    <circle cx="22" cy="21" r="5" fill="#22b77f"/>
+    <text x="38" y="26" font-size="12" font-weight="650" fill="#28644f">lab-system-v2.perm</text>
+  </g>
+
+  <g data-entity="user" transform="translate(52 170)" filter="url(#shadow)">
+    <rect width="178" height="108" rx="20" fill="#283b34"/>
+    <circle cx="38" cy="42" r="18" fill="#d9eee6"/>
+    <circle cx="38" cy="37" r="6" fill="#385f50"/>
+    <path d="M 27 54 C 29 45, 47 45, 49 54" fill="#385f50"/>
+    <text x="68" y="42" font-size="19" font-weight="750" fill="white">user</text>
+    <text x="68" y="62" font-size="11" fill="#bdd0c8">授权主体</text>
+    <text x="20" y="90" font-size="10.5" fill="#a8beb5">被 app / laboratory 引用</text>
+  </g>
+
+  <path d="M 230 224 C 250 224, 250 224, 270 224"
+        fill="none" stroke="#6d847c" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="240" y="210" font-size="10" fill="#6d847c">@user</text>
+
+  <g data-entity="app" transform="translate(270 140)" filter="url(#shadow)">
+    <rect width="900" height="990" rx="24" fill="#ffffff" stroke="#cfe0d9"/>
+    <path d="M 24 0 H 876 A 24 24 0 0 1 900 24 V 72 H 0 V 24 A 24 24 0 0 1 24 0"
+          fill="url(#appHeader)"/>
+    <text x="28" y="34" class="entity-title">app</text>
+    <text x="28" y="55" class="entity-note">系统级角色与能力 · app:global</text>
+    <g transform="translate(724 18)">
+      <rect width="146" height="36" rx="18" fill="rgba(255,255,255,.14)"/>
+      <text x="73" y="23" text-anchor="middle" font-size="11" font-weight="650" fill="white">12 RELATIONS</text>
+    </g>
+
+    <g transform="translate(28 98)">
+      <rect width="350" height="856" rx="18" fill="#f5faf8" stroke="#dcebe5"/>
+      <text x="20" y="30" class="section-title">角色关系</text>
+      <text x="330" y="30" text-anchor="end" class="relation-target">全部指向 @user</text>
+
+      <text x="20" y="66" class="group-title">平台与用户</text>
+      <g data-definition="relation super_admin @user">
+        <text x="20" y="92" class="identifier">super_admin</text>
+        <text x="318" y="92" text-anchor="end" class="relation-target">@user</text>
+      </g>
+      <g data-definition="relation user_manager @user">
+        <text x="20" y="122" class="identifier">user_manager</text>
+        <text x="318" y="122" text-anchor="end" class="relation-target">@user</text>
+      </g>
+      <g data-definition="relation user_viewer @user">
+        <text x="20" y="152" class="identifier">user_viewer</text>
+        <text x="318" y="152" text-anchor="end" class="relation-target">@user</text>
+      </g>
+
+      <line x1="20" y1="174" x2="330" y2="174" stroke="#dce8e3"/>
+      <text x="20" y="204" class="group-title">教务</text>
+      <g data-definition="relation edu_semester_manager @user">
+        <text x="20" y="230" class="identifier">edu_semester_manager</text>
+        <text x="318" y="230" text-anchor="end" class="relation-target">@user</text>
+      </g>
+      <g data-definition="relation edu_semester_viewer @user">
+        <text x="20" y="260" class="identifier">edu_semester_viewer</text>
+        <text x="318" y="260" text-anchor="end" class="relation-target">@user</text>
+      </g>
+      <g data-definition="relation edu_timetable_manager @user">
+        <text x="20" y="290" class="identifier">edu_timetable_manager</text>
+        <text x="318" y="290" text-anchor="end" class="relation-target">@user</text>
+      </g>
+      <g data-definition="relation edu_timetable_viewer @user">
+        <text x="20" y="320" class="identifier">edu_timetable_viewer</text>
+        <text x="318" y="320" text-anchor="end" class="relation-target">@user</text>
+      </g>
+
+      <line x1="20" y1="342" x2="330" y2="342" stroke="#dce8e3"/>
+      <text x="20" y="372" class="group-title">实验室</text>
+      <g data-definition="relation laboratory_manager @user">
+        <text x="20" y="398" class="identifier">laboratory_manager</text>
+        <text x="318" y="398" text-anchor="end" class="relation-target">@user</text>
+      </g>
+
+      <line x1="20" y1="420" x2="330" y2="420" stroke="#dce8e3"/>
+      <text x="20" y="450" class="group-title">智能策略</text>
+      <g data-definition="relation smart_manager @user">
+        <text x="20" y="476" class="identifier">smart_manager</text>
+        <text x="318" y="476" text-anchor="end" class="relation-target">@user</text>
+      </g>
+      <g data-definition="relation smart_viewer @user">
+        <text x="20" y="506" class="identifier">smart_viewer</text>
+        <text x="318" y="506" text-anchor="end" class="relation-target">@user</text>
+      </g>
+      <g data-definition="relation smart_keeper @user">
+        <text x="20" y="536" class="identifier">smart_keeper</text>
+        <text x="318" y="536" text-anchor="end" class="relation-target">@user</text>
+      </g>
+
+      <line x1="20" y1="558" x2="330" y2="558" stroke="#dce8e3"/>
+      <text x="20" y="588" class="group-title">数据分析</text>
+      <g data-definition="relation data_analyst @user">
+        <text x="20" y="614" class="identifier">data_analyst</text>
+        <text x="318" y="614" text-anchor="end" class="relation-target">@user</text>
+      </g>
+
+      <rect x="20" y="668" width="310" height="156" rx="14" fill="#e9f5f0"/>
+      <text x="38" y="698" class="group-title">角色含义</text>
+      <circle cx="42" cy="728" r="5" fill="#075f46"/>
+      <text x="56" y="732" class="legend">manager：管理与变更</text>
+      <circle cx="42" cy="758" r="5" fill="#4f8c76"/>
+      <text x="56" y="762" class="legend">viewer：只读访问</text>
+      <circle cx="42" cy="788" r="5" fill="#90b9aa"/>
+      <text x="56" y="792" class="legend">keeper：策略启停运维</text>
+    </g>
+
+    <g transform="translate(400 98)">
+      <rect width="472" height="856" rx="18" fill="#fbfcfc" stroke="#e1e8e5"/>
+      <text x="20" y="30" class="section-title">动作及授权表达式</text>
+      <text x="450" y="30" text-anchor="end" font-size="10" fill="#7d8b86">OR 关系</text>
+
+      <rect x="18" y="50" width="436" height="166" rx="14" fill="#f4f8f6"/>
+      <text x="34" y="76" class="group-title">用户管理</text>
+      <g data-definition="action create_user = user_manager or super_admin">
+        <text x="34" y="101" class="identifier">create_user</text>
+        <text x="174" y="101" class="expression">user_manager or super_admin</text>
+      </g>
+      <g data-definition="action edit_user = user_manager or super_admin">
+        <text x="34" y="130" class="identifier">edit_user</text>
+        <text x="174" y="130" class="expression">user_manager or super_admin</text>
+      </g>
+      <g data-definition="action delete_user = super_admin">
+        <text x="34" y="159" class="identifier">delete_user</text>
+        <text x="174" y="159" class="expression">super_admin</text>
+      </g>
+      <g data-definition="action list_user = user_manager or user_viewer or super_admin">
+        <text x="34" y="188" class="identifier">list_user</text>
+        <text x="174" y="188" class="expression">user_manager or user_viewer or super_admin</text>
+      </g>
+
+      <rect x="18" y="230" width="436" height="166" rx="14" fill="#f4f8f6"/>
+      <text x="34" y="256" class="group-title">教务管理</text>
+      <g data-definition="action manage_semester = edu_semester_manager or super_admin">
+        <text x="34" y="281" class="identifier">manage_semester</text>
+        <text x="174" y="281" class="expression">edu_semester_manager or super_admin</text>
+      </g>
+      <g data-definition="action list_semester = edu_semester_manager or edu_semester_viewer or super_admin">
+        <text x="34" y="310" class="identifier">list_semester</text>
+        <text x="174" y="310" class="expression">semester manager or viewer or super_admin</text>
+      </g>
+      <g data-definition="action manage_timetable = edu_timetable_manager or super_admin">
+        <text x="34" y="339" class="identifier">manage_timetable</text>
+        <text x="174" y="339" class="expression">edu_timetable_manager or super_admin</text>
+      </g>
+      <g data-definition="action view_timetable = edu_timetable_manager or edu_timetable_viewer or super_admin">
+        <text x="34" y="368" class="identifier">view_timetable</text>
+        <text x="174" y="368" class="expression">timetable manager or viewer or super_admin</text>
+      </g>
+
+      <rect x="18" y="410" width="436" height="78" rx="14" fill="#f4f8f6"/>
+      <text x="34" y="436" class="group-title">实验室管理</text>
+      <g data-definition="action manage_laboratory = laboratory_manager or super_admin">
+        <text x="34" y="466" class="identifier">manage_laboratory</text>
+        <text x="174" y="466" class="expression">laboratory_manager or super_admin</text>
+      </g>
+
+      <rect x="18" y="502" width="436" height="136" rx="14" fill="#f4f8f6"/>
+      <text x="34" y="528" class="group-title">智能策略</text>
+      <g data-definition="action manage_smart_strategy = smart_manager or super_admin">
+        <text x="34" y="553" class="identifier">manage_smart_strategy</text>
+        <text x="218" y="553" class="expression">smart_manager or super_admin</text>
+      </g>
+      <g data-definition="action change_smart_strategy_status = smart_manager or smart_keeper or super_admin">
+        <text x="34" y="582" class="identifier">change_smart_strategy_status</text>
+        <text x="264" y="582" class="expression">manager or keeper or super_admin</text>
+      </g>
+      <g data-definition="action list_smart_strategies = smart_manager or smart_keeper or smart_viewer or super_admin">
+        <text x="34" y="611" class="identifier">list_smart_strategies</text>
+        <text x="218" y="611" class="expression">manager or keeper or viewer or super_admin</text>
+      </g>
+
+      <rect x="18" y="652" width="436" height="136" rx="14" fill="#f4f8f6"/>
+      <text x="34" y="678" class="group-title">数据分析</text>
+      <g data-definition="action edu_data_analysis = data_analyst or super_admin">
+        <text x="34" y="703" class="identifier">edu_data_analysis</text>
+        <text x="204" y="703" class="expression">data_analyst or super_admin</text>
+      </g>
+      <g data-definition="action air_condition_data_analysis = data_analyst or super_admin">
+        <text x="34" y="732" class="identifier">air_condition_data_analysis</text>
+        <text x="264" y="732" class="expression">data_analyst or super_admin</text>
+      </g>
+      <g data-definition="action circuit_break_data_analysis = data_analyst or super_admin">
+        <text x="34" y="761" class="identifier">circuit_break_data_analysis</text>
+        <text x="264" y="761" class="expression">data_analyst or super_admin</text>
+      </g>
+
+      <rect x="18" y="802" width="436" height="34" rx="10" fill="#e9f5f0"/>
+      <text x="236" y="824" text-anchor="middle" class="legend">super_admin 参与全部应用动作的授权</text>
+    </g>
+  </g>
+
+  <path d="M 1170 350 C 1192 350, 1204 350, 1226 350"
+        fill="none" stroke="#6d847c" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="1198" y="336" text-anchor="middle" font-size="10" fill="#6d847c">@app</text>
+
+  <path d="M 140 278 C 140 410, 1190 740, 1260 624"
+        fill="none" stroke="#9baaa4" stroke-width="1.5" stroke-dasharray="6 6"
+        marker-end="url(#arrow)"/>
+  <text x="1040" y="714" font-size="10" fill="#7c8d86">@user</text>
+
+  <g data-entity="laboratory" transform="translate(1226 246)" filter="url(#shadow)">
+    <rect width="326" height="474" rx="24" fill="#ffffff" stroke="#d6deed"/>
+    <path d="M 24 0 H 302 A 24 24 0 0 1 326 24 V 72 H 0 V 24 A 24 24 0 0 1 24 0"
+          fill="url(#labHeader)"/>
+    <text x="24" y="34" class="entity-title">laboratory</text>
+    <text x="24" y="55" class="entity-note">实验室范围授权</text>
+
+    <text x="22" y="110" class="section-title">关系</text>
+    <g data-definition="relation app @app">
+      <rect x="20" y="126" width="286" height="54" rx="12" fill="#f2f5fb"/>
+      <text x="36" y="158" class="lab-identifier">app</text>
+      <text x="286" y="158" text-anchor="end" class="relation-target">@app</text>
+    </g>
+    <g data-definition="relation viewer @user">
+      <rect x="20" y="190" width="286" height="54" rx="12" fill="#f2f5fb"/>
+      <text x="36" y="222" class="lab-identifier">viewer</text>
+      <text x="286" y="222" text-anchor="end" class="relation-target">@user</text>
+    </g>
+
+    <text x="22" y="282" class="section-title">派生权限</text>
+    <g data-definition="permission can_view = app.super_admin or viewer">
+      <rect x="20" y="298" width="286" height="98" rx="14" fill="#eaf0fb" stroke="#cfdaef"/>
+      <text x="36" y="330" class="lab-identifier">can_view</text>
+      <text x="36" y="356" class="lab-expression">app.super_admin</text>
+      <text x="36" y="376" class="lab-expression">or viewer</text>
+    </g>
+
+    <rect x="20" y="416" width="286" height="34" rx="10" fill="#f1f4f9"/>
+    <text x="163" y="438" text-anchor="middle" class="legend">平台超管或实验室查看者可见</text>
+  </g>
+
+  <g transform="translate(1226 758)">
+    <text x="0" y="0" class="group-title">阅读方式</text>
+    <circle cx="6" cy="28" r="5" fill="#0f8a62"/>
+    <text x="20" y="32" class="legend">绿色：应用级角色与动作</text>
+    <circle cx="6" cy="58" r="5" fill="#4b78c7"/>
+    <text x="20" y="62" class="legend">蓝色：实验室范围关系与权限</text>
+    <line x1="0" y1="88" x2="30" y2="88" stroke="#6d847c" stroke-width="2"
+          marker-end="url(#arrow)"/>
+    <text x="42" y="92" class="legend">实体关系引用</text>
+  </g>
+
+  <text x="52" y="1170" font-size="11" fill="#84928c">
+    Generated documentation · Update domains/auth/service/schema/lab-system-v2.perm first
+  </text>
+  <text x="1548" y="1170" text-anchor="end" font-size="11" fill="#84928c">
+    Lab System Cloud
+  </text>
+</svg>

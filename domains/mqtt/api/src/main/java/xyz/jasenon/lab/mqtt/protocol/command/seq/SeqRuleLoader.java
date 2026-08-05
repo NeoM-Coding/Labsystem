@@ -20,11 +20,17 @@ public class SeqRuleLoader {
     }
 
     public static List<SeqRule> loadDefault() {
-        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
-        if (classLoader == null) {
-            classLoader = SeqRuleLoader.class.getClassLoader();
+        InputStream inputStream = null;
+        ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
+        if (contextClassLoader != null) {
+            inputStream = contextClassLoader.getResourceAsStream(DEFAULT_RULE_PATH);
         }
-        InputStream inputStream = classLoader.getResourceAsStream(DEFAULT_RULE_PATH);
+
+        // Callback threads supplied by libraries or containers may use a context
+        // class loader that cannot see resources packaged with mqtt-api.
+        if (inputStream == null) {
+            inputStream = SeqRuleLoader.class.getResourceAsStream("/" + DEFAULT_RULE_PATH);
+        }
         if (inputStream == null) {
             throw new IllegalStateException("Default seq rule file not found: " + DEFAULT_RULE_PATH);
         }

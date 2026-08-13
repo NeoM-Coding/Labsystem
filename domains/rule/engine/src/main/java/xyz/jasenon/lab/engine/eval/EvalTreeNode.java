@@ -13,6 +13,9 @@ import java.util.Objects;
  * <p>节点保存表达式片段对 true/false 输入的变换结果，因此既能压缩树高，
  * 又能保持 {@code A OR B AND C == (A OR B) AND C} 的链式语义。</p>
  */
+
+// todo 改造这里的节点设计  现在的节点杂糅  同一个class承载了太多的事情
+// 从数字逻辑基础上解释这里的设计
 @Getter
 @Setter
 public class EvalTreeNode {

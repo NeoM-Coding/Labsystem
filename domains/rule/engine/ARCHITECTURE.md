@@ -15,7 +15,7 @@
 - 负责调用 MQTT 内部 RPC 执行控制动作。
 - 不直接连接 MQTT broker。
 - 不直接解码设备二进制 payload。
-- 不提供通知通道投递能力；`ReportAction` 当前只记录日志并返回 `NOT_IMPLEMENTED`。
+- 提供动作组完成后的 WebSocket 站内信；`ReportAction` 的 SMS、SMTP 仍只记录日志并返回 `NOT_IMPLEMENTED`。
 - 不负责前端动态表单；前端最终需要序列化成 `rule-api` 中的 `RuntimeRevision`。
 
 ## 总体架构
@@ -387,7 +387,43 @@ sequenceDiagram
 - 通知类型：`SMS`、`SMTP`
 - 内容
 
-但当前通知通道尚未实现。执行时仅记录日志，并返回 `ActionExecutionResult.notImplemented`。
+`SMS`、`SMTP` 外部通道仍未实现，执行时记录日志并返回
+`ActionExecutionResult.notImplemented`。不过 `ReportAction` 已作为站内信的数据源：动作组完成后，
+调度器会聚合命中的设备/时间条件组、全部动作结果、通知内容和用户 ID，通过统一实时事件协议推送。
+
+### 动作组站内信
+
+`AsyncRuntimeScheduler` 等待同一动作组的全部 Action Future 完成后，生成一次
+`RuleExecutionNotice`：
+
+- 每个命中的动作组都会通过 `onAlert` Hook 保存告警日志；没有 ReportAction 或有效用户 ID 时不发送 WebSocket。
+- 只有 ReportAction 提供至少一个有效用户 ID 时，才按 `USER` 受众定向推送。
+- 事件类型为 `rule.action-group.executed`，资源类型为 `runtime`。
+- `RuleExecutionNoticeHook` 是持久化告警日志的扩展点；Hook、序列化和 Redis 发布失败均不反向改变动作结果。
+
+```mermaid
+sequenceDiagram
+    participant Scheduler as AsyncRuntimeScheduler
+    participant Executor as RuntimeExecutor
+    participant Hook as RuleExecutionNoticeHook
+    participant Redis as Redis realtime:events
+    participant Web as WebSocket Subscriber
+
+    Scheduler->>Executor: execute every action
+    Executor-->>Scheduler: ActionExecutionResult futures
+    Scheduler->>Scheduler: aggregate condition groups and results
+    Scheduler->>Hook: onAlert(notice)
+    alt ReportAction 含有效 userId
+        Scheduler->>Redis: USER / rule.action-group.executed
+        Redis->>Web: RealtimeMessage
+    else 无有效接收人
+        Scheduler-->>Scheduler: 不发送 WebSocket
+    end
+```
+
+告警日志保存动作组命中时间、条件组、聚合状态、Report 内容与接收人，以及完整动作结果 JSON。
+`GET /api/smart-strategies/alert-logs` 使用 MyBatis-Plus `Page` 查询，支持按 Runtime、动作组、
+状态和命中时间范围过滤，单页最多 100 条。
 
 ## 持久化与恢复
 
@@ -573,16 +609,16 @@ flowchart LR
 
 ### 接入通知能力
 
-当前 `ReportAction` 只是模型和日志占位。真正接入时需要补：
+当前站内信已经接入统一 WebSocket 实时协议；后续完整通知能力仍需要补：
 
-- 通知 provider，例如短信、邮件或站内信。
-- `DefaultRuntimeExecutor.executeReport` 的真实投递逻辑。
+- SMS、SMTP provider。
+- `DefaultRuntimeExecutor.executeReport` 的外部通道投递逻辑。
 - 失败重试或幂等策略。
-- 用户查询通知发送结果的接口。
+- 告警日志已经通过 `RuleExecutionNoticeHook.onAlert` 持久化，并由分页查询接口暴露。
 
 ## 当前已知边界
 
-- `ReportAction` 尚未真实发送通知。
+- `ReportAction` 的 SMS、SMTP 尚未真实发送；站内信仅保留当前进程内前端收件箱，不支持离线补发。
 - 规则引擎只消费 MQTT 模块发布的设备快照事件，不直接读取 MQTT broker。
 - 设备字段事件只在值变化时发布；如果上游重复推送相同值，不会唤醒 Runtime。
 - 时间点事件是瞬时脉冲，只在本次 signal 推演中成立。

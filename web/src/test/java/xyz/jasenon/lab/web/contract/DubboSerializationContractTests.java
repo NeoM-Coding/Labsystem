@@ -13,6 +13,7 @@ import xyz.jasenon.lab.base.api.service.LaboratoryService;
 import xyz.jasenon.lab.base.api.service.UserService;
 import xyz.jasenon.lab.common.rpc.RpcResult;
 import xyz.jasenon.lab.engine.api.SmartStrategyService;
+import xyz.jasenon.lab.engine.api.RuleAlertLogService;
 import xyz.jasenon.lab.edu.api.SemesterService;
 import xyz.jasenon.lab.edu.api.TimetableService;
 
@@ -49,6 +50,7 @@ class DubboSerializationContractTests {
             MqttGatewayCRUD.class,
             MqttTelemetryQuery.class,
             SmartStrategyService.class,
+            RuleAlertLogService.class,
             SemesterService.class,
             TimetableService.class,
             AuditLogService.class

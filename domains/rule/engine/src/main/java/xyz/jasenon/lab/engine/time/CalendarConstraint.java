@@ -57,6 +57,7 @@ public final class CalendarConstraint {
 
     public LocalDate nextMatchingDate(LocalDate date) {
         LocalDate candidate = startDate != null && date.isBefore(startDate) ? startDate : date;
+        // ring 7 一周时间得到下一个调度 候选date
         for (int i = 0; i < 8; i++) {
             if (endDate != null && candidate.isAfter(endDate)) {
                 return null;

@@ -5,6 +5,7 @@ import xyz.jasenon.lab.auth.command.ActionCommand;
 import xyz.jasenon.lab.auth.context.UserContext;
 import xyz.jasenon.lab.auth.permission.Action;
 import xyz.jasenon.lab.engine.api.command.SmartStrategyCreate;
+import xyz.jasenon.lab.engine.api.command.AlertLogListQuery;
 import xyz.jasenon.lab.engine.api.command.SmartStrategyGet;
 import xyz.jasenon.lab.engine.api.command.SmartStrategyStatusChange;
 import xyz.jasenon.lab.engine.definition.RuntimeRevision;
@@ -41,6 +42,10 @@ class SmartStrategyAuthorizationConfigurationTests {
                 .handle(new SmartStrategyGet("runtime-1"), context);
 
         assertEquals(Action.App.list_smart_strategies, command.action());
+
+        ActionCommand alertQuery = configuration.alertLogListAuthorization()
+                .handle(new AlertLogListQuery(1, 20, null, null, null, null, null), context);
+        assertEquals(Action.App.list_alert_logs, alertQuery.action());
     }
 
     private RuntimeRevision revision() {

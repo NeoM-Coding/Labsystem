@@ -14,6 +14,7 @@ import xyz.jasenon.lab.engine.api.command.SmartStrategyGet;
 import xyz.jasenon.lab.engine.api.command.SmartStrategyListQuery;
 import xyz.jasenon.lab.engine.api.command.SmartStrategyStatusChange;
 import xyz.jasenon.lab.engine.api.command.SmartStrategyUpdate;
+import xyz.jasenon.lab.engine.api.command.AlertLogListQuery;
 
 @Configuration(proxyBeanMethods = false)
 public class SmartStrategyAuthorizationConfiguration {
@@ -46,6 +47,11 @@ public class SmartStrategyAuthorizationConfiguration {
     @Bean
     ActionCommandHandler<SmartStrategyListQuery> smartStrategyListAuthorization() {
         return appHandler(SmartStrategyListQuery.class, Action.App.list_smart_strategies);
+    }
+
+    @Bean
+    ActionCommandHandler<AlertLogListQuery> alertLogListAuthorization() {
+        return appHandler(AlertLogListQuery.class, Action.App.list_alert_logs);
     }
 
     private static <T> ActionCommandHandler<T> appHandler(Class<T> commandType, Action.App permission) {

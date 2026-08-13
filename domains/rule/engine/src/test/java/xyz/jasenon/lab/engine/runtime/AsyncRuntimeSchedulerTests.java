@@ -10,6 +10,8 @@ import xyz.jasenon.lab.engine.eval.LogicType;
 import xyz.jasenon.lab.engine.eval.Operator;
 import xyz.jasenon.lab.engine.event.TimeEvent;
 import xyz.jasenon.lab.engine.event.TimeSignal;
+import xyz.jasenon.lab.engine.notification.RuleExecutionNotice;
+import xyz.jasenon.lab.engine.notification.RuleExecutionNoticePublisher;
 import xyz.jasenon.lab.engine.time.CalendarConstraint;
 import xyz.jasenon.lab.engine.time.TimeConditionGroup;
 import xyz.jasenon.lab.engine.time.TimePointCondition;
@@ -213,6 +215,71 @@ class AsyncRuntimeSchedulerTests {
                     ),
                     runtimeExecutor.executed
             );
+        } finally {
+            scheduler.shutdown();
+        }
+    }
+
+    @Test
+    void publishesOneOrderedNoticeAfterEveryActionInTheGroupCompletes() throws InterruptedException {
+        RecordingRuntimeExecutor runtimeExecutor = new RecordingRuntimeExecutor(2);
+        List<RuleExecutionNotice> notices = new CopyOnWriteArrayList<>();
+        CountDownLatch noticePublished = new CountDownLatch(1);
+        RuleExecutionNoticePublisher publisher = notice -> {
+            notices.add(notice);
+            noticePublished.countDown();
+        };
+        ExecutorService executorService = Executors.newFixedThreadPool(2);
+        AsyncRuntimeScheduler scheduler = new AsyncRuntimeScheduler(
+                runtimeExecutor,
+                publisher,
+                executorService,
+                new xyz.jasenon.lab.engine.action.ActionGroupEvaluator(java.time.Clock.systemUTC())
+        );
+        Runtime runtime = new Runtime("runtime-notice");
+        ActionGroup group = actionGroup("notice-group", true);
+        group.addAction(() -> Action.ActionType.Report);
+        runtime.registerActionGroup(group);
+
+        try {
+            scheduler.schedule(runtime);
+
+            assertTrue(noticePublished.await(2, TimeUnit.SECONDS));
+            assertEquals(1, notices.size());
+            RuleExecutionNotice notice = notices.get(0);
+            assertEquals("runtime-notice", notice.runtimeId());
+            assertEquals("notice-group", notice.actionGroupId());
+            assertEquals(2, notice.actions().size());
+            assertEquals(List.of(0, 1), notice.actions().stream().map(RuleExecutionNotice.ActionResult::index).toList());
+        } finally {
+            scheduler.shutdown();
+        }
+    }
+
+    @Test
+    void publishesNoticeForSatisfiedEmptyActionGroup() throws InterruptedException {
+        RuntimeExecutor runtimeExecutor = (runtime, group, action) ->
+                CompletableFuture.completedFuture(success(runtime, group, action));
+        List<RuleExecutionNotice> notices = new CopyOnWriteArrayList<>();
+        CountDownLatch noticePublished = new CountDownLatch(1);
+        ExecutorService executorService = Executors.newSingleThreadExecutor();
+        AsyncRuntimeScheduler scheduler = new AsyncRuntimeScheduler(
+                runtimeExecutor,
+                notice -> {
+                    notices.add(notice);
+                    noticePublished.countDown();
+                },
+                executorService,
+                new xyz.jasenon.lab.engine.action.ActionGroupEvaluator(java.time.Clock.systemUTC())
+        );
+        EvalNode dummy = new EvalNode();
+        dummy.setResult(true);
+        Runtime runtime = new Runtime("runtime-empty", List.of(new ActionGroup("empty-group", dummy)));
+
+        try {
+            scheduler.schedule(runtime);
+            assertTrue(noticePublished.await(2, TimeUnit.SECONDS));
+            assertTrue(notices.get(0).actions().isEmpty());
         } finally {
             scheduler.shutdown();
         }

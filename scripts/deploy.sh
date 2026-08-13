@@ -13,6 +13,7 @@ DATABASE_MIGRATIONS=(
     "$ROOT_DIR/sql/migrations/20260729_add_timetable_sections.sql"
     "$ROOT_DIR/sql/migrations/20260730_add_latest_telemetry_indexes.sql"
     "$ROOT_DIR/sql/migrations/20260731_allow_contact_credentials_null.sql"
+    "$ROOT_DIR/sql/migrations/20260811_add_alert_log.sql"
 )
 
 log() {

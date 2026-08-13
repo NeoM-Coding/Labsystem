@@ -10,20 +10,25 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import xyz.jasenon.lab.common.util.R;
+import xyz.jasenon.lab.engine.api.RuleAlertLogService;
 import xyz.jasenon.lab.engine.api.SmartStrategyService;
+import xyz.jasenon.lab.engine.api.command.AlertLogListQuery;
 import xyz.jasenon.lab.engine.api.command.SmartStrategyCreate;
 import xyz.jasenon.lab.engine.api.command.SmartStrategyDelete;
 import xyz.jasenon.lab.engine.api.command.SmartStrategyGet;
 import xyz.jasenon.lab.engine.api.command.SmartStrategyListQuery;
 import xyz.jasenon.lab.engine.api.command.SmartStrategyStatusChange;
 import xyz.jasenon.lab.engine.api.command.SmartStrategyUpdate;
+import xyz.jasenon.lab.engine.api.model.AlertLogPage;
 import xyz.jasenon.lab.engine.definition.RuntimeRevision;
 import xyz.jasenon.lab.observability.annotation.Traced;
 import xyz.jasenon.lab.observability.rpc.RpcClient;
 import xyz.jasenon.lab.web.response.DiyResponseEntity;
 
+import java.time.Instant;
 import java.util.List;
 
 @RestController
@@ -34,6 +39,25 @@ public class SmartStrategyController {
 
     @DubboReference(check = false)
     private SmartStrategyService smartStrategyService;
+
+    @DubboReference(check = false)
+    private RuleAlertLogService ruleAlertLogService;
+
+    @GetMapping("/alert-logs")
+    @Operation(summary = "分页查询告警日志", description = "按规则、动作组、执行状态和命中时间分页查询动作组告警日志。")
+    public DiyResponseEntity<R<AlertLogPage>> alerts(
+            @RequestParam(defaultValue = "1") long current,
+            @RequestParam(defaultValue = "20") long size,
+            @RequestParam(required = false) String runtimeId,
+            @RequestParam(required = false) String actionGroupId,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Instant matchedFrom,
+            @RequestParam(required = false) Instant matchedTo
+    ) {
+        return DiyResponseEntity.of(R.success(RpcClient.call(() -> ruleAlertLogService.list(
+                new AlertLogListQuery(current, size, runtimeId, actionGroupId, status, matchedFrom, matchedTo)
+        ))));
+    }
 
     @GetMapping
     @Operation(summary = "查询智能策略", description = "返回当前用户有权查看的智能策略版本列表。")

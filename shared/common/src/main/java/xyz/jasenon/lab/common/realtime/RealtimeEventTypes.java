@@ -7,6 +7,7 @@ public final class RealtimeEventTypes {
     public static final String DEVICE_ONLINE_CHANGED = "device.online.changed";
     public static final String DEVICE_ALERT_RAISED = "device.alert.raised";
     public static final String DEVICE_ALERT_RESOLVED = "device.alert.resolved";
+    public static final String RULE_ACTION_GROUP_EXECUTED = "rule.action-group.executed";
 
     private RealtimeEventTypes() {
     }

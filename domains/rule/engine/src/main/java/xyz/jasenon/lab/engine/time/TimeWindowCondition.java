@@ -89,6 +89,7 @@ public final class TimeWindowCondition implements TimeCondition {
     }
 
     private ZonedDateTime end(LocalDate date) {
+        // 跨天时间处理
         LocalDate endDate = endTime.isAfter(startTime) ? date : date.plusDays(1);
         return ZonedDateTime.of(endDate, endTime, calendar.zoneId());
     }

@@ -74,7 +74,20 @@ lab:
 - 单台/批量控制。
 - 智能策略创建、更新、启停和删除。
 
-## 6. 安全边界
+## 6. 分页查询
+
+Web 层通过 `GET /api/audit-logs` 暴露管理员审计查询。接口使用 MyBatis Plus 的 `Page`，分页插件统一复用 `shared/persistence-core`，默认每页 20 条，单页最多 100 条。
+
+支持的筛选字段包括：
+
+- 操作人 ID、用户名、姓名。
+- operation、action、objectType、objectId、eventType。
+- 描述关键词、traceId、requestId。
+- `occurredFrom` 至 `occurredTo` 的发生时间范围，采用 ISO 日期时间格式。
+
+结果按发生时间、审计 ID 倒序排列。查询受全局 `list_audit_logs` 权限保护，系统超级管理员或 `log_viewer` 可使用该能力。
+
+## 7. 安全边界
 
 审计摘要不得包含：
 

@@ -20,6 +20,9 @@ public interface Action extends Permission {
         change_smart_strategy_status,
         list_smart_strategies,
 
+        list_audit_logs,
+        list_alert_logs,
+
         edu_data_analysis,
         air_condition_data_analysis,
         circuit_break_data_analysis;

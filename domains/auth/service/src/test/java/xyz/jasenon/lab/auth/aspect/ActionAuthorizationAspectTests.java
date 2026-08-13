@@ -140,5 +140,9 @@ class ActionAuthorizationAspectTests {
         public void synchronize(UserAuthorizationCommand command) {
         }
 
+        @Override
+        public void removeUser(String userId) {
+        }
+
     }
 }

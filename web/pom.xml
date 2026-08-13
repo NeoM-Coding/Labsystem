@@ -59,6 +59,11 @@
             <artifactId>edu-api</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>xyz.jasenon.lab</groupId>
+            <artifactId>audit-api</artifactId>
+            <version>${project.version}</version>
+        </dependency>
 
         <dependency>
             <groupId>xyz.jasenon.lab</groupId>

@@ -50,6 +50,12 @@ entity app {
 
 	action list_smart_strategies = smart_manager or smart_keeper or smart_viewer or super_admin
 
+	relation log_viewer @user
+
+	action list_audit_logs = super_admin or log_viewer
+
+	action list_alert_logs = super_admin or log_viewer
+
 	relation data_analyst @user
 
 	action edu_data_analysis = data_analyst or super_admin

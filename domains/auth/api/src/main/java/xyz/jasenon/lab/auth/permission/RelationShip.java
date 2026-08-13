@@ -19,6 +19,8 @@ public interface RelationShip extends Permission {
         smart_viewer,
         smart_keeper,
 
+        log_viewer,
+
         data_analyst;
 
         @Override

@@ -1,6 +1,9 @@
 package xyz.jasenon.lab.persistence.config;
 
+import com.baomidou.mybatisplus.annotation.DbType;
 import com.baomidou.mybatisplus.core.incrementer.IdentifierGenerator;
+import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
+import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
 import io.github.sunjieyi60.uid.starter.UidGenerator;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.context.annotation.Bean;
@@ -10,6 +13,16 @@ import org.springframework.context.annotation.Bean;
  */
 @AutoConfiguration
 public class MybatisPlusConfig {
+
+    @Bean
+    public MybatisPlusInterceptor mybatisPlusInterceptor() {
+        MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
+        PaginationInnerInterceptor pagination = new PaginationInnerInterceptor(DbType.MYSQL);
+        pagination.setOverflow(false);
+        pagination.setMaxLimit(100L);
+        interceptor.addInnerInterceptor(pagination);
+        return interceptor;
+    }
 
     @Bean
     public CustomIdGenerator customIdGenerator(UidGenerator uidGenerator) {

@@ -20,6 +20,7 @@ import xyz.jasenon.lab.base.api.dto.ContactUserCreate;
 import xyz.jasenon.lab.base.api.dto.UserCreate;
 import xyz.jasenon.lab.base.api.dto.UserAuthorizationUpdate;
 import xyz.jasenon.lab.base.api.dto.UserListQuery;
+import xyz.jasenon.lab.base.api.dto.UserDelete;
 import xyz.jasenon.lab.base.mapper.UserMapper;
 import xyz.jasenon.lab.base.mapper.LaboratoryMapper;
 import xyz.jasenon.lab.base.context.UserContextFactory;
@@ -211,6 +212,30 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         User updated = getById(user.getId());
         afterCommit(() -> userContextStore.save(buildUserContext(updated)));
         return RpcResult.success(user);
+    }
+
+    @Override
+    @ActionAuthorized
+    @Audited("user.delete")
+    @Transactional
+    public RpcResult<Void> deleteUser(UserDelete command) {
+        if (command == null || isBlank(command.userId())) {
+            throw new BusinessException(BAD_REQUEST, "用户 ID 不能为空");
+        }
+        String userId = command.userId().trim();
+        UserContext context = requireUserContext();
+        if (userId.equals(context.getUserId())) {
+            throw new BusinessException(BAD_REQUEST, "不能删除当前登录用户");
+        }
+        if (getById(userId) == null) {
+            throw new BusinessException(NOT_FOUND, "用户或联系人不存在");
+        }
+        if (!removeById(userId)) {
+            throw new BusinessException(NOT_FOUND, "用户或联系人不存在");
+        }
+        auth.removeUser(userId);
+        afterCommit(() -> userContextStore.delete(userId));
+        return RpcResult.success();
     }
 
     private boolean nameExists(String name) {

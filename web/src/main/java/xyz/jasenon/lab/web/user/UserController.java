@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 import xyz.jasenon.lab.base.api.dto.UserAuthorizationUpdate;
 import xyz.jasenon.lab.base.api.dto.UserCreate;
 import xyz.jasenon.lab.base.api.dto.UserListQuery;
+import xyz.jasenon.lab.base.api.dto.UserDelete;
 import xyz.jasenon.lab.base.api.model.User;
 import xyz.jasenon.lab.base.api.service.UserService;
 import xyz.jasenon.lab.common.util.R;
@@ -66,5 +68,12 @@ public class UserController {
         );
         User updated = RpcClient.call(() -> userService.updateUser(downstream));
         return DiyResponseEntity.of(R.success(updated.mask()));
+    }
+
+    @DeleteMapping("/{userId}")
+    @Operation(summary = "删除用户或联系人", description = "删除指定成员，并清理其应用权限、实验室访问范围和登录上下文。")
+    public DiyResponseEntity<R<Void>> delete(@PathVariable String userId) {
+        RpcClient.run(() -> userService.deleteUser(new UserDelete(userId, null)));
+        return DiyResponseEntity.of(R.success());
     }
 }

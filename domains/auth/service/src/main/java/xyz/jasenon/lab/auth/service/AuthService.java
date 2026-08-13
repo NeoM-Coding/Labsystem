@@ -95,6 +95,30 @@ public class AuthService implements Auth {
         ));
     }
 
+    @Override
+    public void removeUser(String userId) {
+        String normalizedUserId = requireText(userId, "userId");
+        Set<String> currentRelations = operations.relationsOf(
+                SourceType.app, GLOBAL_APP_ID, SourceType.user, normalizedUserId
+        );
+        for (RelationShip.App relation : RelationShip.App.values()) {
+            if (currentRelations.contains(relation.str())) {
+                operations.revoke(
+                        SourceType.app, GLOBAL_APP_ID, relation,
+                        SourceType.user, normalizedUserId
+                );
+            }
+        }
+        Set<String> laboratoryIds = operations.entityIdsOf(
+                SourceType.laboratory, RelationShip.Laboratory.viewer,
+                SourceType.user, normalizedUserId
+        );
+        laboratoryIds.forEach(laboratoryId -> operations.revoke(
+                SourceType.laboratory, laboratoryId, RelationShip.Laboratory.viewer,
+                SourceType.user, normalizedUserId
+        ));
+    }
+
     private static Set<RelationShip.App> knownMutableAppRelations(Set<String> relations) {
         EnumSet<RelationShip.App> result = EnumSet.noneOf(RelationShip.App.class);
         for (RelationShip.App relation : RelationShip.App.values()) {
@@ -167,5 +191,12 @@ public class AuthService implements Auth {
 
     private static PermissionDeniedException denied(SourceType type, String id, String permission) {
         return new PermissionDeniedException(type, id, permission);
+    }
+
+    private static String requireText(String value, String name) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(name + " 不能为空");
+        }
+        return value.trim();
     }
 }

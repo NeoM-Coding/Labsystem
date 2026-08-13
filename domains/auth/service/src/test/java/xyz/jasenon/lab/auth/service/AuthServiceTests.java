@@ -123,6 +123,19 @@ class AuthServiceTests {
         assertTrue(operations.mutations.isEmpty());
     }
 
+    @Test
+    void removeUserRevokesAllKnownAppAndLaboratoryRelations() {
+        operations.targetRelations.add(RelationShip.App.super_admin.str());
+        operations.targetRelations.add(RelationShip.App.user_viewer.str());
+        operations.targetLaboratoryIds.add("lab-1");
+
+        auth.removeUser(" target ");
+
+        assertTrue(operations.mutations.contains("revoke:app:global#super_admin@user:target"));
+        assertTrue(operations.mutations.contains("revoke:app:global#user_viewer@user:target"));
+        assertTrue(operations.mutations.contains("revoke:laboratory:lab-1#viewer@user:target"));
+    }
+
     private static GrantCommand appGrant(RelationShip.App relation) {
         return new GrantCommand(
                 SourceType.app, AuthService.GLOBAL_APP_ID, relation,

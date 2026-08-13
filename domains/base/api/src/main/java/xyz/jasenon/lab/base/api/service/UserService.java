@@ -4,6 +4,7 @@ import xyz.jasenon.lab.base.api.dto.ContactUserCreate;
 import xyz.jasenon.lab.base.api.dto.UserCreate;
 import xyz.jasenon.lab.base.api.dto.UserAuthorizationUpdate;
 import xyz.jasenon.lab.base.api.dto.UserListQuery;
+import xyz.jasenon.lab.base.api.dto.UserDelete;
 import xyz.jasenon.lab.base.api.model.User;
 import xyz.jasenon.lab.common.rpc.RpcResult;
 
@@ -26,5 +27,7 @@ public interface UserService {
     RpcResult<User> registerContactUser(ContactUserCreate command);
 
     RpcResult<User> updateUser(UserAuthorizationUpdate command);
+
+    RpcResult<Void> deleteUser(UserDelete command);
 
 }

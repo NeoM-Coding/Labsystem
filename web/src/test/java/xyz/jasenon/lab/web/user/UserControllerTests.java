@@ -3,6 +3,7 @@ package xyz.jasenon.lab.web.user;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 import xyz.jasenon.lab.base.api.dto.UserListQuery;
+import xyz.jasenon.lab.base.api.dto.UserDelete;
 import xyz.jasenon.lab.base.api.model.User;
 import xyz.jasenon.lab.base.api.service.UserService;
 import xyz.jasenon.lab.common.rpc.RpcResult;
@@ -44,5 +45,18 @@ class UserControllerTests {
         controller.list(null);
 
         verify(userService).list(new UserListQuery(null));
+    }
+
+    @Test
+    void deleteAdaptsPathIdentityToSerializableCommand() {
+        UserService userService = mock(UserService.class);
+        when(userService.deleteUser(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(RpcResult.success());
+        UserController controller = new UserController();
+        ReflectionTestUtils.setField(controller, "userService", userService);
+
+        controller.delete("user-2");
+
+        verify(userService).deleteUser(new UserDelete("user-2", null));
     }
 }

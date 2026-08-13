@@ -6,6 +6,7 @@ import xyz.jasenon.lab.auth.permission.RelationShip;
 import xyz.jasenon.lab.base.api.dto.ContactUserCreate;
 import xyz.jasenon.lab.base.api.dto.UserAuthorizationUpdate;
 import xyz.jasenon.lab.base.api.dto.UserCreate;
+import xyz.jasenon.lab.base.api.dto.UserDelete;
 import xyz.jasenon.lab.base.api.model.User;
 
 import java.util.Set;
@@ -53,5 +54,15 @@ class UserAuditHandlerTests {
         assertThat(fragment.action()).isEqualTo(AuditAction.EDIT);
         assertThat(fragment.objectId()).isEqualTo("user-2");
         assertThat(fragment.description()).contains("张三", "1 项应用权限", "2 个实验室范围");
+    }
+
+    @Test
+    void deleteHandlerUsesTargetUserIdAndDisplayName() {
+        var fragment = new UserDeleteAuditHandler().handle(new UserDelete("user-2", "张三"));
+
+        assertThat(fragment.action()).isEqualTo(AuditAction.DELETE);
+        assertThat(fragment.objectType()).isEqualTo("user");
+        assertThat(fragment.objectId()).isEqualTo("user-2");
+        assertThat(fragment.description()).contains("张三");
     }
 }

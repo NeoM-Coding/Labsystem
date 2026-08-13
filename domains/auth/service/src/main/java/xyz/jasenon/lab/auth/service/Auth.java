@@ -15,4 +15,6 @@ public interface Auth {
 
     void synchronize(UserAuthorizationCommand command);
 
+    void removeUser(String userId);
+
 }

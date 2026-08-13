@@ -33,9 +33,7 @@ class SuperAdminFixtureTests {
     }
 
     private static Map<String, String> readExampleEnvironment() throws IOException {
-        Path file = Files.exists(Path.of(".env.example"))
-                ? Path.of(".env.example")
-                : Path.of("..", ".env.example");
+        Path file = locateRepositoryFile(".env.example");
         try (var lines = Files.lines(file)) {
             return lines
                     .map(String::trim)
@@ -44,6 +42,18 @@ class SuperAdminFixtureTests {
                     .filter(parts -> parts.length == 2)
                     .collect(Collectors.toMap(parts -> parts[0], parts -> unquote(parts[1])));
         }
+    }
+
+    private static Path locateRepositoryFile(String fileName) throws IOException {
+        Path directory = Path.of("").toAbsolutePath();
+        while (directory != null) {
+            Path candidate = directory.resolve(fileName);
+            if (Files.isRegularFile(candidate)) {
+                return candidate;
+            }
+            directory = directory.getParent();
+        }
+        throw new IOException("无法从当前目录向上找到 " + fileName);
     }
 
     private static String unquote(String value) {

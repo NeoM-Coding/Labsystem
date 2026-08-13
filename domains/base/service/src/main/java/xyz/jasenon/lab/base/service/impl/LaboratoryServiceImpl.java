@@ -51,12 +51,12 @@ public class LaboratoryServiceImpl extends ServiceImpl<LaboratoryMapper, Laborat
 
     @Override
     public RpcResult<List<Pair<String, String>>> collectionOrgName() {
-        return RpcResult.success(this.baseMapper.collectionOrgName());
+        return RpcResult.success(scopeOptions(true));
     }
 
     @Override
     public RpcResult<List<Pair<String, String>>> collectionBuildingName() {
-        return RpcResult.success(this.baseMapper.collectionBuildingName());
+        return RpcResult.success(scopeOptions(false));
     }
 
     @Override
@@ -186,6 +186,22 @@ public class LaboratoryServiceImpl extends ServiceImpl<LaboratoryMapper, Laborat
             throw new BusinessException(UNAUTHORIZED, "登陆已过期");
         }
         return context;
+    }
+
+    private static List<Pair<String, String>> scopeOptions(boolean organization) {
+        UserContext context = requireUserContext();
+        if (context.getLaboratoryScopes() == null) {
+            return List.of();
+        }
+        return context.getLaboratoryScopes().stream()
+                .filter(java.util.Objects::nonNull)
+                .filter(scope -> scope.getLaboratoryId() != null && !scope.getLaboratoryId().isBlank())
+                .map(scope -> Pair.of(
+                        scope.getLaboratoryId(),
+                        organization ? scope.getOrgName() : scope.getBuildingName()
+                ))
+                .filter(pair -> pair.s != null && !pair.s.isBlank())
+                .toList();
     }
 
     private static Laboratory from(LaboratoryCreate command) {

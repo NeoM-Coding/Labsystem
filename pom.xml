@@ -64,6 +64,7 @@
         <module>domains/base/service</module>
         <module>domains/edu/service</module>
         <module>domains/rule/engine</module>
+        <module>domains/rule/benchmark</module>
     </modules>
     <packaging>pom</packaging>
 

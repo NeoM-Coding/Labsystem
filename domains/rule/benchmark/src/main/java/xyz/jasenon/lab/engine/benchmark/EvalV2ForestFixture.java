@@ -5,12 +5,13 @@ import xyz.jasenon.lab.engine.eval.EvalNode;
 import xyz.jasenon.lab.engine.eval.LogicType;
 import xyz.jasenon.lab.engine.eval.Operator;
 import xyz.jasenon.lab.engine.eval.v2.EvalForest;
+import xyz.jasenon.lab.engine.eval.v2.EvalRootKey;
 import xyz.jasenon.lab.engine.event.DeviceEventKey;
 
 import java.util.ArrayList;
 import java.util.List;
 
-/** 构造与 EvalV2DemoForest 相同的四棵树，供基准测试稳定复用。 */
+/** 为 JMH 构造可重复的共享森林，不经过 Spring 或持久化链路。 */
 final class EvalV2ForestFixture {
 
     static final List<String> FIELDS = List.of(
@@ -23,122 +24,120 @@ final class EvalV2ForestFixture {
     static Scenario create(int deviceCount) {
         EvalForest forest = new EvalForest();
         List<List<DeviceEventKey>> keysByDevice = new ArrayList<>(deviceCount);
-        for (int index = 0; index < deviceCount; index++) {
-            String deviceId = "ac-benchmark-" + index;
-            registerDevice(forest, deviceId, index);
-            keysByDevice.add(FIELDS.stream()
+        for (int deviceIndex = 0; deviceIndex < deviceCount; deviceIndex++) {
+            String deviceId = "ac-" + deviceIndex;
+            registerProductionLikeTrees(forest, deviceId, deviceIndex);
+            List<DeviceEventKey> keys = FIELDS.stream()
                     .map(field -> key(deviceId, field))
-                    .toList());
+                    .toList();
+            keysByDevice.add(keys);
+            forest.accept(keys.get(0), "20");
+            forest.accept(keys.get(1), "false");
+            forest.accept(keys.get(2), "Heating");
+            forest.accept(keys.get(3), "0");
+            forest.accept(keys.get(4), "Low");
         }
-        verifyTopology(forest, deviceCount);
         return new Scenario(forest, List.copyOf(keysByDevice));
     }
 
-    /**
-     * 构造高扇出森林：每棵树的所有叶子都监听同一个温度字段，但使用不同阈值。
-     * 一次温度反转会让该设备的全部谓词、叶子和组合节点发生真实传播。
-     */
-    static HighFanOutScenario createHighFanOut(int deviceCount, int treesPerDevice, int leavesPerTree) {
+    static HighFanOutScenario createHighFanOut(
+            int deviceCount,
+            int treesPerDevice,
+            int leavesPerTree
+    ) {
         EvalForest forest = new EvalForest();
         List<DeviceEventKey> keys = new ArrayList<>(deviceCount);
         for (int deviceIndex = 0; deviceIndex < deviceCount; deviceIndex++) {
-            String deviceId = "ac-high-fanout-" + deviceIndex;
-            DeviceEventKey temperature = key(deviceId, "roomTemperature");
-            keys.add(temperature);
+            String deviceId = "fanout-ac-" + deviceIndex;
+            DeviceEventKey eventKey = key(deviceId, "errorCode");
+            keys.add(eventKey);
             for (int treeIndex = 0; treeIndex < treesPerDevice; treeIndex++) {
-                EvalNode[] nodes = new EvalNode[leavesPerTree];
+                EvalNode head = null;
+                EvalNode tail = null;
                 for (int leafIndex = 0; leafIndex < leavesPerTree; leafIndex++) {
-                    int threshold = treeIndex * leavesPerTree + leafIndex + 1;
-                    nodes[leafIndex] = condition(
+                    EvalNode leaf = condition(
+                            "leaf-" + treeIndex + '-' + leafIndex,
                             deviceId,
-                            "threshold-" + threshold,
-                            "roomTemperature",
+                            "errorCode",
                             Operator.GT,
-                            Integer.toString(threshold),
-                            leafIndex == 0 ? null : LogicType.AND
+                            Integer.toString((treeIndex + leafIndex) & 7),
+                            leafIndex == 0 || (leafIndex & 1) == 0 ? LogicType.AND : LogicType.OR
                     );
+                    if (head == null) {
+                        head = leaf;
+                    } else {
+                        tail.setNext(leaf);
+                    }
+                    tail = leaf;
                 }
                 forest.register(
-                        "device-" + deviceIndex + ":large-tree-" + treeIndex,
-                        chain(nodes)
+                        new EvalRootKey("fanout-runtime-" + deviceIndex, "tree-" + treeIndex),
+                        head
                 );
             }
-        }
-
-        int expectedTrees = deviceCount * treesPerDevice;
-        int expectedPredicates = expectedTrees * leavesPerTree;
-        if (forest.eventSourceCount() != deviceCount
-                || forest.treeCount() != expectedTrees
-                || forest.predicateCount() != expectedPredicates) {
-            throw new IllegalStateException("high-fan-out benchmark topology is incomplete");
+            forest.accept(eventKey, "0");
         }
         return new HighFanOutScenario(forest, List.copyOf(keys));
     }
 
-    private static void verifyTopology(EvalForest forest, int deviceCount) {
-        if (forest.eventSourceCount() != deviceCount * 5
-                || forest.predicateCount() != deviceCount * 12
-                || forest.treeCount() != deviceCount * 4) {
-            throw new IllegalStateException("benchmark forest topology does not match EvalV2DemoForest");
-        }
-    }
-
-    private static void registerDevice(EvalForest forest, String deviceId, int index) {
-        String prefix = "device-" + index + ":";
-        forest.register(prefix + "safety-interlock", chain(
-                condition(deviceId, "warm", "roomTemperature", Operator.GT, "26", null),
-                condition(deviceId, "open", "opened", Operator.EQ, "true", LogicType.AND),
-                condition(deviceId, "cooling", "mode", Operator.EQ, "Cooling", LogicType.AND),
-                condition(deviceId, "no-error", "errorCode", Operator.EQ, "0", LogicType.AND)
+    private static void registerProductionLikeTrees(
+            EvalForest forest,
+            String deviceId,
+            int deviceIndex
+    ) {
+        String runtimeId = "benchmark-runtime-" + deviceIndex;
+        forest.register(new EvalRootKey(runtimeId, "warm"), chain(
+                condition("warm", deviceId, "roomTemperature", Operator.GT, "26", LogicType.AND),
+                condition("open", deviceId, "opened", Operator.EQ, "true", LogicType.AND),
+                condition("cooling", deviceId, "mode", Operator.EQ, "Cooling", LogicType.OR),
+                condition("no-error", deviceId, "errorCode", Operator.EQ, "0", LogicType.AND)
         ));
-        forest.register(prefix + "outside-comfort", chain(
-                condition(deviceId, "cold", "roomTemperature", Operator.ST, "18", null),
-                condition(deviceId, "hot", "roomTemperature", Operator.GT, "30", LogicType.OR),
-                condition(deviceId, "open", "opened", Operator.EQ, "true", LogicType.AND),
-                condition(deviceId, "has-error", "errorCode", Operator.NE, "0", LogicType.OR),
-                condition(deviceId, "high-speed", "speed", Operator.EQ, "High", LogicType.OR)
+        forest.register(new EvalRootKey(runtimeId, "risk"), chain(
+                condition("hot", deviceId, "roomTemperature", Operator.GT, "30", LogicType.AND),
+                condition("error", deviceId, "errorCode", Operator.NE, "0", LogicType.OR),
+                condition("fast", deviceId, "speed", Operator.EQ, "High", LogicType.OR)
         ));
-        forest.register(prefix + "cooling-response", chain(
-                condition(deviceId, "cooling", "mode", Operator.EQ, "Cooling", null),
-                condition(deviceId, "high-speed", "speed", Operator.EQ, "High", LogicType.AND),
-                condition(deviceId, "very-hot", "roomTemperature", Operator.GT, "32", LogicType.OR),
-                condition(deviceId, "open", "opened", Operator.EQ, "true", LogicType.AND),
-                condition(deviceId, "has-error", "errorCode", Operator.NE, "0", LogicType.OR)
+        forest.register(new EvalRootKey(runtimeId, "comfort"), chain(
+                condition("lower", deviceId, "roomTemperature", Operator.GT, "22", LogicType.AND),
+                condition("upper", deviceId, "roomTemperature", Operator.ST, "28", LogicType.AND),
+                condition("open", deviceId, "opened", Operator.EQ, "true", LogicType.AND)
         ));
-        forest.register(prefix + "stable-zone", chain(
-                condition(deviceId, "lower-bound", "roomTemperature", Operator.GE, "22", null),
-                condition(deviceId, "upper-bound", "roomTemperature", Operator.SE, "28", LogicType.AND),
-                condition(deviceId, "open", "opened", Operator.EQ, "true", LogicType.AND),
-                condition(deviceId, "no-error", "errorCode", Operator.EQ, "0", LogicType.AND),
-                condition(deviceId, "cooling", "mode", Operator.EQ, "Cooling", LogicType.AND),
-                condition(deviceId, "not-high-speed", "speed", Operator.NE, "High", LogicType.AND)
+        forest.register(new EvalRootKey(runtimeId, "cooling"), chain(
+                condition("mode", deviceId, "mode", Operator.EQ, "Cooling", LogicType.AND),
+                condition("open", deviceId, "opened", Operator.EQ, "true", LogicType.AND)
+        ));
+        forest.register(new EvalRootKey(runtimeId, "compound"), chain(
+                condition("warm", deviceId, "roomTemperature", Operator.GT, "26", LogicType.AND),
+                condition("open", deviceId, "opened", Operator.EQ, "true", LogicType.OR),
+                condition("safe", deviceId, "errorCode", Operator.EQ, "0", LogicType.AND),
+                condition("cooling", deviceId, "mode", Operator.EQ, "Cooling", LogicType.OR),
+                condition("fast", deviceId, "speed", Operator.EQ, "High", LogicType.AND)
         ));
     }
 
     private static EvalNode chain(EvalNode... nodes) {
-        for (int index = 0; index < nodes.length - 1; index++) {
+        for (int index = 0; index + 1 < nodes.length; index++) {
             nodes[index].setNext(nodes[index + 1]);
         }
         return nodes[0];
     }
 
     private static EvalNode condition(
-            String deviceId,
             String nodeId,
+            String deviceId,
             String field,
             Operator operator,
-            String target,
+            String value,
             LogicType logic
     ) {
         EvalNode node = new EvalNode();
         node.setNodeId(nodeId);
-        node.setDeviceId(deviceId);
         node.setDeviceType(DeviceType.AirCondition);
+        node.setDeviceId(deviceId);
         node.setField(field);
         node.setOperator(operator);
-        node.setValue(target);
+        node.setValue(value);
         node.setLogicToPrev(logic);
-        node.setResult(false);
         return node;
     }
 

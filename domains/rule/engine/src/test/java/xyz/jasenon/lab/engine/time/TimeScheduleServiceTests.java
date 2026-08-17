@@ -1,11 +1,12 @@
 package xyz.jasenon.lab.engine.time;
 
 import org.junit.jupiter.api.Test;
-import xyz.jasenon.lab.engine.action.ActionGroup;
-import xyz.jasenon.lab.engine.eval.EvalNode;
+import xyz.jasenon.lab.engine.eval.v2.EvalForest;
 import xyz.jasenon.lab.engine.event.TimeEvent;
 import xyz.jasenon.lab.engine.event.TimeSignal;
 import xyz.jasenon.lab.engine.runtime.Runtime;
+import xyz.jasenon.lab.engine.runtime.RuntimeActionGroup;
+import xyz.jasenon.lab.engine.runtime.RuntimeLifetime;
 
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -39,11 +40,17 @@ class TimeScheduleServiceTests {
                         targetTime.toLocalTime()
                 )
         ));
-        EvalNode dummy = new EvalNode();
-        dummy.setResult(true);
-        Runtime runtime = new Runtime("runtime-time-service");
-        runtime.registerActionGroup(new ActionGroup("group-1", dummy, timeGroup));
-        runtime.registerActionGroup(new ActionGroup("group-2", dummy, timeGroup));
+        EvalForest forest = new EvalForest();
+        Runtime runtime = new Runtime(
+                "runtime-time-service",
+                RuntimeLifetime.always(),
+                forest.registerRuntime("runtime-time-service", java.util.Map.of(), Set.of("always")),
+                java.util.Map.of(timeGroup.getGroupId(), timeGroup),
+                List.of(
+                        new RuntimeActionGroup("group-1", "always", timeGroup, List.of()),
+                        new RuntimeActionGroup("group-2", "always", timeGroup, List.of())
+                )
+        );
         CountDownLatch delivered = new CountDownLatch(1);
         AtomicReference<TimeEvent> received = new AtomicReference<>();
         AtomicInteger deliveryCount = new AtomicInteger();
@@ -63,7 +70,8 @@ class TimeScheduleServiceTests {
             assertEquals("point-1", received.get().key().conditionId());
             assertEquals(1, deliveryCount.get());
         } finally {
-            service.cancel(runtime.getRuntimeId());
+            service.cancel(runtime.runtimeId());
+            runtime.close();
             service.shutdown();
         }
     }

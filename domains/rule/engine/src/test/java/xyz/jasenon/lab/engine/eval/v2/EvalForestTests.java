@@ -49,17 +49,17 @@ class EvalForestTests {
     @Test
     void sharesEventSourcesAndEqualPredicatesAcrossTrees() {
         EvalForest forest = new EvalForest();
-        forest.register("warm", chain(node("1", Operator.GT, "26", LogicType.AND, false)));
-        forest.register("hot", chain(node("2", Operator.GT, "30", LogicType.AND, false)));
-        forest.register("warm-copy", chain(node("3", Operator.GT, "26", LogicType.OR, false)));
+        forest.register(key("warm"), chain(node("1", Operator.GT, "26", LogicType.AND, false)));
+        forest.register(key("hot"), chain(node("2", Operator.GT, "30", LogicType.AND, false)));
+        forest.register(key("warm-copy"), chain(node("3", Operator.GT, "26", LogicType.OR, false)));
 
         assertEquals(3, forest.treeCount());
         assertEquals(1, forest.eventSourceCount());
         assertEquals(2, forest.predicateCount());
         assertEquals(2, forest.eventSource(TEMPERATURE).orElseThrow().predicateObserverCount());
 
-        LeafTransformNode warmLeaf = firstLeaf(forest.root("warm").orElseThrow().input());
-        LeafTransformNode copyLeaf = firstLeaf(forest.root("warm-copy").orElseThrow().input());
+        LeafTransformNode warmLeaf = firstLeaf(forest.root(key("warm")).orElseThrow().input());
+        LeafTransformNode copyLeaf = firstLeaf(forest.root(key("warm-copy")).orElseThrow().input());
         assertSame(warmLeaf.predicate(), copyLeaf.predicate());
         assertNotSame(warmLeaf, copyLeaf);
     }
@@ -73,7 +73,8 @@ class EvalForestTests {
         b.setNext(c);
 
         EvalForest forest = new EvalForest();
-        RootNode root = forest.register("expression", a);
+        forest.register(key("expression"), a);
+        RootNode root = forest.root(key("expression")).orElseThrow();
         assertInstanceOf(CompositeNode.class, root.input());
 
         assertFalse(root.value());
@@ -88,7 +89,8 @@ class EvalForestTests {
         EvalForest forest = new EvalForest();
         EvalNode first = node("first", Operator.GT, "26", LogicType.OR, false);
 
-        RootNode root = forest.register("single", first);
+        forest.register(key("single"), first);
+        RootNode root = forest.root(key("single")).orElseThrow();
         LeafTransformNode leaf = (LeafTransformNode) root.input();
 
         assertEquals(LogicType.AND, leaf.logicToPrevious());
@@ -103,7 +105,7 @@ class EvalForestTests {
         dummy.setResult(true);
         dummy.setNext(node("first", Operator.GT, "26", LogicType.AND, false));
 
-        assertThrows(IllegalArgumentException.class, () -> forest.register("legacy-chain", dummy));
+        assertThrows(IllegalArgumentException.class, () -> forest.register(key("legacy-chain"), dummy));
     }
 
     @Test
@@ -113,15 +115,18 @@ class EvalForestTests {
         first.setNext(second);
 
         EvalForest forest = new EvalForest();
-        forest.register("both", first);
+        forest.register(key("both"), first);
 
         EvalUpdate update = forest.accept(TEMPERATURE, "25");
-        assertEquals(java.util.Map.of("both", true), update.changedResults());
-        assertEquals(true, forest.rootResult("both").orElseThrow());
+        assertEquals(
+                java.util.Map.of(key("both"), true),
+                update.changedResults()
+        );
+        assertEquals(true, forest.rootResult(key("both")).orElseThrow());
 
         assertFalse(forest.accept(TEMPERATURE, "26").changed());
         assertTrue(forest.accept(TEMPERATURE, "15").changed());
-        assertFalse(forest.rootResult("both").orElseThrow());
+        assertFalse(forest.rootResult(key("both")).orElseThrow());
     }
 
     @Test
@@ -131,12 +136,12 @@ class EvalForestTests {
         first.setNext(second);
 
         EvalForest forest = new EvalForest();
-        forest.register("either-side", first);
+        forest.register(key("either-side"), first);
 
         EvalUpdate update = forest.accept(TEMPERATURE, "15");
 
         assertFalse(update.changed());
-        assertTrue(forest.rootResult("either-side").orElseThrow());
+        assertTrue(forest.rootResult(key("either-side")).orElseThrow());
     }
 
     @Test
@@ -150,7 +155,8 @@ class EvalForestTests {
         }
 
         EvalForest forest = new EvalForest();
-        RootNode root = forest.register("balanced", head);
+        forest.register(key("balanced"), head);
+        RootNode root = forest.root(key("balanced")).orElseThrow();
 
         assertTrue(height(root.input()) <= 5);
     }
@@ -158,31 +164,31 @@ class EvalForestTests {
     @Test
     void ignoresUnknownKeysAndTreatsInvalidValuesAsFalse() {
         EvalForest forest = new EvalForest();
-        forest.register("warm", chain(node("1", Operator.GT, "26", LogicType.AND, true)));
+        forest.register(key("warm"), chain(node("1", Operator.GT, "26", LogicType.AND, true)));
 
         DeviceEventKey unknown = new DeviceEventKey(DeviceType.AirCondition, "ac-2", "roomTemperature");
         assertFalse(forest.accept(unknown, "30").changed());
         assertTrue(forest.accept(TEMPERATURE, "not-a-number").changed());
-        assertFalse(forest.rootResult("warm").orElseThrow());
+        assertFalse(forest.rootResult(key("warm")).orElseThrow());
     }
 
     @Test
     void predicatesRegisteredLaterInheritTheCurrentEventValue() {
         EvalForest forest = new EvalForest();
-        forest.register("warm", chain(node("1", Operator.GT, "26", LogicType.AND, false)));
+        forest.register(key("warm"), chain(node("1", Operator.GT, "26", LogicType.AND, false)));
         forest.accept(TEMPERATURE, "30");
 
-        forest.register("hot", chain(node("2", Operator.GT, "28", LogicType.AND, false)));
+        forest.register(key("hot"), chain(node("2", Operator.GT, "28", LogicType.AND, false)));
 
-        assertTrue(forest.rootResult("hot").orElseThrow());
+        assertTrue(forest.rootResult(key("hot")).orElseThrow());
     }
 
     @Test
     void supportsConcurrentInferenceAndKeepsTheLatestRootRealityVisible() throws Exception {
         EvalForest forest = new EvalForest();
-        forest.register("warm", chain(node("1", Operator.GT, "26", LogicType.AND, false)));
+        forest.register(key("warm"), chain(node("1", Operator.GT, "26", LogicType.AND, false)));
         List<Boolean> observations = new CopyOnWriteArrayList<>();
-        forest.root("warm").orElseThrow().observe((source, previous, current) -> observations.add(current));
+        forest.root(key("warm")).orElseThrow().observe((source, previous, current) -> observations.add(current));
 
         int eventCount = 40;
         ExecutorService executor = Executors.newFixedThreadPool(4);
@@ -203,14 +209,73 @@ class EvalForestTests {
         executor.shutdownNow();
 
         forest.accept(TEMPERATURE, "30");
-        assertTrue(forest.rootResult("warm").orElseThrow());
+        assertTrue(forest.rootResult(key("warm")).orElseThrow());
         forest.accept(TEMPERATURE, "20");
-        assertFalse(forest.rootResult("warm").orElseThrow());
+        assertFalse(forest.rootResult(key("warm")).orElseThrow());
         assertEquals(false, observations.get(observations.size() - 1));
+    }
+
+    @Test
+    void unregistersOneTreeWithoutRemovingSharedPredicate() {
+        EvalForest forest = new EvalForest();
+        EvalRootHandle first = forest.register(
+                new EvalRootKey("runtime-1", "warm"),
+                node("1", Operator.GT, "26", null, false)
+        );
+        EvalRootHandle second = forest.register(
+                new EvalRootKey("runtime-2", "warm"),
+                node("2", Operator.GT, "26", null, false)
+        );
+
+        assertEquals(2, forest.treeCount());
+        assertEquals(1, forest.eventSourceCount());
+        assertEquals(1, forest.predicateCount());
+
+        first.close();
+
+        assertTrue(first.closed());
+        assertEquals(1, forest.treeCount());
+        assertEquals(1, forest.eventSourceCount());
+        assertEquals(1, forest.predicateCount());
+        assertTrue(forest.accept(TEMPERATURE, "30").changedResults()
+                .containsKey(second.key()));
+
+        second.close();
+
+        assertEquals(0, forest.treeCount());
+        assertEquals(0, forest.predicateCount());
+        assertEquals(0, forest.eventSourceCount());
+        assertFalse(forest.accept(TEMPERATURE, "20").changed());
+    }
+
+    @Test
+    void closesAWholeRuntimeRegistrationAndKeepsConstantRootsOutOfTheFieldIndex() {
+        EvalForest forest = new EvalForest();
+        EvalForestRegistration registration = forest.registerRuntime(
+                "runtime-1",
+                java.util.Map.of("warm", node("1", Operator.GT, "26", null, false)),
+                java.util.Set.of("time-only")
+        );
+
+        assertEquals(2, forest.treeCount());
+        assertEquals(1, forest.eventSourceCount());
+        assertTrue(registration.root("time-only").value());
+
+        registration.close();
+        registration.close();
+
+        assertTrue(registration.closed());
+        assertEquals(0, forest.treeCount());
+        assertEquals(0, forest.predicateCount());
+        assertEquals(0, forest.eventSourceCount());
     }
 
     private static EvalNode chain(EvalNode condition) {
         return condition;
+    }
+
+    private static EvalRootKey key(String conditionGroupId) {
+        return new EvalRootKey("test-runtime", conditionGroupId);
     }
 
     private static EvalNode node(

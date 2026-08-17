@@ -51,37 +51,44 @@ public class RuntimeLifecycleManager {
         return clock.instant();
     }
 
-    public void track(Runtime runtime, Runnable onActivate, Runnable onExpire) {
-        Objects.requireNonNull(runtime, "runtime");
+    public void track(
+            String runtimeId,
+            RuntimeLifetime lifetime,
+            Runnable onActivate,
+            Runnable onExpire
+    ) {
+        if (runtimeId == null || runtimeId.isBlank()) {
+            throw new IllegalArgumentException("runtimeId must not be blank");
+        }
+        Objects.requireNonNull(lifetime, "lifetime");
         Objects.requireNonNull(onActivate, "onActivate");
         Objects.requireNonNull(onExpire, "onExpire");
 
-        cancel(runtime.getRuntimeId());
+        cancel(runtimeId);
         LifecycleSlot slot = new LifecycleSlot();
-        slots.put(runtime.getRuntimeId(), slot);
+        slots.put(runtimeId, slot);
 
         Instant now = clock.instant();
-        if (runtime.getLifetime().isExpiredAt(now)) {
-            slots.remove(runtime.getRuntimeId(), slot);
-            runtime.expire();
+        if (lifetime.isExpiredAt(now)) {
+            slots.remove(runtimeId, slot);
             onExpire.run();
             return;
         }
 
-        if (runtime.getLifetime().isPendingAt(now)) {
+        if (lifetime.isPendingAt(now)) {
             slot.activateFuture = schedule(
-                    runtime.getLifetime().activeFrom(),
-                    () -> runIfCurrent(runtime.getRuntimeId(), slot, onActivate)
+                    lifetime.activeFrom(),
+                    () -> runIfCurrent(runtimeId, slot, onActivate)
             );
         } else {
             onActivate.run();
         }
 
-        if (runtime.getLifetime().activeUntil() != null) {
+        if (lifetime.activeUntil() != null) {
             slot.expireFuture = schedule(
-                    runtime.getLifetime().activeUntil(),
+                    lifetime.activeUntil(),
                     () -> {
-                        if (slots.remove(runtime.getRuntimeId(), slot)) {
+                        if (slots.remove(runtimeId, slot)) {
                             slot.cancelled.set(true);
                             onExpire.run();
                         }

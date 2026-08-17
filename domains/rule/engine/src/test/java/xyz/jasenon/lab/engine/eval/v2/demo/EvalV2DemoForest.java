@@ -9,6 +9,7 @@ import xyz.jasenon.lab.engine.eval.v2.BooleanTransform;
 import xyz.jasenon.lab.engine.eval.v2.CompositeNode;
 import xyz.jasenon.lab.engine.eval.v2.EvalForest;
 import xyz.jasenon.lab.engine.eval.v2.EvalUpdate;
+import xyz.jasenon.lab.engine.eval.v2.EvalRootKey;
 import xyz.jasenon.lab.engine.eval.v2.EventSourceNode;
 import xyz.jasenon.lab.engine.eval.v2.LeafTransformNode;
 import xyz.jasenon.lab.engine.eval.v2.ObservableValue;
@@ -60,7 +61,10 @@ public class EvalV2DemoForest {
                 : request.deviceId();
         DeviceEventKey eventKey = new DeviceEventKey(deviceType, deviceId, request.field());
         EvalUpdate update = forest.accept(eventKey, request.value());
-        return new EventResult(update.changedResults(), snapshot());
+        Map<String, Boolean> changedRoots = new LinkedHashMap<>();
+        update.changedResults().forEach((key, value) ->
+                changedRoots.put(key.conditionGroupId(), value));
+        return new EventResult(changedRoots, snapshot());
     }
 
     public ForestSnapshot snapshot() {
@@ -70,7 +74,7 @@ public class EvalV2DemoForest {
         Map<String, Boolean> roots = new LinkedHashMap<>();
 
         for (String groupId : GROUP_NAMES.keySet().stream().sorted().toList()) {
-            RootNode root = currentForest.root(groupId).orElseThrow();
+            RootNode root = currentForest.root(rootKey(groupId)).orElseThrow();
             String inputId = visitExpression(groupId, "0", root.input(), nodes, edges);
             String rootId = "root:" + groupId;
             nodes.put(rootId, new GraphNode(
@@ -98,27 +102,27 @@ public class EvalV2DemoForest {
         EvalForest next = new EvalForest();
 
         // 最右侧 errorCode == 0 为 false 时，前面三项即使变化也无法穿透顶层复合节点。
-        next.register("safety-interlock", chain(
+        next.register(rootKey("safety-interlock"), chain(
                 condition("warm", "roomTemperature", Operator.GT, "26", null),
                 condition("open", "opened", Operator.EQ, "true", LogicType.AND),
                 condition("cooling", "mode", Operator.EQ, "Cooling", LogicType.AND),
                 condition("no-error", "errorCode", Operator.EQ, "0", LogicType.AND)
         ));
-        next.register("outside-comfort", chain(
+        next.register(rootKey("outside-comfort"), chain(
                 condition("cold", "roomTemperature", Operator.ST, "18", null),
                 condition("hot", "roomTemperature", Operator.GT, "30", LogicType.OR),
                 condition("open", "opened", Operator.EQ, "true", LogicType.AND),
                 condition("has-error", "errorCode", Operator.NE, "0", LogicType.OR),
                 condition("high-speed", "speed", Operator.EQ, "High", LogicType.OR)
         ));
-        next.register("cooling-response", chain(
+        next.register(rootKey("cooling-response"), chain(
                 condition("cooling", "mode", Operator.EQ, "Cooling", null),
                 condition("high-speed", "speed", Operator.EQ, "High", LogicType.AND),
                 condition("very-hot", "roomTemperature", Operator.GT, "32", LogicType.OR),
                 condition("open", "opened", Operator.EQ, "true", LogicType.AND),
                 condition("has-error", "errorCode", Operator.NE, "0", LogicType.OR)
         ));
-        next.register("stable-zone", chain(
+        next.register(rootKey("stable-zone"), chain(
                 condition("lower-bound", "roomTemperature", Operator.GE, "22", null),
                 condition("upper-bound", "roomTemperature", Operator.SE, "28", LogicType.AND),
                 condition("open", "opened", Operator.EQ, "true", LogicType.AND),
@@ -227,6 +231,10 @@ public class EvalV2DemoForest {
 
     private static DeviceEventKey key(String field) {
         return new DeviceEventKey(DeviceType.AirCondition, DEVICE_ID, field);
+    }
+
+    private static EvalRootKey rootKey(String conditionGroupId) {
+        return new EvalRootKey("eval-v2-demo", conditionGroupId);
     }
 
     private static String format(BooleanTransform transform) {

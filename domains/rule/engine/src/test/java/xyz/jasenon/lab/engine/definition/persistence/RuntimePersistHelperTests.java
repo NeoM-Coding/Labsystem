@@ -3,9 +3,11 @@ package xyz.jasenon.lab.engine.definition.persistence;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
+import com.baomidou.mybatisplus.autoconfigure.MybatisPlusAutoConfiguration;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.jdbc.Sql;
-import org.springframework.test.util.ReflectionTestUtils;
 import xyz.jasenon.lab.device.model.DeviceType;
 import xyz.jasenon.lab.engine.Engine;
 import xyz.jasenon.lab.engine.RuleEngineApplication;
@@ -17,7 +19,6 @@ import xyz.jasenon.lab.engine.definition.RuntimeRevision.TimeConditionGroupDefin
 import xyz.jasenon.lab.engine.eval.LogicType;
 import xyz.jasenon.lab.engine.eval.Operator;
 import xyz.jasenon.lab.engine.runtime.Runtime;
-import xyz.jasenon.lab.engine.runtime.RuntimeTable;
 
 import java.util.List;
 
@@ -52,6 +53,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
         },
         executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD
 )
+@ImportAutoConfiguration({DataSourceAutoConfiguration.class, MybatisPlusAutoConfiguration.class})
 class RuntimePersistHelperTests {
 
     @Autowired
@@ -66,8 +68,7 @@ class RuntimePersistHelperTests {
     @Test
     void appendsImmutableRevisionForUpdateEnableAndDisable() {
         assertTrue(helper.register(revision("runtime-1", true, "26")));
-        RuntimeTable runtimeTable = runtimeTable();
-        Runtime registered = runtimeTable.get("runtime-1").orElseThrow();
+        Runtime registered = engine.runtime("runtime-1").orElseThrow();
         assertFalse(helper.register(revision("runtime-1", true, "26")));
         assertEquals(1, revisionCount("runtime-1"));
         assertTrue(helper.fetch().get(0).isEnabled());
@@ -75,18 +76,18 @@ class RuntimePersistHelperTests {
         assertTrue(helper.disable("runtime-1"));
         assertEquals(2, revisionCount("runtime-1"));
         assertFalse(helper.fetch().get(0).isEnabled());
-        assertFalse(runtimeTable.contains("runtime-1"));
+        assertTrue(engine.runtime("runtime-1").isEmpty());
 
         assertTrue(helper.enable("runtime-1"));
         assertEquals(3, revisionCount("runtime-1"));
         assertTrue(helper.fetch().get(0).isEnabled());
-        Runtime reenabled = runtimeTable.get("runtime-1").orElseThrow();
+        Runtime reenabled = engine.runtime("runtime-1").orElseThrow();
         assertNotSame(registered, reenabled);
         assertTrue(helper.enable("runtime-1"));
         assertEquals(3, revisionCount("runtime-1"));
 
         assertTrue(helper.update("runtime-1", revision("runtime-1", true, "30")));
-        assertNotSame(reenabled, runtimeTable.get("runtime-1").orElseThrow());
+        assertNotSame(reenabled, engine.runtime("runtime-1").orElseThrow());
         assertEquals(4, revisionCount("runtime-1"));
         assertEquals(
                 "30",
@@ -97,7 +98,7 @@ class RuntimePersistHelperTests {
         );
 
         assertTrue(helper.remove("runtime-1"));
-        assertFalse(runtimeTable.contains("runtime-1"));
+        assertTrue(engine.runtime("runtime-1").isEmpty());
         assertTrue(helper.fetch().isEmpty());
         assertEquals(4, revisionCount("runtime-1"));
     }
@@ -111,13 +112,8 @@ class RuntimePersistHelperTests {
         engine.remove("disabled-runtime");
         helper.restoreEnabledRuntimes();
 
-        RuntimeTable runtimeTable = runtimeTable();
-        assertTrue(runtimeTable.contains("enabled-runtime"));
-        assertFalse(runtimeTable.contains("disabled-runtime"));
-    }
-
-    private RuntimeTable runtimeTable() {
-        return (RuntimeTable) ReflectionTestUtils.getField(engine, "runtimeHelper");
+        assertTrue(engine.runtime("enabled-runtime").isPresent());
+        assertTrue(engine.runtime("disabled-runtime").isEmpty());
     }
 
     private int revisionCount(String runtimeId) {

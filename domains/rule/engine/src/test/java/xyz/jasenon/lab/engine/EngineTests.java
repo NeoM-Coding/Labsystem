@@ -1,212 +1,177 @@
 package xyz.jasenon.lab.engine;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import xyz.jasenon.lab.device.model.DeviceType;
-import xyz.jasenon.lab.engine.action.ActionGroup;
-import xyz.jasenon.lab.engine.eval.DeviceConditionGroup;
+import xyz.jasenon.lab.engine.definition.RuntimePlan;
 import xyz.jasenon.lab.engine.eval.EvalNode;
 import xyz.jasenon.lab.engine.eval.LogicType;
 import xyz.jasenon.lab.engine.eval.Operator;
+import xyz.jasenon.lab.engine.eval.v2.EvalForest;
 import xyz.jasenon.lab.engine.event.DeviceEvent;
-import xyz.jasenon.lab.engine.event.TimeEvent;
-import xyz.jasenon.lab.engine.event.TimeSignal;
+import xyz.jasenon.lab.engine.event.DeviceEventKey;
 import xyz.jasenon.lab.engine.runtime.Runtime;
+import xyz.jasenon.lab.engine.runtime.RuntimeActionGroup;
+import xyz.jasenon.lab.engine.runtime.RuntimeLifecycleManager;
 import xyz.jasenon.lab.engine.runtime.RuntimeLifetime;
-import xyz.jasenon.lab.engine.runtime.RuntimeSignal;
 import xyz.jasenon.lab.engine.runtime.RuntimeScheduler;
-import xyz.jasenon.lab.engine.runtime.RuntimeState;
-import xyz.jasenon.lab.engine.time.CalendarConstraint;
+import xyz.jasenon.lab.engine.runtime.RuntimeSignal;
 import xyz.jasenon.lab.engine.time.TimeConditionGroup;
-import xyz.jasenon.lab.engine.time.TimePointCondition;
-import xyz.jasenon.lab.engine.time.TimeWindowCondition;
+import xyz.jasenon.lab.engine.time.TimeScheduleService;
 
-import java.time.Duration;
 import java.time.Instant;
-import java.time.LocalTime;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
-import java.util.function.BooleanSupplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class EngineTests {
 
-    @Test
-    void refreshesMatchedRuntimeAndDelegatesScheduling() {
-        RecordingRuntimeScheduler scheduler = new RecordingRuntimeScheduler();
-        Engine engine = new Engine(scheduler);
-        Runtime runtime = runtime("runtime-1");
-        engine.register(runtime);
+    private final EvalForest forest = new EvalForest();
+    private final RecordingScheduler scheduler = new RecordingScheduler();
+    private final RuntimeLifecycleManager lifecycle = new RuntimeLifecycleManager();
+    private final TimeScheduleService time = new TimeScheduleService();
+    private final Engine engine = new Engine(forest, scheduler, lifecycle, time);
 
-        engine.accept(event("27"));
-
-        assertEquals(List.of("runtime-1"), scheduler.scheduledRuntimeIds);
-        assertTrue(runtime.getActionGroups().get(0).getRoot().isOk());
+    @AfterEach
+    void closeServices() {
+        lifecycle.shutdown();
+        time.shutdown();
     }
 
     @Test
-    void fansOutSharedDeviceConditionGroupToEveryReferencingActionGroup() {
-        RecordingRuntimeScheduler scheduler = new RecordingRuntimeScheduler();
-        Engine engine = new Engine(scheduler);
-        DeviceConditionGroup sharedDeviceGroup = new DeviceConditionGroup(
-                "shared-high-temperature",
-                chain("ac-1", "roomTemperature", Operator.GT, "26", false)
-        );
-        TimeConditionGroup always = TimeConditionGroup.always("shared-always");
-        Runtime runtime = new Runtime("runtime-shared-device", List.of(
-                new ActionGroup("notify-user", sharedDeviceGroup, always),
-                new ActionGroup("close-circuit", sharedDeviceGroup, always)
-        ));
+    void routesOneForestUpdateToEveryAffectedRuntime() {
+        engine.register(plan("runtime-a", "warm", "action-a", "26"));
+        engine.register(plan("runtime-b", "hot", "action-b", "30"));
+        scheduler.clear();
 
-        try {
-            engine.register(runtime);
-            engine.accept(event("27"));
+        engine.accept(event("31"));
 
-            RuntimeSignal.StateChanged signal =
-                    (RuntimeSignal.StateChanged) scheduler.signals.get(0);
-            assertEquals(
-                    Set.of("notify-user", "close-circuit"),
-                    signal.candidateActionGroupIds()
-            );
-            assertTrue(sharedDeviceGroup.getRoot().isOk());
-        } finally {
-            engine.remove(runtime.getRuntimeId());
-        }
+        assertEquals(Set.of("runtime-a", "runtime-b"), scheduler.runtimeIds());
+        assertEquals(2, scheduler.signals.size());
+        assertEquals(1, forest.eventSourceCount());
+        assertEquals(2, forest.predicateCount());
     }
 
     @Test
-    void ignoresUnregisteredEvents() {
-        RecordingRuntimeScheduler scheduler = new RecordingRuntimeScheduler();
-        Engine engine = new Engine(scheduler);
+    void atomicallyReplacesRuntimeAndPreservesSharedSourceValue() {
+        Runtime first = engine.register(plan("runtime-a", "temperature", "action-a", "26"));
+        engine.accept(event("28"));
+        assertTrue(first.deviceConditionSatisfied("temperature"));
+        scheduler.clear();
 
-        engine.accept(event("27"));
+        Runtime replacement = engine.register(plan("runtime-a", "temperature", "action-a", "30"));
 
-        assertTrue(scheduler.scheduledRuntimeIds.isEmpty());
+        assertNotSame(first, replacement);
+        assertSame(replacement, engine.runtime("runtime-a").orElseThrow());
+        assertEquals(1, forest.treeCount());
+        assertEquals(1, forest.eventSourceCount());
+        assertEquals(1, forest.predicateCount());
+        assertTrue(!replacement.deviceConditionSatisfied("temperature"));
+
+        scheduler.clear();
+        engine.accept(event("31"));
+        assertEquals(Set.of("runtime-a"), scheduler.runtimeIds());
     }
 
     @Test
-    void removeClearsEventIndexAndCancelsRuntimeScheduling() {
-        RecordingRuntimeScheduler scheduler = new RecordingRuntimeScheduler();
-        Engine engine = new Engine(scheduler);
-        engine.register(runtime("runtime-1"));
-
-        engine.remove("runtime-1");
-        engine.accept(event("27"));
-
-        assertEquals(List.of("runtime-1"), scheduler.cancelledRuntimeIds);
-        assertTrue(scheduler.scheduledRuntimeIds.isEmpty());
-    }
-
-    @Test
-    void activatesPendingRuntimeAndProactivelyRemovesItAtExpiry() throws InterruptedException {
-        RecordingRuntimeScheduler scheduler = new RecordingRuntimeScheduler();
-        Engine engine = new Engine(scheduler);
-        Instant now = Instant.now();
-        Runtime runtime = new Runtime(
-                "runtime-lifecycle",
-                new RuntimeLifetime(
-                        now.plus(Duration.ofMillis(100)),
-                        now.plus(Duration.ofMillis(500))
-                ),
-                List.of(new ActionGroup(
-                        "high-temperature",
-                        chain("ac-1", "roomTemperature", Operator.GT, "26", false)
-                ))
-        );
-        engine.register(runtime);
-
-        engine.accept(event("27"));
-        assertTrue(scheduler.scheduledRuntimeIds.isEmpty());
-
-        assertTrue(await(() -> runtime.getState() == RuntimeState.ACTIVE));
-        engine.accept(event("27"));
-        assertEquals(List.of("runtime-lifecycle"), scheduler.scheduledRuntimeIds);
-
-        assertTrue(await(() -> runtime.getState() == RuntimeState.EXPIRED));
-        assertTrue(engine.runtimeTable().get(runtime.getRuntimeId()).isEmpty());
-        assertEquals(List.of("runtime-lifecycle"), scheduler.cancelledRuntimeIds);
-    }
-
-    @Test
-    void activeWindowSchedulesInitialInference() {
-        RecordingRuntimeScheduler scheduler = new RecordingRuntimeScheduler();
-        Engine engine = new Engine(scheduler);
-        LocalTime now = LocalTime.now(ZoneOffset.UTC);
-        TimeConditionGroup timeGroup = new TimeConditionGroup(List.of(
-                new TimeWindowCondition(
-                        "current-window",
-                        CalendarConstraint.everyDay(ZoneOffset.UTC),
-                        now.minusMinutes(1),
-                        now.plusMinutes(1)
-                )
-        ));
-        Runtime runtime = new Runtime("runtime-window");
-        runtime.registerActionGroup(new ActionGroup(
-                "window-group",
-                chain("ac-1", "roomTemperature", Operator.GT, "26", true),
-                timeGroup
-        ));
-
-        try {
-            engine.register(runtime);
-
-            assertEquals(List.of("runtime-window"), scheduler.scheduledRuntimeIds);
-            assertTrue(scheduler.signals.get(0) instanceof RuntimeSignal.StateChanged);
-        } finally {
-            engine.remove(runtime.getRuntimeId());
-        }
-    }
-
-    @Test
-    void routesTimePointAsLosslessRuntimeSignal() {
-        RecordingRuntimeScheduler scheduler = new RecordingRuntimeScheduler();
-        Engine engine = new Engine(scheduler);
-        TimeConditionGroup timeGroup = new TimeConditionGroup(List.of(
-                new TimePointCondition(
-                        "point-1",
-                        CalendarConstraint.everyDay(ZoneOffset.UTC),
-                        LocalTime.NOON
-                )
-        ));
-        Runtime runtime = new Runtime("runtime-point");
-        runtime.registerActionGroup(new ActionGroup(
-                "point-group",
-                chain("ac-1", "roomTemperature", Operator.GT, "26", true),
-                timeGroup
-        ));
-        Instant scheduledAt = Instant.parse("2026-07-05T12:00:00Z");
-        TimeEvent event = new TimeEvent(
-                runtime.getRuntimeId(),
-                timeGroup.getGroupId(),
-                "point-1",
-                TimeSignal.TIME_POINT,
-                scheduledAt,
-                scheduledAt
+    void failedReplacementKeepsPreviousRuntimeAndTopology() {
+        Runtime current = engine.register(plan("runtime-a", "temperature", "action-a", "26"));
+        EvalNode invalid = new EvalNode();
+        RuntimePlan broken = new RuntimePlan(
+                "runtime-a",
+                RuntimeLifetime.always(),
+                Map.of("temperature", invalid),
+                Set.of(),
+                Map.of("always", TimeConditionGroup.always("always")),
+                List.of(),
+                Set.of()
         );
 
-        try {
-            engine.register(runtime);
-            engine.accept(event);
+        assertThrows(IllegalArgumentException.class, () -> engine.register(broken));
+        assertSame(current, engine.runtime("runtime-a").orElseThrow());
+        assertEquals(1, forest.treeCount());
 
-            assertEquals(List.of("runtime-point"), scheduler.scheduledRuntimeIds);
-            RuntimeSignal.TimePointOccurred signal =
-                    (RuntimeSignal.TimePointOccurred) scheduler.signals.get(0);
-            assertEquals(event.occurrenceId(), signal.event().occurrenceId());
-        } finally {
-            engine.remove(runtime.getRuntimeId());
-        }
+        scheduler.clear();
+        engine.accept(event("28"));
+        assertEquals(Set.of("runtime-a"), scheduler.runtimeIds());
     }
 
-    private static Runtime runtime(String runtimeId) {
-        Runtime runtime = new Runtime(runtimeId);
-        runtime.registerActionGroup(new ActionGroup(
-                "high-temperature",
-                chain("ac-1", "roomTemperature", Operator.GT, "26", false)
-        ));
-        return runtime;
+    @Test
+    void removeReclaimsUnobservedForestNodes() {
+        engine.register(plan("runtime-a", "temperature", "action-a", "26"));
+
+        engine.remove("runtime-a");
+
+        assertEquals(0, engine.runtimeCount());
+        assertEquals(0, forest.treeCount());
+        assertEquals(0, forest.predicateCount());
+        assertEquals(0, forest.eventSourceCount());
+    }
+
+    @Test
+    void pendingRuntimeKeepsForestCurrentAndEvaluatesLatestStateWhenActivated()
+            throws InterruptedException {
+        RuntimePlan original = plan("runtime-pending", "temperature", "action-a", "26");
+        RuntimePlan pending = new RuntimePlan(
+                original.runtimeId(),
+                new RuntimeLifetime(Instant.now().plusMillis(500), null),
+                original.deviceChains(),
+                original.constantTrueGroups(),
+                original.timeConditionGroups(),
+                original.actionGroups(),
+                original.requiredEventKeys()
+        );
+        Runtime runtime = engine.register(pending);
+
+        engine.accept(event("28"));
+
+        assertTrue(runtime.deviceConditionSatisfied("temperature"));
+        assertEquals(0, scheduler.signalCount());
+        assertTrue(await(() -> scheduler.signalCount() == 1));
+        assertEquals(Set.of("runtime-pending"), scheduler.runtimeIds());
+    }
+
+    private static RuntimePlan plan(
+            String runtimeId,
+            String groupId,
+            String actionGroupId,
+            String threshold
+    ) {
+        EvalNode node = new EvalNode();
+        node.setNodeId(groupId + "-condition");
+        node.setDeviceType(DeviceType.AirCondition);
+        node.setDeviceId("ac-1");
+        node.setField("roomTemperature");
+        node.setOperator(Operator.GT);
+        node.setValue(threshold);
+        node.setLogicToPrev(LogicType.AND);
+        TimeConditionGroup always = TimeConditionGroup.always("always");
+        DeviceEventKey key = new DeviceEventKey(
+                DeviceType.AirCondition,
+                "ac-1",
+                "roomTemperature"
+        );
+        return new RuntimePlan(
+                runtimeId,
+                RuntimeLifetime.always(),
+                Map.of(groupId, node),
+                Set.of(),
+                Map.of(always.getGroupId(), always),
+                List.of(new RuntimeActionGroup(
+                        actionGroupId,
+                        groupId,
+                        always,
+                        List.of()
+                )),
+                Set.of(key)
+        );
     }
 
     private static DeviceEvent event(String value) {
@@ -219,54 +184,44 @@ class EngineTests {
         );
     }
 
-    private static EvalNode chain(
-            String deviceId,
-            String field,
-            Operator operator,
-            String value,
-            boolean initialResult
-    ) {
-        EvalNode dummy = new EvalNode();
-        dummy.setResult(true);
-
-        EvalNode node = new EvalNode();
-        node.setNodeId("node-1");
-        node.setDeviceId(deviceId);
-        node.setDeviceType(DeviceType.AirCondition);
-        node.setField(field);
-        node.setOperator(operator);
-        node.setValue(value);
-        node.setLogicToPrev(LogicType.AND);
-        node.setResult(initialResult);
-        dummy.setNext(node);
-        return dummy;
-    }
-
-    private static boolean await(BooleanSupplier condition) throws InterruptedException {
-        for (int i = 0; i < 100; i++) {
+    private static boolean await(java.util.function.BooleanSupplier condition)
+            throws InterruptedException {
+        for (int index = 0; index < 100; index++) {
             if (condition.getAsBoolean()) {
                 return true;
             }
-            Thread.sleep(10);
+            Thread.sleep(20);
         }
         return false;
     }
 
-    private static class RecordingRuntimeScheduler implements RuntimeScheduler {
+    private static final class RecordingScheduler implements RuntimeScheduler {
 
-        private final List<String> scheduledRuntimeIds = new ArrayList<>();
-        private final List<String> cancelledRuntimeIds = new ArrayList<>();
-        private final List<RuntimeSignal> signals = new ArrayList<>();
+        private final List<Scheduled> signals = new ArrayList<>();
 
         @Override
-        public void schedule(Runtime runtime, RuntimeSignal signal) {
-            scheduledRuntimeIds.add(runtime.getRuntimeId());
-            signals.add(signal);
+        public synchronized void schedule(Runtime runtime, RuntimeSignal signal) {
+            signals.add(new Scheduled(runtime.runtimeId(), runtime.generation(), signal));
         }
 
         @Override
         public void cancel(String runtimeId) {
-            cancelledRuntimeIds.add(runtimeId);
         }
+
+        synchronized void clear() {
+            signals.clear();
+        }
+
+        synchronized Set<String> runtimeIds() {
+            return signals.stream().map(Scheduled::runtimeId)
+                    .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        }
+
+        synchronized int signalCount() {
+            return signals.size();
+        }
+    }
+
+    private record Scheduled(String runtimeId, long generation, RuntimeSignal signal) {
     }
 }

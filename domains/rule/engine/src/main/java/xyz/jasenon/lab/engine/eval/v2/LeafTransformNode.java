@@ -3,6 +3,7 @@ package xyz.jasenon.lab.engine.eval.v2;
 import xyz.jasenon.lab.engine.eval.LogicType;
 
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /** 将共享谓词结果适配为当前表达式位置所需的布尔函数。 */
 public final class LeafTransformNode implements ObservableValue<BooleanTransform>, ValueObserver<Boolean> {
@@ -10,6 +11,8 @@ public final class LeafTransformNode implements ObservableValue<BooleanTransform
     private final PredicateNode predicate;
     private final LogicType logicToPrevious;
     private final ObservableSupport<BooleanTransform> observable = new ObservableSupport<>();
+    private final Observation predicateObservation;
+    private final AtomicBoolean closed = new AtomicBoolean(false);
     private volatile BooleanTransform value;
 
     private LeafTransformNode(
@@ -20,7 +23,7 @@ public final class LeafTransformNode implements ObservableValue<BooleanTransform
         this.predicate = Objects.requireNonNull(predicate, "predicate");
         this.logicToPrevious = logicToPrevious;
         this.value = Objects.requireNonNull(initialValue, "initialValue");
-        predicate.observe(this);
+        this.predicateObservation = predicate.observe(this);
     }
 
     static LeafTransformNode predicate(PredicateNode predicate, LogicType logicToPrevious) {
@@ -47,16 +50,26 @@ public final class LeafTransformNode implements ObservableValue<BooleanTransform
     }
 
     @Override
-    public void observe(ValueObserver<BooleanTransform> observer) {
-        observable.add(observer);
+    public Observation observe(ValueObserver<BooleanTransform> observer) {
+        return observable.add(observer);
     }
 
     @Override
     public synchronized void onValueChanged(ObservableValue<Boolean> ignored, Boolean previous, Boolean current) {
+        if (closed.get()) {
+            return;
+        }
         BooleanTransform next = transform(current, logicToPrevious);
         BooleanTransform old = value;
         value = next;
         observable.publish(this, old, next);
+    }
+
+    void close() {
+        if (closed.compareAndSet(false, true)) {
+            predicateObservation.close();
+            observable.clear();
+        }
     }
 
     private static BooleanTransform transform(boolean predicateResult, LogicType logic) {

@@ -53,7 +53,7 @@ public class DefaultRuntimeExecutor implements RuntimeExecutor {
     @Override
     public CompletableFuture<ActionExecutionResult> execute(
             Runtime runtime,
-            ActionGroup actionGroup,
+            RuntimeActionGroup actionGroup,
             Action action
     ) {
         Objects.requireNonNull(runtime, "runtime");
@@ -77,7 +77,7 @@ public class DefaultRuntimeExecutor implements RuntimeExecutor {
 
     private CompletableFuture<ActionExecutionResult> executeControl(
             Runtime runtime,
-            ActionGroup actionGroup,
+            RuntimeActionGroup actionGroup,
             ControlAction action
     ) {
         MqttTaskDto task = action.getControl();
@@ -135,16 +135,16 @@ public class DefaultRuntimeExecutor implements RuntimeExecutor {
             tracker.recordSuccess();
             String gatewayId = response == null ? null : response.getGatewayId();
             ActionExecutionResult result = ActionExecutionResult.success(
-                    runtime.getRuntimeId(),
-                    actionGroup.getActionGroupId(),
+                    runtime.runtimeId(),
+                    actionGroup.actionGroupId(),
                     action.is(),
                     "mqtt control completed, device-id:" + task.getDeviceId() + ", gateway-id:" + gatewayId
             );
             log.info(
                     "[RuleEngine] control action succeeded, runtime-id:{}, action-group-id:{}, "
                             + "device-id:{}, gateway-id:{}, command:{}",
-                    runtime.getRuntimeId(),
-                    actionGroup.getActionGroupId(),
+                    runtime.runtimeId(),
+                    actionGroup.actionGroupId(),
                     task.getDeviceId(),
                     gatewayId,
                     task.getCommandLine()
@@ -155,22 +155,22 @@ public class DefaultRuntimeExecutor implements RuntimeExecutor {
 
     private CompletableFuture<ActionExecutionResult> executeReport(
             Runtime runtime,
-            ActionGroup actionGroup,
+            RuntimeActionGroup actionGroup,
             ReportAction action
     ) {
         // 通知通道暂未实现；当前用完整日志代替实际投递，便于验证 ActionGroup 链路。
         log.info(
                 "[RuleEngine] report action logged, runtime-id:{}, action-group-id:{}, "
                         + "users:{}, types:{}, content:{}",
-                runtime.getRuntimeId(),
-                actionGroup.getActionGroupId(),
+                runtime.runtimeId(),
+                actionGroup.actionGroupId(),
                 action.getUserIds(),
                 action.getTypes(),
                 action.getContent()
         );
         return CompletableFuture.completedFuture(ActionExecutionResult.notImplemented(
-                runtime.getRuntimeId(),
-                actionGroup.getActionGroupId(),
+                runtime.runtimeId(),
+                actionGroup.actionGroupId(),
                 action.is(),
                 "report delivery capability is not implemented"
         ));
@@ -178,7 +178,7 @@ public class DefaultRuntimeExecutor implements RuntimeExecutor {
 
     private ActionExecutionResult failure(
             Runtime runtime,
-            ActionGroup actionGroup,
+            RuntimeActionGroup actionGroup,
             Action action,
             String targetId,
             Throwable throwable
@@ -187,8 +187,8 @@ public class DefaultRuntimeExecutor implements RuntimeExecutor {
                 ? throwable.getClass().getSimpleName()
                 : throwable.getMessage();
         tracker.recordFailure(new ActionFailure(
-                runtime.getRuntimeId(),
-                actionGroup.getActionGroupId(),
+                runtime.runtimeId(),
+                actionGroup.actionGroupId(),
                 action.is(),
                 targetId,
                 throwable.getClass().getName(),
@@ -197,15 +197,15 @@ public class DefaultRuntimeExecutor implements RuntimeExecutor {
         ));
         log.warn(
                 "[RuleEngine] action execution failed, runtime-id:{}, action-group-id:{}, action-type:{}, target-id:{}",
-                runtime.getRuntimeId(),
-                actionGroup.getActionGroupId(),
+                runtime.runtimeId(),
+                actionGroup.actionGroupId(),
                 action.is(),
                 targetId,
                 throwable
         );
         return ActionExecutionResult.failed(
-                runtime.getRuntimeId(),
-                actionGroup.getActionGroupId(),
+                runtime.runtimeId(),
+                actionGroup.actionGroupId(),
                 action.is(),
                 message
         );

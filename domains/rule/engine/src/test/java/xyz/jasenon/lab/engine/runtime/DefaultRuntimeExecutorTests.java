@@ -15,10 +15,13 @@ import xyz.jasenon.lab.device.model.DeviceType;
 import xyz.jasenon.lab.engine.Engine;
 import xyz.jasenon.lab.engine.RuleEngineApplication;
 import xyz.jasenon.lab.engine.action.*;
+import xyz.jasenon.lab.engine.definition.RuntimePlan;
 import xyz.jasenon.lab.engine.eval.EvalNode;
 import xyz.jasenon.lab.engine.eval.LogicType;
 import xyz.jasenon.lab.engine.eval.Operator;
 import xyz.jasenon.lab.engine.event.DeviceEvent;
+import xyz.jasenon.lab.engine.event.DeviceEventKey;
+import xyz.jasenon.lab.engine.time.TimeConditionGroup;
 
 import java.time.Instant;
 import java.util.EnumSet;
@@ -44,8 +47,8 @@ class DefaultRuntimeExecutorTests {
         MqttRuleIo mqttIo = mock(MqttRuleIo.class);
         ActionExecutionTracker tracker = new ActionExecutionTracker();
         DefaultRuntimeExecutor executor = new DefaultRuntimeExecutor(tracker, mqttIo);
-        Runtime runtime = new Runtime("runtime-1");
-        ActionGroup actionGroup = actionGroup("group-1");
+        RuntimeActionGroup actionGroup = actionGroup("group-1");
+        Runtime runtime = runtime("runtime-1", actionGroup);
         MqttTaskDto task = task("ac-1");
         MqttResponseDto response = new MqttResponseDto();
         response.setGatewayId("gateway-1");
@@ -69,8 +72,8 @@ class DefaultRuntimeExecutorTests {
         MqttRuleIo mqttIo = mock(MqttRuleIo.class);
         ActionExecutionTracker tracker = new ActionExecutionTracker();
         DefaultRuntimeExecutor executor = new DefaultRuntimeExecutor(tracker, mqttIo);
-        Runtime runtime = new Runtime("runtime-1");
-        ActionGroup actionGroup = actionGroup("group-1");
+        RuntimeActionGroup actionGroup = actionGroup("group-1");
+        Runtime runtime = runtime("runtime-1", actionGroup);
         MqttTaskDto task = task("ac-1");
         when(mqttIo.asyncSend(task)).thenReturn(CompletableFuture.failedFuture(new TimeoutException("timeout")));
 
@@ -105,7 +108,7 @@ class DefaultRuntimeExecutorTests {
         );
 
         ActionExecutionResult result = executor.execute(
-                new Runtime("runtime-1"),
+                runtime("runtime-1", actionGroup("group-1")),
                 actionGroup("group-1"),
                 action
         ).join();
@@ -148,10 +151,15 @@ class DefaultRuntimeExecutorTests {
         void sendsControlActionsAndTracksFailures() throws InterruptedException {
             String runtimeId = "spring-mqtt-runtime";
             String actionGroupId = "spring-mqtt-actions";
-            ActionGroup actionGroup = conditionalActionGroup(actionGroupId, "source-ac");
-            actionGroup.addAction(new ControlAction(actionGroupId, task("target-ok")));
-            actionGroup.addAction(new ControlAction(actionGroupId, task("target-fail")));
-            Runtime runtime = new Runtime(runtimeId, List.of(actionGroup));
+            RuntimePlan runtime = conditionalPlan(
+                    runtimeId,
+                    actionGroupId,
+                    "source-ac",
+                    List.of(
+                            new ControlAction(actionGroupId, task("target-ok")),
+                            new ControlAction(actionGroupId, task("target-fail"))
+                    )
+            );
 
             springMqttIo.reset();
             long successBefore = springTracker.successCount();
@@ -189,16 +197,21 @@ class DefaultRuntimeExecutorTests {
         }
     }
 
-    private static ActionGroup actionGroup(String actionGroupId) {
-        EvalNode dummy = new EvalNode();
-        dummy.setResult(true);
-        return new ActionGroup(actionGroupId, dummy);
+    private static RuntimeActionGroup actionGroup(String actionGroupId) {
+        return new RuntimeActionGroup(
+                actionGroupId,
+                "always",
+                TimeConditionGroup.always("always-time"),
+                List.of()
+        );
     }
 
-    private static ActionGroup conditionalActionGroup(String actionGroupId, String deviceId) {
-        EvalNode dummy = new EvalNode();
-        dummy.setResult(true);
-
+    private static RuntimePlan conditionalPlan(
+            String runtimeId,
+            String actionGroupId,
+            String deviceId,
+            List<Action> actions
+    ) {
         EvalNode condition = new EvalNode();
         condition.setNodeId("temperature-condition");
         condition.setDeviceId(deviceId);
@@ -208,8 +221,43 @@ class DefaultRuntimeExecutorTests {
         condition.setValue("26");
         condition.setLogicToPrev(LogicType.AND);
         condition.setResult(false);
-        dummy.setNext(condition);
-        return new ActionGroup(actionGroupId, dummy);
+        TimeConditionGroup always = TimeConditionGroup.always("always-time");
+        DeviceEventKey key = new DeviceEventKey(
+                DeviceType.AirCondition,
+                deviceId,
+                "roomTemperature"
+        );
+        return new RuntimePlan(
+                runtimeId,
+                RuntimeLifetime.always(),
+                java.util.Map.of("temperature", condition),
+                java.util.Set.of(),
+                java.util.Map.of(always.getGroupId(), always),
+                List.of(new RuntimeActionGroup(
+                        actionGroupId,
+                        "temperature",
+                        always,
+                        actions
+                )),
+                java.util.Set.of(key)
+        );
+    }
+
+    private static Runtime runtime(String runtimeId, RuntimeActionGroup actionGroup) {
+        xyz.jasenon.lab.engine.eval.v2.EvalForest forest = new xyz.jasenon.lab.engine.eval.v2.EvalForest();
+        TimeConditionGroup timeGroup = actionGroup.timeConditionGroup();
+        return new Runtime(
+                runtimeId,
+                RuntimeLifetime.always(),
+                forest.registerRuntime(runtimeId, java.util.Map.of(), java.util.Set.of("always")),
+                java.util.Map.of(timeGroup.getGroupId(), timeGroup),
+                List.of(new RuntimeActionGroup(
+                        actionGroup.actionGroupId(),
+                        "always",
+                        timeGroup,
+                        actionGroup.actions()
+                ))
+        );
     }
 
     private static MqttTaskDto task(String deviceId) {

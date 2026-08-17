@@ -1,82 +1,120 @@
 package xyz.jasenon.lab.engine;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import xyz.jasenon.lab.engine.definition.RuntimePlan;
+import xyz.jasenon.lab.engine.eval.v2.EvalForest;
+import xyz.jasenon.lab.engine.eval.v2.EvalForestRegistration;
+import xyz.jasenon.lab.engine.eval.v2.EvalRootKey;
+import xyz.jasenon.lab.engine.eval.v2.EvalUpdate;
 import xyz.jasenon.lab.engine.event.DeviceEvent;
-import xyz.jasenon.lab.engine.event.DeviceEventHandler;
 import xyz.jasenon.lab.engine.event.EngineEvent;
-import xyz.jasenon.lab.engine.event.EventKey;
-import xyz.jasenon.lab.engine.event.EventTable;
-import xyz.jasenon.lab.engine.event.RuntimeEventRouter;
 import xyz.jasenon.lab.engine.event.TimeEvent;
-import xyz.jasenon.lab.engine.event.TimeEventHandler;
-import xyz.jasenon.lab.engine.runtime.Runtime;
 import xyz.jasenon.lab.engine.runtime.RuntimeLifecycleManager;
+import xyz.jasenon.lab.engine.runtime.Runtime;
+import xyz.jasenon.lab.engine.runtime.RuntimeSignalRouter;
 import xyz.jasenon.lab.engine.runtime.RuntimeScheduler;
 import xyz.jasenon.lab.engine.runtime.RuntimeSignal;
-import xyz.jasenon.lab.engine.runtime.RuntimeState;
-import xyz.jasenon.lab.engine.runtime.RuntimeTable;
 import xyz.jasenon.lab.engine.time.TimeScheduleService;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
- * 规则引擎入口，只负责 Runtime 管理和事件路由。
+ * 全局 EvalForest 驱动的规则引擎入口。
  *
- * <p>生命周期定时、时间边界计算以及异步推演均委托给独立组件，
- * 避免 Engine 再次持有线程池或动作执行细节。</p>
+ * <p>Engine 只管理 Runtime 拓扑与事件路由。设备事件只进入 Forest 一次，
+ * Root 变化再按 Runtime 身份收窄为动作组调度信号。</p>
  */
 @Component
 public class Engine {
 
-    private final EventTable<Set<String>> eventHelper = new EventTable<>();
-    private final RuntimeTable runtimeHelper = new RuntimeTable();
+    private final EvalForest evalForest;
     private final RuntimeScheduler runtimeScheduler;
     private final RuntimeLifecycleManager lifecycleManager;
     private final TimeScheduleService timeScheduleService;
-    private final RuntimeEventRouter eventRouter;
+    private final RuntimeSignalRouter signalRouter;
+    private final ConcurrentHashMap<String, Runtime> runtimes = new ConcurrentHashMap<>();
+    private final AtomicLong generations = new AtomicLong();
+    private final ReentrantReadWriteLock topologyLock = new ReentrantReadWriteLock();
 
-    @Autowired
     public Engine(
+            EvalForest evalForest,
             RuntimeScheduler runtimeScheduler,
             RuntimeLifecycleManager lifecycleManager,
-            TimeScheduleService timeScheduleService,
-            RuntimeEventRouter eventRouter
+            TimeScheduleService timeScheduleService
     ) {
+        this.evalForest = Objects.requireNonNull(evalForest, "evalForest");
         this.runtimeScheduler = Objects.requireNonNull(runtimeScheduler, "runtimeScheduler");
         this.lifecycleManager = Objects.requireNonNull(lifecycleManager, "lifecycleManager");
         this.timeScheduleService = Objects.requireNonNull(timeScheduleService, "timeScheduleService");
-        this.eventRouter = Objects.requireNonNull(eventRouter, "eventRouter");
+        this.signalRouter = new RuntimeSignalRouter();
     }
 
-    public Engine(RuntimeScheduler runtimeScheduler) {
-        this(
-                runtimeScheduler,
-                new RuntimeLifecycleManager(),
-                new TimeScheduleService(),
-                new RuntimeEventRouter(new DeviceEventHandler(), new TimeEventHandler())
-        );
-    }
+    /** 原子安装或替换一个 Runtime。 */
+    public Runtime register(RuntimePlan plan) {
+        Objects.requireNonNull(plan, "plan");
+        topologyLock.writeLock().lock();
+        try {
+            String runtimeId = plan.runtimeId();
+            Runtime previous = runtimes.get(runtimeId);
+            EvalForestRegistration registration = evalForest.replaceRuntime(
+                    runtimeId,
+                    plan.deviceChains(),
+                    plan.constantTrueGroups()
+            );
+            Runtime replacement;
+            try {
+                replacement = new Runtime(
+                        runtimeId,
+                        generations.incrementAndGet(),
+                        plan.lifetime(),
+                        registration,
+                        plan.timeConditionGroups(),
+                        plan.actionGroups()
+                );
+            } catch (RuntimeException exception) {
+                registration.close();
+                throw exception;
+            }
 
-    public void register(Runtime runtime) {
-        Objects.requireNonNull(runtime, "runtime");
-        remove(runtime.getRuntimeId());
-        runtimeHelper.register(runtime);
-        lifecycleManager.track(
-                runtime,
-                () -> activate(runtime),
-                () -> expire(runtime)
-        );
+            lifecycleManager.cancel(runtimeId);
+            timeScheduleService.cancel(runtimeId);
+            runtimeScheduler.cancel(runtimeId);
+            runtimes.put(runtimeId, replacement);
+            if (previous != null) {
+                previous.close();
+            }
+            lifecycleManager.track(
+                    runtimeId,
+                    replacement.lifetime(),
+                    () -> activate(replacement),
+                    () -> expire(replacement)
+            );
+            return replacement;
+        } finally {
+            topologyLock.writeLock().unlock();
+        }
     }
 
     public void remove(String runtimeId) {
-        Runtime runtime = runtimeHelper.remove(runtimeId);
-        if (runtime == null) {
+        if (runtimeId == null || runtimeId.isBlank()) {
             return;
         }
-        unregister(runtime, RuntimeState.CANCELLED);
+        topologyLock.writeLock().lock();
+        try {
+            Runtime runtime = runtimes.remove(runtimeId);
+            if (runtime != null) {
+                unregister(runtime, false);
+            }
+        } finally {
+            topologyLock.writeLock().unlock();
+        }
     }
 
     public void accept(EngineEvent event) {
@@ -86,75 +124,98 @@ public class Engine {
             return;
         }
         if (event instanceof TimeEvent timeEvent) {
-            runtimeHelper.get(timeEvent.key().runtimeId())
-                    .ifPresent(runtime -> accept(runtime, timeEvent));
+            acceptTime(timeEvent);
             return;
         }
         throw new IllegalArgumentException("unsupported engine event: " + event.getClass().getName());
     }
 
-    RuntimeTable runtimeTable() {
-        return runtimeHelper;
+    public Optional<Runtime> runtime(String runtimeId) {
+        return Optional.ofNullable(runtimes.get(runtimeId));
+    }
+
+    public int runtimeCount() {
+        return runtimes.size();
+    }
+
+    private void acceptDevice(DeviceEvent event) {
+        topologyLock.readLock().lock();
+        try {
+            EvalUpdate update = evalForest.accept(event.getKey(), event.getValue());
+            if (!update.changed()) {
+                return;
+            }
+            Map<String, Set<String>> groupsByRuntime = new LinkedHashMap<>();
+            update.changedResults().keySet().forEach(rootKey -> groupsByRuntime
+                    .computeIfAbsent(rootKey.runtimeId(), ignored -> ConcurrentHashMap.newKeySet())
+                    .add(rootKey.conditionGroupId()));
+            groupsByRuntime.forEach((runtimeId, groupIds) -> {
+                Runtime runtime = runtimes.get(runtimeId);
+                if (runtime == null || !runtime.isActiveAt(lifecycleManager.now())) {
+                    return;
+                }
+                Set<String> candidates = runtime.actionGroupIdsForDeviceGroups(groupIds);
+                if (!candidates.isEmpty()) {
+                    runtimeScheduler.schedule(runtime, RuntimeSignal.stateChanged(candidates));
+                }
+            });
+        } finally {
+            topologyLock.readLock().unlock();
+        }
+    }
+
+    private void acceptTime(TimeEvent event) {
+        topologyLock.readLock().lock();
+        try {
+            Runtime runtime = runtimes.get(event.key().runtimeId());
+            if (runtime == null || !runtime.isActiveAt(lifecycleManager.now())) {
+                return;
+            }
+            RuntimeSignal signal = signalRouter.route(runtime, event);
+            if (signal != null) {
+                runtimeScheduler.schedule(runtime, signal);
+            }
+        } finally {
+            topologyLock.readLock().unlock();
+        }
     }
 
     private void activate(Runtime runtime) {
-        if (runtimeHelper.get(runtime.getRuntimeId()).orElse(null) != runtime || !runtime.activate()) {
-            return;
-        }
-        // PENDING Runtime 在真正激活前不会进入设备事件反向索引。
-        for (EventKey key : runtime.getRoots().keys()) {
-            eventHelper.computeIfAbsent(key, ignored -> ConcurrentHashMap.newKeySet())
-                    .add(runtime.getRuntimeId());
-        }
-        if (timeScheduleService.track(runtime, this::accept)) {
-            runtimeScheduler.schedule(runtime, RuntimeSignal.stateChanged());
+        topologyLock.writeLock().lock();
+        try {
+            if (runtimes.get(runtime.runtimeId()) != runtime || !runtime.activate()) {
+                return;
+            }
+            timeScheduleService.track(runtime, this::accept);
+            // Pending 期间 Forest 仍持续更新；激活时基于最新现实状态完整推演一次。
+            RuntimeSignal activationSignal = signalRouter.routeActivation(runtime);
+            if (activationSignal != null) {
+                runtimeScheduler.schedule(runtime, activationSignal);
+            }
+        } finally {
+            topologyLock.writeLock().unlock();
         }
     }
 
     private void expire(Runtime runtime) {
-        if (!runtimeHelper.remove(runtime.getRuntimeId(), runtime)) {
-            return;
+        topologyLock.writeLock().lock();
+        try {
+            if (!runtimes.remove(runtime.runtimeId(), runtime)) {
+                return;
+            }
+            unregister(runtime, true);
+        } finally {
+            topologyLock.writeLock().unlock();
         }
-        unregister(runtime, RuntimeState.EXPIRED);
     }
 
-    private void unregister(Runtime runtime, RuntimeState terminalState) {
-        lifecycleManager.cancel(runtime.getRuntimeId());
-        timeScheduleService.cancel(runtime.getRuntimeId());
-        for (EventKey key : runtime.getRoots().keys()) {
-            // 原子更新索引，避免注销与同 EventKey 的新 Runtime 激活发生误删竞态。
-            eventHelper.computeIfPresent(key, (ignored, runtimeIds) -> {
-                runtimeIds.remove(runtime.getRuntimeId());
-                return runtimeIds.isEmpty() ? null : runtimeIds;
-            });
-        }
-        runtimeScheduler.cancel(runtime.getRuntimeId());
-        if (terminalState == RuntimeState.EXPIRED) {
+    private void unregister(Runtime runtime, boolean expired) {
+        lifecycleManager.cancel(runtime.runtimeId());
+        timeScheduleService.cancel(runtime.runtimeId());
+        runtimeScheduler.cancel(runtime.runtimeId());
+        if (expired) {
             runtime.expire();
-        } else {
-            runtime.cancel();
         }
-    }
-
-    private void acceptDevice(DeviceEvent event) {
-        Set<String> runtimeIds = eventHelper.getOrDefault(event.eventKey(), Set.of());
-        for (String runtimeId : runtimeIds) {
-            runtimeHelper.get(runtimeId).ifPresent(runtime -> accept(runtime, event));
-        }
-    }
-
-    private void accept(Runtime runtime, EngineEvent event) {
-        var now = lifecycleManager.now();
-        if (runtime.isExpiredAt(now)) {
-            expire(runtime);
-            return;
-        }
-        if (!runtime.isActiveAt(now)) {
-            return;
-        }
-        RuntimeSignal signal = eventRouter.route(runtime, event);
-        if (signal != null) {
-            runtimeScheduler.schedule(runtime, signal);
-        }
+        runtime.close();
     }
 }

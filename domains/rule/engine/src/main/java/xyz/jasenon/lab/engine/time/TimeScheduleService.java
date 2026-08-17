@@ -5,7 +5,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import xyz.jasenon.lab.engine.event.TimeEvent;
-import xyz.jasenon.lab.engine.runtime.Runtime;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -53,17 +52,36 @@ public class TimeScheduleService {
      *
      * @return 当前是否至少有一个时间条件组处于有效窗口
      */
-    public boolean track(Runtime runtime, Consumer<TimeEvent> eventSink) {
+    /** 时间服务只生产边界事件，窗口状态保留在 Runtime 自身。 */
+    public boolean track(
+            xyz.jasenon.lab.engine.runtime.Runtime runtime,
+            Consumer<TimeEvent> eventSink
+    ) {
         Objects.requireNonNull(runtime, "runtime");
         Objects.requireNonNull(eventSink, "eventSink");
 
-        cancel(runtime.getRuntimeId());
-        TimeScheduleSlot slot = new TimeScheduleSlot(runtime.getRuntimeId(), eventSink);
-        slots.put(runtime.getRuntimeId(), slot);
+        return track(
+                runtime.runtimeId(),
+                runtime::initializeTimeConditions,
+                runtime.timeConditionGroups().values(),
+                eventSink
+        );
+    }
+
+    private boolean track(
+            String runtimeId,
+            java.util.function.Function<Instant, Boolean> initializer,
+            Iterable<TimeConditionGroup> timeConditionGroups,
+            Consumer<TimeEvent> eventSink
+    ) {
+
+        cancel(runtimeId);
+        TimeScheduleSlot slot = new TimeScheduleSlot(runtimeId, eventSink);
+        slots.put(runtimeId, slot);
 
         Instant now = clock.instant();
-        boolean activeWindow = runtime.initializeTimeConditions(now);
-        for (TimeConditionGroup timeConditionGroup : runtime.getTimeConditionGroups().values()) {
+        boolean activeWindow = initializer.apply(now);
+        for (TimeConditionGroup timeConditionGroup : timeConditionGroups) {
             for (TimeCondition condition : timeConditionGroup.conditions()) {
                 scheduleNext(slot, timeConditionGroup.getGroupId(), condition, now);
             }

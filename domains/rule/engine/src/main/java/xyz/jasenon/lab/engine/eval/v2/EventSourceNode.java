@@ -25,8 +25,8 @@ public final class EventSourceNode implements ObservableValue<String> {
     }
 
     @Override
-    public void observe(ValueObserver<String> observer) {
-        observable.add(observer);
+    public Observation observe(ValueObserver<String> observer) {
+        return observable.add(observer);
     }
 
     synchronized void accept(String eventValue) {

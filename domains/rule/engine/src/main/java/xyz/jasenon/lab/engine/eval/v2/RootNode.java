@@ -1,6 +1,7 @@
 package xyz.jasenon.lab.engine.eval.v2;
 
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /** 一棵表达式树可被观察的网络出口。 */
 public final class RootNode implements ObservableValue<Boolean>, ValueObserver<BooleanTransform> {
@@ -9,6 +10,8 @@ public final class RootNode implements ObservableValue<Boolean>, ValueObserver<B
     private final ObservableValue<BooleanTransform> input;
     private final RootChangeListener listener;
     private final ObservableSupport<Boolean> observable = new ObservableSupport<>();
+    private final Observation inputObservation;
+    private final AtomicBoolean closed = new AtomicBoolean(false);
     private volatile boolean value;
 
     RootNode(String groupId, ObservableValue<BooleanTransform> input, RootChangeListener listener) {
@@ -17,7 +20,7 @@ public final class RootNode implements ObservableValue<Boolean>, ValueObserver<B
         this.listener = Objects.requireNonNull(listener, "listener");
         // true 是 AND 折叠的单位元，首项在编译时统一归一为 AND。
         this.value = input.value().apply(true);
-        input.observe(this);
+        this.inputObservation = input.observe(this);
     }
 
     public String groupId() {
@@ -34,8 +37,8 @@ public final class RootNode implements ObservableValue<Boolean>, ValueObserver<B
     }
 
     @Override
-    public void observe(ValueObserver<Boolean> observer) {
-        observable.add(observer);
+    public Observation observe(ValueObserver<Boolean> observer) {
+        return observable.add(observer);
     }
 
     @Override
@@ -44,12 +47,22 @@ public final class RootNode implements ObservableValue<Boolean>, ValueObserver<B
             BooleanTransform previous,
             BooleanTransform current
     ) {
+        if (closed.get()) {
+            return;
+        }
         boolean next = current.apply(true);
         boolean old = value;
         value = next;
         if (old != next) {
             listener.changed(groupId, old, next);
             observable.publish(this, old, next);
+        }
+    }
+
+    void close() {
+        if (closed.compareAndSet(false, true)) {
+            inputObservation.close();
+            observable.clear();
         }
     }
 

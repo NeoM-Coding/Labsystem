@@ -7,8 +7,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import xyz.jasenon.lab.engine.action.Action;
 import xyz.jasenon.lab.engine.action.ActionExecutionResult;
-import xyz.jasenon.lab.engine.action.ActionGroup;
-import xyz.jasenon.lab.engine.action.ActionGroupEvaluator;
 import xyz.jasenon.lab.engine.action.ControlAction;
 import xyz.jasenon.lab.engine.action.ReportAction;
 import xyz.jasenon.lab.engine.notification.RuleExecutionNotice;
@@ -45,7 +43,7 @@ public class AsyncRuntimeScheduler implements RuntimeScheduler {
     private final RuntimeExecutor runtimeExecutor;
     private final RuleExecutionNoticePublisher noticePublisher;
     private final ExecutorService executorService;
-    private final ActionGroupEvaluator actionGroupEvaluator;
+    private final RuntimeActionGroupEvaluator actionGroupEvaluator;
     private final ConcurrentHashMap<String, RuntimeSlot> slots = new ConcurrentHashMap<>();
     private final AtomicBoolean closed = new AtomicBoolean(false);
 
@@ -61,20 +59,20 @@ public class AsyncRuntimeScheduler implements RuntimeScheduler {
                         Math.max(2, java.lang.Runtime.getRuntime().availableProcessors() / 2),
                         namedThreadFactory("rule-engine-runtime")
                 ),
-                new ActionGroupEvaluator(Clock.systemUTC())
+                new RuntimeActionGroupEvaluator(Clock.systemUTC())
         );
     }
 
     AsyncRuntimeScheduler(RuntimeExecutor runtimeExecutor, ExecutorService executorService) {
         this(runtimeExecutor, RuleExecutionNoticePublisher.noop(), executorService,
-                new ActionGroupEvaluator(Clock.systemUTC()));
+                new RuntimeActionGroupEvaluator(Clock.systemUTC()));
     }
 
     AsyncRuntimeScheduler(
             RuntimeExecutor runtimeExecutor,
             RuleExecutionNoticePublisher noticePublisher,
             ExecutorService executorService,
-            ActionGroupEvaluator actionGroupEvaluator
+            RuntimeActionGroupEvaluator actionGroupEvaluator
     ) {
         this.runtimeExecutor = Objects.requireNonNull(runtimeExecutor, "runtimeExecutor");
         this.noticePublisher = Objects.requireNonNull(noticePublisher, "noticePublisher");
@@ -90,7 +88,7 @@ public class AsyncRuntimeScheduler implements RuntimeScheduler {
             throw new RejectedExecutionException("runtime scheduler is closed");
         }
 
-        RuntimeSlot slot = slots.compute(runtime.getRuntimeId(), (runtimeId, current) -> {
+        RuntimeSlot slot = slots.compute(runtime.runtimeId(), (runtimeId, current) -> {
             if (current == null || current.cancelled.get()) {
                 return new RuntimeSlot(runtime);
             }
@@ -155,18 +153,18 @@ public class AsyncRuntimeScheduler implements RuntimeScheduler {
             RuntimeSignal signal
     ) {
         List<CompletableFuture<Void>> groupExecutions = new ArrayList<>();
-        for (ActionGroup actionGroup : runtime.getActionGroups()) {
+        for (RuntimeActionGroup actionGroup : runtime.actionGroups()) {
             if (actionGroupEvaluator.shouldExecute(runtime, actionGroup, signal)) {
                 Instant matchedAt = Instant.now();
                 String traceId = TraceContext.traceId();
                 log.info(
                         "[RuleEngine] action group triggered, runtime-id:{}, action-group-id:{}",
-                        runtime.getRuntimeId(),
-                        actionGroup.getActionGroupId()
+                        runtime.runtimeId(),
+                        actionGroup.actionGroupId()
                 );
                 List<ScheduledAction> scheduledActions = new ArrayList<>();
                 int actionIndex = 0;
-                for (Action action : actionGroup.getActions()) {
+                for (Action action : actionGroup.actions()) {
                     if (!actionGroupEvaluator.isRuntimeActive(runtime)) {
                         break;
                     }
@@ -200,7 +198,7 @@ public class AsyncRuntimeScheduler implements RuntimeScheduler {
 
     private ActionExecutionResult unexpectedFailure(
             Runtime runtime,
-            ActionGroup actionGroup,
+            RuntimeActionGroup actionGroup,
             Action action,
             Throwable throwable
     ) {
@@ -218,8 +216,8 @@ public class AsyncRuntimeScheduler implements RuntimeScheduler {
             type = null;
         }
         return ActionExecutionResult.failed(
-                runtime.getRuntimeId(),
-                actionGroup.getActionGroupId(),
+                runtime.runtimeId(),
+                actionGroup.actionGroupId(),
                 type,
                 message
         );
@@ -227,7 +225,7 @@ public class AsyncRuntimeScheduler implements RuntimeScheduler {
 
     private void publishNotice(
             Runtime runtime,
-            ActionGroup actionGroup,
+            RuntimeActionGroup actionGroup,
             Instant matchedAt,
             String traceId,
             List<ScheduledAction> scheduledActions
@@ -237,10 +235,10 @@ public class AsyncRuntimeScheduler implements RuntimeScheduler {
                 .toList();
         RuleExecutionNotice notice = new RuleExecutionNotice(
                 UUID.randomUUID().toString(),
-                runtime.getRuntimeId(),
-                actionGroup.getActionGroupId(),
-                actionGroup.getDeviceConditionGroupId(),
-                actionGroup.getTimeConditionGroupId(),
+                runtime.runtimeId(),
+                actionGroup.actionGroupId(),
+                actionGroup.deviceConditionGroupId(),
+                actionGroup.timeConditionGroupId(),
                 matchedAt,
                 Instant.now(),
                 traceId,
@@ -250,7 +248,7 @@ public class AsyncRuntimeScheduler implements RuntimeScheduler {
             noticePublisher.publish(notice);
         } catch (RuntimeException exception) {
             log.warn("[RuleEngine] execution notice publisher failed, runtime-id:{}, action-group-id:{}",
-                    runtime.getRuntimeId(), actionGroup.getActionGroupId(), exception);
+                    runtime.runtimeId(), actionGroup.actionGroupId(), exception);
         }
     }
 
@@ -304,7 +302,7 @@ public class AsyncRuntimeScheduler implements RuntimeScheduler {
     private void continueOrRelease(RuntimeSlot slot, Throwable throwable) {
         if (throwable != null) {
             log.warn("[RuleEngine] runtime action execution completed exceptionally, runtime-id:{}",
-                    slot.runtime.getRuntimeId(), throwable);
+                    slot.runtime.runtimeId(), throwable);
         }
         if (slot.cancelled.get()) {
             slot.running.set(false);
@@ -316,7 +314,7 @@ public class AsyncRuntimeScheduler implements RuntimeScheduler {
             } catch (RejectedExecutionException e) {
                 slot.running.set(false);
                 log.warn("[RuleEngine] reject dirty runtime rerun, runtime-id:{}",
-                        slot.runtime.getRuntimeId(), e);
+                        slot.runtime.runtimeId(), e);
             }
             return;
         }

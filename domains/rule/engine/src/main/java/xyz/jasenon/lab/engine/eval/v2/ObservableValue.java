@@ -5,5 +5,5 @@ public interface ObservableValue<T> {
 
     T value();
 
-    void observe(ValueObserver<T> observer);
+    Observation observe(ValueObserver<T> observer);
 }

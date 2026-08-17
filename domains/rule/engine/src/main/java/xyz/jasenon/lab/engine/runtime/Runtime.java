@@ -1,123 +1,133 @@
 package xyz.jasenon.lab.engine.runtime;
 
-import lombok.AccessLevel;
-import lombok.Getter;
-import xyz.jasenon.lab.engine.action.ActionGroup;
-import xyz.jasenon.lab.engine.eval.DeviceConditionGroup;
-import xyz.jasenon.lab.engine.eval.DeviceConditionLeaf;
-import xyz.jasenon.lab.engine.eval.EvalNode;
-import xyz.jasenon.lab.engine.eval.EvalTreeNode;
-import xyz.jasenon.lab.engine.eval.NodeType;
-import xyz.jasenon.lab.engine.event.DeviceEventKey;
-import xyz.jasenon.lab.engine.event.EventKey;
-import xyz.jasenon.lab.engine.event.EventTable;
+import xyz.jasenon.lab.engine.eval.v2.EvalRootHandle;
+import xyz.jasenon.lab.engine.eval.v2.EvalForestRegistration;
+import xyz.jasenon.lab.engine.eval.v2.EvalUpdate;
 import xyz.jasenon.lab.engine.time.TimeConditionGroup;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
-import java.time.Instant;
 
 /**
- * 一条用户规则在内存中的运行上下文。
+ * 一条规则在 v2 中的业务运行上下文。
  *
- * <p>同时保存生命周期、ActionGroup，以及设备 EventKey 到表达式叶子的反向索引。</p>
+ * <p>设备表达式状态归全局 EvalForest 所有；Runtime 只持有 Root 句柄、
+ * 时间状态、动作绑定和生命周期。</p>
  */
-@Getter
-public class Runtime {
+public final class Runtime implements AutoCloseable {
 
     private final String runtimeId;
+    private final long generation;
     private final RuntimeLifetime lifetime;
-    private final List<ActionGroup> actionGroups = new CopyOnWriteArrayList<>();
-    private final Map<String, ActionGroup> actionGroupMap = new ConcurrentHashMap<>();
-    private final Map<String, DeviceConditionGroup> deviceConditionGroups = new ConcurrentHashMap<>();
-    private final Map<String, TimeConditionGroup> timeConditionGroups = new ConcurrentHashMap<>();
-    private final Map<String, Set<String>> deviceGroupActionGroups = new ConcurrentHashMap<>();
-    private final Map<String, Set<String>> timeGroupActionGroups = new ConcurrentHashMap<>();
-    private final EventTable<Set<DeviceConditionLeaf>> roots = new EventTable<>();
-    private final Map<String, EvalTreeNode> treeRootMap = new ConcurrentHashMap<>();
-    private final Map<String, EvalNode> dummyNodeMap = new ConcurrentHashMap<>();
-    @Getter(AccessLevel.NONE)
+    private final EvalForestRegistration evalForestRegistration;
+    private final List<RuntimeActionGroup> actionGroups;
+    private final Map<String, RuntimeActionGroup> actionGroupMap;
+    private final Map<String, TimeConditionGroup> timeConditionGroups;
+    private final Map<String, String> deviceGroupByRootId;
+    private final Map<String, Set<String>> deviceGroupActionGroups;
+    private final Map<String, Set<String>> timeGroupActionGroups;
     private final AtomicReference<RuntimeState> lifecycleState;
 
-    public Runtime(String runtimeId) {
-        this(runtimeId, RuntimeLifetime.always(), List.of());
-    }
-
-    public Runtime(String runtimeId, RuntimeLifetime lifetime) {
-        this(runtimeId, lifetime, List.of());
-    }
-
-    public Runtime(String runtimeId, List<ActionGroup> actionGroups) {
-        this(runtimeId, RuntimeLifetime.always(), actionGroups);
+    public Runtime(
+            String runtimeId,
+            long generation,
+            RuntimeLifetime lifetime,
+            EvalForestRegistration evalForestRegistration,
+            Map<String, TimeConditionGroup> timeConditionGroups,
+            List<RuntimeActionGroup> actionGroups
+    ) {
+        this.runtimeId = requireText(runtimeId, "runtimeId");
+        if (generation < 0) {
+            throw new IllegalArgumentException("generation must not be negative");
+        }
+        this.generation = generation;
+        this.lifetime = Objects.requireNonNull(lifetime, "lifetime");
+        this.evalForestRegistration = Objects.requireNonNull(evalForestRegistration, "evalRegistration");
+        if (!runtimeId.equals(evalForestRegistration.runtimeId())) {
+            throw new IllegalArgumentException("Eval registration belongs to another Runtime");
+        }
+        this.timeConditionGroups = Map.copyOf(Objects.requireNonNull(timeConditionGroups, "timeConditionGroups"));
+        this.deviceGroupByRootId = indexRootIds(evalForestRegistration);
+        this.actionGroups = actionGroups == null ? List.of() : List.copyOf(actionGroups);
+        this.actionGroupMap = indexActionGroups(this.actionGroups);
+        this.deviceGroupActionGroups = reverseDeviceGroups(this.actionGroups);
+        this.timeGroupActionGroups = reverseTimeGroups(this.actionGroups);
+        validateReferences();
+        this.lifecycleState = new AtomicReference<>(
+                lifetime.equals(RuntimeLifetime.always()) ? RuntimeState.ACTIVE : RuntimeState.PENDING
+        );
     }
 
     public Runtime(
             String runtimeId,
             RuntimeLifetime lifetime,
-            List<ActionGroup> actionGroups
+            EvalForestRegistration evalForestRegistration,
+            Map<String, TimeConditionGroup> timeConditionGroups,
+            List<RuntimeActionGroup> actionGroups
     ) {
-        if (runtimeId == null || runtimeId.isBlank()) {
-            throw new IllegalArgumentException("runtimeId must not be blank");
-        }
-        this.runtimeId = runtimeId;
-        this.lifetime = Objects.requireNonNull(lifetime, "lifetime");
-        this.lifecycleState = new AtomicReference<>(
-                lifetime.equals(RuntimeLifetime.always()) ? RuntimeState.ACTIVE : RuntimeState.PENDING
-        );
-        if (actionGroups != null) {
-            actionGroups.forEach(this::registerActionGroup);
-        }
+        this(runtimeId, 0, lifetime, evalForestRegistration, timeConditionGroups, actionGroups);
     }
 
-    public synchronized void registerActionGroup(ActionGroup actionGroup) {
-        Objects.requireNonNull(actionGroup, "actionGroup");
-        if (actionGroupMap.containsKey(actionGroup.getActionGroupId())) {
-            throw new IllegalArgumentException(
-                    "duplicate action group id: " + actionGroup.getActionGroupId()
-            );
-        }
-        validateConditionGroupReference(
-                deviceConditionGroups,
-                actionGroup.getDeviceConditionGroupId(),
-                actionGroup.getDeviceConditionGroup(),
-                "device"
-        );
-        validateConditionGroupReference(
-                timeConditionGroups,
-                actionGroup.getTimeConditionGroupId(),
-                actionGroup.getTimeConditionGroup(),
-                "time"
-        );
-
-        registerDeviceConditionGroup(actionGroup.getDeviceConditionGroup());
-        registerTimeConditionGroup(actionGroup.getTimeConditionGroup());
-        actionGroupMap.put(actionGroup.getActionGroupId(), actionGroup);
-        actionGroups.add(actionGroup);
-        deviceGroupActionGroups
-                .computeIfAbsent(actionGroup.getDeviceConditionGroupId(), ignored -> ConcurrentHashMap.newKeySet())
-                .add(actionGroup.getActionGroupId());
-        timeGroupActionGroups
-                .computeIfAbsent(actionGroup.getTimeConditionGroupId(), ignored -> ConcurrentHashMap.newKeySet())
-                .add(actionGroup.getActionGroupId());
+    public String runtimeId() {
+        return runtimeId;
     }
 
-    public Set<DeviceConditionLeaf> leaves(EventKey key) {
-        return roots.getOrDefault(key, Set.of());
+    public long generation() {
+        return generation;
     }
 
-    public ActionGroup actionGroup(String actionGroupId) {
+    public RuntimeLifetime lifetime() {
+        return lifetime;
+    }
+
+    public List<RuntimeActionGroup> actionGroups() {
+        return actionGroups;
+    }
+
+    public RuntimeActionGroup actionGroup(String actionGroupId) {
         return actionGroupMap.get(actionGroupId);
     }
 
-    public TimeConditionGroup timeConditionGroup(String timeConditionGroupId) {
-        return timeConditionGroups.get(timeConditionGroupId);
+    public Map<String, TimeConditionGroup> timeConditionGroups() {
+        return timeConditionGroups;
+    }
+
+    public TimeConditionGroup timeConditionGroup(String groupId) {
+        return timeConditionGroups.get(groupId);
+    }
+
+    public EvalRootHandle root(String deviceConditionGroupId) {
+        return evalForestRegistration.root(deviceConditionGroupId);
+    }
+
+    public boolean deviceConditionSatisfied(String deviceConditionGroupId) {
+        EvalRootHandle root = root(deviceConditionGroupId);
+        return root != null && !root.closed() && root.value();
+    }
+
+    /** 供未来全局 Engine 建立 rootId → Runtime 的反向路由。 */
+    public Set<String> rootIds() {
+        return deviceGroupByRootId.keySet();
+    }
+
+    /** 将全局 Forest 的变化结果收窄为本 Runtime 需要检查的动作组。 */
+    public Set<String> actionGroupIdsFor(EvalUpdate update) {
+        Objects.requireNonNull(update, "update");
+        Set<String> changedDeviceGroups = new HashSet<>();
+        update.changedResults().keySet().forEach(rootKey -> {
+            if (runtimeId.equals(rootKey.runtimeId())) {
+                changedDeviceGroups.add(rootKey.conditionGroupId());
+            }
+        });
+        return actionGroupIdsForDeviceGroups(changedDeviceGroups);
     }
 
     public Set<String> actionGroupIdsForDeviceGroups(Collection<String> groupIds) {
@@ -132,12 +142,11 @@ public class Runtime {
         return Set.copyOf(timeGroupActionGroups.getOrDefault(groupId, Set.of()));
     }
 
-    public RuntimeState getState() {
+    public RuntimeState state() {
         return lifecycleState.get();
     }
 
     public boolean activate() {
-        // ACTIVE 重复回调视为成功；终态 Runtime 不允许重新激活。
         RuntimeState state = lifecycleState.get();
         return state == RuntimeState.ACTIVE
                 || lifecycleState.compareAndSet(RuntimeState.PENDING, RuntimeState.ACTIVE);
@@ -149,10 +158,6 @@ public class Runtime {
         );
     }
 
-    public void cancel() {
-        lifecycleState.set(RuntimeState.CANCELLED);
-    }
-
     public boolean isActiveAt(Instant instant) {
         return lifecycleState.get() == RuntimeState.ACTIVE && lifetime.contains(instant);
     }
@@ -162,69 +167,78 @@ public class Runtime {
     }
 
     public boolean initializeTimeConditions(Instant instant) {
-        // Runtime 激活时统一按当前时间恢复全部 ActionGroup 的窗口状态。
         boolean activeWindow = false;
-        for (TimeConditionGroup timeConditionGroup : timeConditionGroups.values()) {
-            activeWindow |= timeConditionGroup.initialize(instant);
+        for (TimeConditionGroup group : timeConditionGroups.values()) {
+            activeWindow |= group.initialize(instant);
         }
         return activeWindow;
     }
 
-    private void registerDeviceConditionGroup(DeviceConditionGroup group) {
-        DeviceConditionGroup existing = deviceConditionGroups.putIfAbsent(group.getGroupId(), group);
-        if (existing != null && existing != group) {
-            throw new IllegalArgumentException(
-                    "device condition group id points to different instances: " + group.getGroupId()
-            );
-        }
-        if (existing == null) {
-            treeRootMap.put(group.getGroupId(), group.getRoot());
-            dummyNodeMap.put(group.getGroupId(), group.getDummyHead());
-            indexLeaves(group.getGroupId(), group.getRoot());
-        }
+    @Override
+    public void close() {
+        lifecycleState.updateAndGet(state ->
+                state == RuntimeState.EXPIRED ? state : RuntimeState.CANCELLED
+        );
+        evalForestRegistration.close();
     }
 
-    private void registerTimeConditionGroup(TimeConditionGroup group) {
-        TimeConditionGroup existing = timeConditionGroups.putIfAbsent(group.getGroupId(), group);
-        if (existing != null && existing != group) {
-            throw new IllegalArgumentException(
-                    "time condition group id points to different instances: " + group.getGroupId()
-            );
-        }
-    }
-
-    private static <T> void validateConditionGroupReference(
-            Map<String, T> groups,
-            String groupId,
-            T group,
-            String type
-    ) {
-        T existing = groups.get(groupId);
-        if (existing != null && existing != group) {
-            throw new IllegalArgumentException(
-                    type + " condition group id points to different instances: " + groupId
-            );
-        }
-    }
-
-    private void indexLeaves(String deviceConditionGroupId, EvalTreeNode node) {
-        if (node == null) {
-            return;
-        }
-        if (node.getNodeType() == NodeType.LEAF) {
-            EvalNode source = node.getSource();
-            if (source != null
-                    && source.getDeviceType() != null
-                    && source.getDeviceId() != null
-                    && source.getField() != null
-                    && source.getOperator() != null) {
-                DeviceEventKey key = new DeviceEventKey(source.getDeviceType(), source.getDeviceId(), source.getField());
-                roots.computeIfAbsent(key, ignored -> ConcurrentHashMap.newKeySet())
-                        .add(new DeviceConditionLeaf(deviceConditionGroupId, node));
+    private void validateReferences() {
+        for (RuntimeActionGroup group : actionGroups) {
+            if (root(group.deviceConditionGroupId()) == null) {
+                throw new IllegalArgumentException(
+                        "action group references missing device root: " + group.deviceConditionGroupId()
+                );
             }
-            return;
+            TimeConditionGroup timeGroup = timeConditionGroups.get(group.timeConditionGroupId());
+            if (timeGroup == null || timeGroup != group.timeConditionGroup()) {
+                throw new IllegalArgumentException(
+                        "action group references missing time group: " + group.timeConditionGroupId()
+                );
+            }
         }
-        indexLeaves(deviceConditionGroupId, node.getLeft());
-        indexLeaves(deviceConditionGroupId, node.getRight());
+    }
+
+    private static Map<String, RuntimeActionGroup> indexActionGroups(List<RuntimeActionGroup> groups) {
+        Map<String, RuntimeActionGroup> indexed = new LinkedHashMap<>();
+        for (RuntimeActionGroup group : groups) {
+            if (indexed.put(group.actionGroupId(), group) != null) {
+                throw new IllegalArgumentException("duplicate action group id: " + group.actionGroupId());
+            }
+        }
+        return Map.copyOf(indexed);
+    }
+
+    private static Map<String, String> indexRootIds(EvalForestRegistration registration) {
+        Map<String, String> indexed = new LinkedHashMap<>();
+        registration.roots().forEach((groupId, root) ->
+                indexed.put(root.key().externalId(), groupId));
+        return Map.copyOf(indexed);
+    }
+
+    private static Map<String, Set<String>> reverseDeviceGroups(List<RuntimeActionGroup> groups) {
+        return reverse(groups, RuntimeActionGroup::deviceConditionGroupId);
+    }
+
+    private static Map<String, Set<String>> reverseTimeGroups(List<RuntimeActionGroup> groups) {
+        return reverse(groups, RuntimeActionGroup::timeConditionGroupId);
+    }
+
+    private static Map<String, Set<String>> reverse(
+            List<RuntimeActionGroup> groups,
+            java.util.function.Function<RuntimeActionGroup, String> key
+    ) {
+        Map<String, Set<String>> result = new ConcurrentHashMap<>();
+        groups.forEach(group -> result
+                .computeIfAbsent(key.apply(group), ignored -> ConcurrentHashMap.newKeySet())
+                .add(group.actionGroupId()));
+        return result;
+    }
+
+    private static String requireText(String value, String name) {
+        Objects.requireNonNull(value, name);
+        if (value.isBlank()) {
+            throw new IllegalArgumentException(name + " must not be blank");
+        }
+        return value;
     }
 }

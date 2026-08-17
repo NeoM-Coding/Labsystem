@@ -15,6 +15,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.context.event.EventListener;
 import xyz.jasenon.lab.engine.Engine;
 import xyz.jasenon.lab.engine.definition.RuntimeRevision;
+import xyz.jasenon.lab.engine.definition.RuntimePlan;
 import xyz.jasenon.lab.engine.definition.RuntimeRevisionCompiler;
 import xyz.jasenon.lab.engine.definition.persistence.itfc.RuntimePersist;
 import xyz.jasenon.lab.engine.definition.persistence.mapper.RuleRuntimeMapper;
@@ -24,7 +25,6 @@ import xyz.jasenon.lab.engine.definition.persistence.model.RuleRuntimeEntity;
 import xyz.jasenon.lab.engine.definition.persistence.model.RuleRuntimeRevisionEntity;
 import xyz.jasenon.lab.engine.event.DeviceEventKey;
 import xyz.jasenon.lab.engine.listener.DeviceRecordChangeListener;
-import xyz.jasenon.lab.engine.runtime.Runtime;
 import xyz.jasenon.lab.auth.context.UserContext;
 import xyz.jasenon.lab.auth.context.UserContextHolder;
 
@@ -91,7 +91,7 @@ public class RuntimePersistHelper implements RuntimePersist {
     @Override
     public boolean register(RuntimeRevision revision) {
         RuntimeRevision checked = validateRevision(null, revision);
-        Runtime compiled = compiler.compile(checked);
+        RuntimePlan compiled = compiler.compile(checked);
         EncodedRevision encoded = encode(checked);
 
         try {
@@ -132,7 +132,7 @@ public class RuntimePersistHelper implements RuntimePersist {
     @Override
     public boolean update(String runtimeId, RuntimeRevision revision) {
         RuntimeRevision checked = validateRevision(runtimeId, revision);
-        Runtime compiled = compiler.compile(checked);
+        RuntimePlan compiled = compiler.compile(checked);
         EncodedRevision encoded = encode(checked);
 
         Boolean updated = transactionTemplate.execute(status -> {
@@ -222,7 +222,7 @@ public class RuntimePersistHelper implements RuntimePersist {
     @EventListener(ApplicationReadyEvent.class)
     @Order(Ordered.HIGHEST_PRECEDENCE)
     public void restoreEnabledRuntimes() {
-        List<Runtime> restored = new ArrayList<>();
+        List<RuntimePlan> restored = new ArrayList<>();
         int skipped = 0;
         for (RuntimeRevision revision : fetch()) {
             if (!shouldRun(revision)) {
@@ -230,9 +230,9 @@ public class RuntimePersistHelper implements RuntimePersist {
                 continue;
             }
             try {
-                Runtime runtime = compiler.compile(revision);
-                engine.register(runtime);
-                restored.add(runtime);
+                RuntimePlan plan = compiler.compile(revision);
+                engine.register(plan);
+                restored.add(plan);
             } catch (RuntimeException e) {
                 skipped++;
                 log.error(
@@ -259,7 +259,7 @@ public class RuntimePersistHelper implements RuntimePersist {
             }
             RuntimeRevision current = readCurrentRevision(runtimeId);
             RuntimeRevision desired = current.withEnabled(enabled);
-            Runtime compiled = compiler.compile(desired);
+            RuntimePlan compiled = compiler.compile(desired);
             if (current.isEnabled() == enabled) {
                 return new EnabledChange(desired, compiled);
             }
@@ -342,7 +342,7 @@ public class RuntimePersistHelper implements RuntimePersist {
                 : context.getUserId();
     }
 
-    private void synchronizeEngine(RuntimeRevision revision, Runtime compiled) {
+    private void synchronizeEngine(RuntimeRevision revision, RuntimePlan compiled) {
         if (!shouldRun(revision)) {
             engine.remove(revision.runtimeId());
             return;
@@ -351,12 +351,10 @@ public class RuntimePersistHelper implements RuntimePersist {
         replayCurrentDeviceState(List.of(compiled));
     }
 
-    private void replayCurrentDeviceState(List<Runtime> runtimes) {
+    private void replayCurrentDeviceState(List<RuntimePlan> runtimes) {
         Set<DeviceIdentity> devices = new LinkedHashSet<>();
-        for (Runtime runtime : runtimes) {
-            runtime.getRoots().keys().stream()
-                    .filter(DeviceEventKey.class::isInstance)
-                    .map(DeviceEventKey.class::cast)
+        for (RuntimePlan runtime : runtimes) {
+            runtime.requiredEventKeys().stream()
                     .map(key -> new DeviceIdentity(key.deviceType(), key.deviceId()))
                     .forEach(devices::add);
         }
@@ -428,7 +426,7 @@ public class RuntimePersistHelper implements RuntimePersist {
     private record EncodedRevision(String json, String checksum) {
     }
 
-    private record EnabledChange(RuntimeRevision revision, Runtime compiled) {
+    private record EnabledChange(RuntimeRevision revision, RuntimePlan compiled) {
     }
 
     private record DeviceIdentity(

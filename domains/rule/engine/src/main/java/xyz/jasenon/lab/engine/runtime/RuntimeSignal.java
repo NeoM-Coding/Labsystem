@@ -40,11 +40,11 @@ public sealed interface RuntimeSignal {
         return new StateChanged(Set.of());
     }
 
-    static RuntimeSignal stateChanged(Set<String> candidateActionGroupIds) {
+    public static RuntimeSignal stateChanged(Set<String> candidateActionGroupIds) {
         return new StateChanged(candidateActionGroupIds);
     }
 
-    static RuntimeSignal timePoint(TimeEvent event) {
+    public static RuntimeSignal timePoint(TimeEvent event) {
         return new TimePointOccurred(event.key().timeConditionGroupId(), event);
     }
 }

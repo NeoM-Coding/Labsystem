@@ -13,17 +13,10 @@ import xyz.jasenon.lab.engine.definition.RuntimeRevision.TimeConditionGroupDefin
 import xyz.jasenon.lab.engine.definition.RuntimeRevision.ReportType;
 import xyz.jasenon.lab.engine.eval.LogicType;
 import xyz.jasenon.lab.engine.eval.Operator;
-import xyz.jasenon.lab.engine.event.DeviceEvent;
-import xyz.jasenon.lab.engine.event.DeviceEventHandler;
-import xyz.jasenon.lab.engine.runtime.Runtime;
-import xyz.jasenon.lab.engine.runtime.RuntimeSignal;
-
-import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -33,7 +26,7 @@ class RuntimeRevisionCompilerTests {
 
     @Test
     void compilesSharedConditionGroupsOnceAndFansOutCandidates() {
-        Runtime runtime = compiler.compile(revision(
+        RuntimePlan plan = compiler.compile(revision(
                 new ActionGroupDefinition(
                         "notify-user",
                         "hot-room",
@@ -48,27 +41,13 @@ class RuntimeRevisionCompilerTests {
                 )
         ));
 
-        assertSame(
-                runtime.getActionGroups().get(0).getDeviceConditionGroup(),
-                runtime.getActionGroups().get(1).getDeviceConditionGroup()
-        );
-        assertSame(
-                runtime.getActionGroups().get(0).getTimeConditionGroup(),
-                runtime.getActionGroups().get(1).getTimeConditionGroup()
-        );
-        assertTrue(runtime.getActionGroups().get(0).getActions().get(0) instanceof ReportAction);
-
-        RuntimeSignal.StateChanged signal = (RuntimeSignal.StateChanged) new DeviceEventHandler().handle(
-                runtime,
-                new DeviceEvent(
-                        DeviceType.AirCondition,
-                        "ac-1",
-                        "roomTemperature",
-                        "27",
-                        Instant.now()
-                )
-        );
-        assertEquals(Set.of("notify-user", "notify-admin"), signal.candidateActionGroupIds());
+        assertEquals(1, plan.deviceChains().size());
+        assertEquals("hot-room", plan.actionGroups().get(0).deviceConditionGroupId());
+        assertEquals("hot-room", plan.actionGroups().get(1).deviceConditionGroupId());
+        assertTrue(plan.actionGroups().get(0).actions().get(0) instanceof ReportAction);
+        assertTrue(plan.actionGroups().get(0).timeConditionGroup()
+                == plan.actionGroups().get(1).timeConditionGroup());
+        assertEquals(1, plan.requiredEventKeys().size());
     }
 
     @Test
@@ -100,11 +79,11 @@ class RuntimeRevisionCompilerTests {
 
         String json = objectMapper.writeValueAsString(original);
         RuntimeRevision restored = objectMapper.readValue(json, RuntimeRevision.class);
-        Runtime runtime = compiler.compile(restored);
+        RuntimePlan runtime = compiler.compile(restored);
 
-        assertEquals("web-runtime", runtime.getRuntimeId());
-        assertEquals("hot-room", runtime.getActionGroups().get(0).getDeviceConditionGroupId());
-        assertEquals("always", runtime.getActionGroups().get(0).getTimeConditionGroupId());
+        assertEquals("web-runtime", runtime.runtimeId());
+        assertEquals("hot-room", runtime.actionGroups().get(0).deviceConditionGroupId());
+        assertEquals("always", runtime.actionGroups().get(0).timeConditionGroupId());
     }
 
     @Test

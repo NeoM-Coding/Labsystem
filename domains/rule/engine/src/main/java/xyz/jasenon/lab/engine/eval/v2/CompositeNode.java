@@ -1,6 +1,7 @@
 package xyz.jasenon.lab.engine.eval.v2;
 
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /** 类似 Rete Beta 网络的函数复合节点，但不进行元组连接，也不维护 Beta Memory。 */
 public final class CompositeNode implements ObservableValue<BooleanTransform>, ValueObserver<BooleanTransform> {
@@ -8,6 +9,9 @@ public final class CompositeNode implements ObservableValue<BooleanTransform>, V
     private final ObservableValue<BooleanTransform> left;
     private final ObservableValue<BooleanTransform> right;
     private final ObservableSupport<BooleanTransform> observable = new ObservableSupport<>();
+    private final Observation leftObservation;
+    private final Observation rightObservation;
+    private final AtomicBoolean closed = new AtomicBoolean(false);
     private volatile BooleanTransform leftValue;
     private volatile BooleanTransform rightValue;
     private volatile BooleanTransform value;
@@ -21,8 +25,8 @@ public final class CompositeNode implements ObservableValue<BooleanTransform>, V
         this.leftValue = left.value();
         this.rightValue = right.value();
         this.value = compose();
-        left.observe(this);
-        right.observe(this);
+        this.leftObservation = left.observe(this);
+        this.rightObservation = right.observe(this);
     }
 
     public ObservableValue<BooleanTransform> left() {
@@ -39,8 +43,8 @@ public final class CompositeNode implements ObservableValue<BooleanTransform>, V
     }
 
     @Override
-    public void observe(ValueObserver<BooleanTransform> observer) {
-        observable.add(observer);
+    public Observation observe(ValueObserver<BooleanTransform> observer) {
+        return observable.add(observer);
     }
 
     @Override
@@ -49,6 +53,9 @@ public final class CompositeNode implements ObservableValue<BooleanTransform>, V
             BooleanTransform previous,
             BooleanTransform current
     ) {
+        if (closed.get()) {
+            return;
+        }
         boolean related = false;
         if (source == left) {
             leftValue = current;
@@ -66,6 +73,14 @@ public final class CompositeNode implements ObservableValue<BooleanTransform>, V
         BooleanTransform old = value;
         value = next;
         observable.publish(this, old, next);
+    }
+
+    void close() {
+        if (closed.compareAndSet(false, true)) {
+            leftObservation.close();
+            rightObservation.close();
+            observable.clear();
+        }
     }
 
     private BooleanTransform compose() {

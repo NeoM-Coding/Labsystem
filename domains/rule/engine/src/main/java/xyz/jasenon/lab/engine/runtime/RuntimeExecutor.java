@@ -2,7 +2,6 @@ package xyz.jasenon.lab.engine.runtime;
 
 import xyz.jasenon.lab.engine.action.Action;
 import xyz.jasenon.lab.engine.action.ActionExecutionResult;
-import xyz.jasenon.lab.engine.action.ActionGroup;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -18,5 +17,9 @@ public interface RuntimeExecutor {
     /**
      * @return 描述动作最终结果的非 null Future
      */
-    CompletableFuture<ActionExecutionResult> execute(Runtime runtime, ActionGroup actionGroup, Action action);
+    CompletableFuture<ActionExecutionResult> execute(
+            Runtime runtime,
+            RuntimeActionGroup actionGroup,
+            Action action
+    );
 }

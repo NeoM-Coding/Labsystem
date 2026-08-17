@@ -4,6 +4,9 @@ import com.baomidou.mybatisplus.core.incrementer.IdentifierGenerator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
+import com.baomidou.mybatisplus.autoconfigure.MybatisPlusAutoConfiguration;
 import org.springframework.jdbc.core.JdbcTemplate;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import xyz.jasenon.lab.engine.action.Action;
@@ -44,6 +47,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
                 "fun.uid.assigner-mode=none"
         }
 )
+@ImportAutoConfiguration({DataSourceAutoConfiguration.class, MybatisPlusAutoConfiguration.class})
 class RuntimePersistenceSpringTests {
 
     @Autowired

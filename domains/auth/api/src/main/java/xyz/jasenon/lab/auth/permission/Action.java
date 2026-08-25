@@ -7,6 +7,7 @@ public interface Action extends Permission {
         edit_user,
         delete_user,
         list_user,
+        list_user_permissions,
 
         manage_semester,
         list_semester,

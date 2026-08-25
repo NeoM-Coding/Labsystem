@@ -4,6 +4,7 @@ import xyz.jasenon.lab.base.api.dto.ContactUserCreate;
 import xyz.jasenon.lab.base.api.dto.UserCreate;
 import xyz.jasenon.lab.base.api.dto.UserAuthorizationUpdate;
 import xyz.jasenon.lab.base.api.dto.UserListQuery;
+import xyz.jasenon.lab.base.api.dto.UserPermissionQuery;
 import xyz.jasenon.lab.base.api.dto.UserDelete;
 import xyz.jasenon.lab.base.api.model.User;
 import xyz.jasenon.lab.common.rpc.RpcResult;
@@ -19,6 +20,8 @@ public interface UserService {
     RpcResult<User> current();
 
     RpcResult<List<User>> list(UserListQuery query);
+
+    RpcResult<List<String>> listPermissions(UserPermissionQuery query);
 
     RpcResult<Void> logout();
 

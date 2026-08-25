@@ -8,6 +8,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import xyz.jasenon.lab.auth.annotation.ActionAuthorized;
 import xyz.jasenon.lab.auth.command.UserAuthorizationCommand;
+import xyz.jasenon.lab.auth.permission.Permission;
 import xyz.jasenon.lab.auth.permission.RelationShip;
 import xyz.jasenon.lab.auth.service.Auth;
 import xyz.jasenon.lab.auth.service.LaboratoryAuthorization;
@@ -20,6 +21,7 @@ import xyz.jasenon.lab.base.api.dto.ContactUserCreate;
 import xyz.jasenon.lab.base.api.dto.UserCreate;
 import xyz.jasenon.lab.base.api.dto.UserAuthorizationUpdate;
 import xyz.jasenon.lab.base.api.dto.UserListQuery;
+import xyz.jasenon.lab.base.api.dto.UserPermissionQuery;
 import xyz.jasenon.lab.base.api.dto.UserDelete;
 import xyz.jasenon.lab.base.mapper.UserMapper;
 import xyz.jasenon.lab.base.mapper.LaboratoryMapper;
@@ -103,6 +105,18 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         return RpcResult.success(baseMapper.listUsers(keyword)
                 .stream()
                 .map(User::mask)
+                .toList());
+    }
+
+    @Override
+    @ActionAuthorized
+    @Traced("user-service.permissions")
+    public RpcResult<List<String>> listPermissions(UserPermissionQuery query) {
+        if (query == null || isBlank(query.userId())) {
+            throw new BusinessException(BAD_REQUEST, "用户 ID 不能为空");
+        }
+        return RpcResult.success(auth.list(query.userId().trim()).stream()
+                .map(Permission::str)
                 .toList());
     }
 

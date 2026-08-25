@@ -68,16 +68,29 @@ class AuthServiceTests {
     }
 
     @Test
-    void superAdminRelationCannotBeGrantedOrRevoked() {
+    void superAdminCanGrantAndRevokeSuperAdminRelation() {
         operations.ownedRelations.add(RelationShip.App.super_admin.str());
+
+        auth.grant(appGrant(RelationShip.App.super_admin));
+        assertEquals("grant:app:global#super_admin@user:target", operations.lastMutation);
+
+        auth.revoke(new RevokeCommand(
+                SourceType.app, AuthService.GLOBAL_APP_ID, RelationShip.App.super_admin,
+                SourceType.user, "target"
+        ));
+        assertEquals("revoke:app:global#super_admin@user:target", operations.lastMutation);
+    }
+
+    @Test
+    void userManagerCannotGrantOrRevokeSuperAdminRelation() {
+        operations.ownedRelations.add(RelationShip.App.user_manager.str());
 
         assertThrows(PermissionDeniedException.class,
                 () -> auth.grant(appGrant(RelationShip.App.super_admin)));
-        assertThrows(PermissionDeniedException.class,
-                () -> auth.revoke(new RevokeCommand(
-                        SourceType.app, AuthService.GLOBAL_APP_ID, RelationShip.App.super_admin,
-                        SourceType.user, "target"
-                )));
+        assertThrows(PermissionDeniedException.class, () -> auth.revoke(new RevokeCommand(
+                SourceType.app, AuthService.GLOBAL_APP_ID, RelationShip.App.super_admin,
+                SourceType.user, "target"
+        )));
     }
 
     @Test
@@ -125,6 +138,7 @@ class AuthServiceTests {
 
     @Test
     void removeUserRevokesAllKnownAppAndLaboratoryRelations() {
+        operations.ownedRelations.add(RelationShip.App.super_admin.str());
         operations.targetRelations.add(RelationShip.App.super_admin.str());
         operations.targetRelations.add(RelationShip.App.user_viewer.str());
         operations.targetLaboratoryIds.add("lab-1");
@@ -134,6 +148,45 @@ class AuthServiceTests {
         assertTrue(operations.mutations.contains("revoke:app:global#super_admin@user:target"));
         assertTrue(operations.mutations.contains("revoke:app:global#user_viewer@user:target"));
         assertTrue(operations.mutations.contains("revoke:laboratory:lab-1#viewer@user:target"));
+    }
+
+    @Test
+    void listsKnownTargetAppPermissionsInStableOrder() {
+        operations.targetRelations.add(RelationShip.App.smart_viewer.str());
+        operations.targetRelations.add(RelationShip.App.edu_semester_viewer.str());
+
+        List<Permission> permissions = auth.list("target");
+
+        assertEquals(List.of(
+                RelationShip.App.edu_semester_viewer,
+                RelationShip.App.smart_viewer
+        ), permissions);
+    }
+
+    @Test
+    void synchronizeProtectsSuperAdminFromUserManagerButAllowsSuperAdminToRevokeIt() {
+        operations.targetRelations.add(RelationShip.App.super_admin.str());
+        operations.ownedRelations.add(RelationShip.App.user_manager.str());
+
+        assertThrows(PermissionDeniedException.class, () -> auth.synchronize(
+                new UserAuthorizationCommand("target", Set.of(), Set.of())
+        ));
+        assertTrue(operations.mutations.isEmpty());
+
+        operations.ownedRelations.clear();
+        operations.ownedRelations.add(RelationShip.App.super_admin.str());
+        auth.synchronize(new UserAuthorizationCommand("target", Set.of(), Set.of()));
+
+        assertTrue(operations.mutations.contains("revoke:app:global#super_admin@user:target"));
+    }
+
+    @Test
+    void userManagerCannotRemoveSuperAdminUser() {
+        operations.ownedRelations.add(RelationShip.App.user_manager.str());
+        operations.targetRelations.add(RelationShip.App.super_admin.str());
+
+        assertThrows(PermissionDeniedException.class, () -> auth.removeUser("target"));
+        assertTrue(operations.mutations.isEmpty());
     }
 
     private static GrantCommand appGrant(RelationShip.App relation) {

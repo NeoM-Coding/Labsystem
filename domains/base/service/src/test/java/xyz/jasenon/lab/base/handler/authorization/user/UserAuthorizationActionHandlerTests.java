@@ -8,6 +8,7 @@ import xyz.jasenon.lab.base.api.dto.ContactUserCreate;
 import xyz.jasenon.lab.base.api.dto.UserAuthorizationUpdate;
 import xyz.jasenon.lab.base.api.dto.UserCreate;
 import xyz.jasenon.lab.base.api.dto.UserListQuery;
+import xyz.jasenon.lab.base.api.dto.UserPermissionQuery;
 import xyz.jasenon.lab.base.api.dto.UserDelete;
 import xyz.jasenon.lab.base.api.model.User;
 
@@ -55,6 +56,17 @@ class UserAuthorizationActionHandlerTests {
         var command = new UserListActionHandler().handle(new UserListQuery("张三"), context);
 
         assertEquals(Action.App.list_user, command.action());
+        assertEquals("global", command.entityId());
+        assertEquals("operator", command.subjectId());
+    }
+
+    @Test
+    void permissionListDtoRequiresDedicatedGlobalAction() {
+        var command = new UserPermissionListActionHandler().handle(
+                new UserPermissionQuery("user-2"), context
+        );
+
+        assertEquals(Action.App.list_user_permissions, command.action());
         assertEquals("global", command.entityId());
         assertEquals("operator", command.subjectId());
     }

@@ -51,7 +51,7 @@
 
   <text x="52" y="46" class="eyebrow">AUTHORIZATION MODEL · V2</text>
   <text x="52" y="82" class="title">实验室管理系统权限关系图</text>
-  <text x="52" y="108" class="subtitle">严格对齐 domains/auth/service/schema/lab-system-v2.perm · 13 个应用角色 · 17 个应用动作</text>
+  <text x="52" y="108" class="subtitle">严格对齐 domains/auth/service/schema/lab-system-v2.perm · 13 个应用角色 · 18 个应用动作</text>
   <g transform="translate(1298 38)">
     <rect width="250" height="42" rx="21" fill="#e3f3ed" stroke="#b9dfd0"/>
     <circle cx="22" cy="21" r="5" fill="#22b77f"/>
@@ -186,6 +186,10 @@
       <g data-definition="action list_user = user_manager or user_viewer or super_admin">
         <text x="34" y="188" class="identifier">list_user</text>
         <text x="174" y="188" class="expression">user_manager or user_viewer or super_admin</text>
+      </g>
+      <g data-definition="action list_user_permissions = user_manager or super_admin">
+        <text x="34" y="210" class="identifier">list_user_permissions</text>
+        <text x="174" y="210" class="expression">user_manager or super_admin</text>
       </g>
 
       <rect x="18" y="230" width="436" height="166" rx="14" fill="#f4f8f6"/>

@@ -6,6 +6,8 @@ import xyz.jasenon.lab.auth.context.UserContextStore;
 import xyz.jasenon.lab.auth.service.Auth;
 import xyz.jasenon.lab.auth.service.LaboratoryAuthorization;
 import xyz.jasenon.lab.base.api.dto.UserListQuery;
+import xyz.jasenon.lab.base.api.dto.UserPermissionQuery;
+import xyz.jasenon.lab.auth.permission.RelationShip;
 import xyz.jasenon.lab.base.api.model.User;
 import xyz.jasenon.lab.base.mapper.LaboratoryMapper;
 import xyz.jasenon.lab.base.mapper.UserMapper;
@@ -67,5 +69,24 @@ class UserServiceListTests {
         assertEquals("contact-1", returned.getId());
         assertEquals("李老师", returned.getName());
         assertNull(returned.getUsername());
+    }
+
+    @Test
+    void permissionListMapsInternalPermissionTypesToRpcStrings() {
+        Auth auth = mock(Auth.class);
+        when(auth.list("user-2")).thenReturn(List.of(
+                RelationShip.App.user_manager,
+                RelationShip.App.smart_viewer
+        ));
+        UserServiceImpl service = new UserServiceImpl(
+                auth,
+                mock(LaboratoryAuthorization.class),
+                mock(LaboratoryMapper.class),
+                mock(UserContextStore.class)
+        );
+
+        var result = service.listPermissions(new UserPermissionQuery(" user-2 ")).data();
+
+        assertEquals(List.of("user_manager", "smart_viewer"), result);
     }
 }

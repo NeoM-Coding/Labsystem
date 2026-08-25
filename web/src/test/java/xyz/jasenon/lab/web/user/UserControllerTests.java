@@ -3,6 +3,7 @@ package xyz.jasenon.lab.web.user;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 import xyz.jasenon.lab.base.api.dto.UserListQuery;
+import xyz.jasenon.lab.base.api.dto.UserPermissionQuery;
 import xyz.jasenon.lab.base.api.dto.UserDelete;
 import xyz.jasenon.lab.base.api.model.User;
 import xyz.jasenon.lab.base.api.service.UserService;
@@ -58,5 +59,18 @@ class UserControllerTests {
         controller.delete("user-2");
 
         verify(userService).deleteUser(new UserDelete("user-2", null));
+    }
+
+    @Test
+    void permissionsAdaptsPathIdentityToSerializableQuery() {
+        UserService userService = mock(UserService.class);
+        when(userService.listPermissions(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(RpcResult.success(List.of("user_manager")));
+        UserController controller = new UserController();
+        ReflectionTestUtils.setField(controller, "userService", userService);
+
+        controller.permissions("user-2");
+
+        verify(userService).listPermissions(new UserPermissionQuery("user-2"));
     }
 }

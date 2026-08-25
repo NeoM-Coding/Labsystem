@@ -4,6 +4,9 @@ import xyz.jasenon.lab.auth.command.ActionCommand;
 import xyz.jasenon.lab.auth.command.GrantCommand;
 import xyz.jasenon.lab.auth.command.RevokeCommand;
 import xyz.jasenon.lab.auth.command.UserAuthorizationCommand;
+import xyz.jasenon.lab.auth.permission.Permission;
+
+import java.util.List;
 
 public interface Auth {
 
@@ -16,5 +19,7 @@ public interface Auth {
     void synchronize(UserAuthorizationCommand command);
 
     void removeUser(String userId);
+
+    List<Permission> list(String userId);
 
 }

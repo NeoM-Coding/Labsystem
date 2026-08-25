@@ -57,6 +57,7 @@ class PermifyDemoSchemaTests {
         assertTrue(schema.contains("relation user_manager @user"));
         assertTrue(schema.contains("relation laboratory_manager @user"));
         assertTrue(schema.contains("action create_user = user_manager or super_admin"));
+        assertTrue(schema.contains("action list_user_permissions = user_manager or super_admin"));
         assertTrue(schema.contains("action view_timetable = edu_timetable_manager or edu_timetable_viewer or super_admin"));
         assertTrue(schema.contains("action manage_laboratory = laboratory_manager or super_admin"));
         assertTrue(schema.contains("entity laboratory"));

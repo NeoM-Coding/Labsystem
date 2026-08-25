@@ -18,6 +18,8 @@ entity app {
 
 	action list_user = user_manager or user_viewer or super_admin
 
+	action list_user_permissions = user_manager or super_admin
+
 	relation edu_semester_manager @user
 
 	relation edu_semester_viewer @user

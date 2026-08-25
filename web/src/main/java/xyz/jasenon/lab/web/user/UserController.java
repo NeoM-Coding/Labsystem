@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 import xyz.jasenon.lab.base.api.dto.UserAuthorizationUpdate;
 import xyz.jasenon.lab.base.api.dto.UserCreate;
 import xyz.jasenon.lab.base.api.dto.UserListQuery;
+import xyz.jasenon.lab.base.api.dto.UserPermissionQuery;
 import xyz.jasenon.lab.base.api.dto.UserDelete;
 import xyz.jasenon.lab.base.api.model.User;
 import xyz.jasenon.lab.base.api.service.UserService;
@@ -45,6 +46,20 @@ public class UserController {
             @RequestParam(required = false) String keyword) {
         List<User> users = RpcClient.call(() -> userService.list(new UserListQuery(keyword)));
         return DiyResponseEntity.of(R.success(users));
+    }
+
+    @GetMapping("/{userId}/permissions")
+    @Operation(
+            summary = "查询用户权限",
+            description = "查询指定用户在 app:global 上直接分配的应用权限。"
+                    + "需要 app:global 的 list_user_permissions 权限，"
+                    + "该权限仅由 user_manager 或 super_admin 授予。"
+    )
+    public DiyResponseEntity<R<List<String>>> permissions(@PathVariable String userId) {
+        List<String> permissions = RpcClient.call(
+                () -> userService.listPermissions(new UserPermissionQuery(userId))
+        );
+        return DiyResponseEntity.of(R.success(permissions));
     }
 
     @PostMapping

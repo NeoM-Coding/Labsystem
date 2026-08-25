@@ -11,18 +11,18 @@ import xyz.jasenon.lab.auth.context.UserContextHolder;
 import xyz.jasenon.lab.auth.exception.AuthenticationRequiredException;
 import xyz.jasenon.lab.auth.exception.AuthorizationConfigurationException;
 import xyz.jasenon.lab.auth.exception.PermissionDeniedException;
+import xyz.jasenon.lab.auth.permission.Permission;
 import xyz.jasenon.lab.auth.permission.RelationShip;
 
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 public class AuthService implements Auth {
 
     public static final String GLOBAL_APP_ID = "global";
-
-    private static final Set<RelationShip.App> PROTECTED_APP_RELATIONS =
-            Set.of(RelationShip.App.super_admin);
 
     private final AuthorizationOperations operations;
 
@@ -33,7 +33,7 @@ public class AuthService implements Auth {
     @Override
     public void grant(GrantCommand command) {
         UserContext operator = requireUserContext();
-        validateGrantScope(command.entityType(), command.entityId(), command.relation(), operator);
+        validateGrantScope(command.entityType(), command.entityId(), command.relation(), operator, "grant");
         operations.grant(
                 command.entityType(), command.entityId(), command.relation(),
                 command.subjectType(), command.subjectId()
@@ -43,7 +43,7 @@ public class AuthService implements Auth {
     @Override
     public void revoke(RevokeCommand command) {
         UserContext operator = requireUserContext();
-        validateGrantScope(command.entityType(), command.entityId(), command.relation(), operator);
+        validateGrantScope(command.entityType(), command.entityId(), command.relation(), operator, "revoke");
         operations.revoke(
                 command.entityType(), command.entityId(), command.relation(),
                 command.subjectType(), command.subjectId()
@@ -62,7 +62,7 @@ public class AuthService implements Auth {
     public void synchronize(UserAuthorizationCommand command) {
         UserContext operator = requireUserContext();
         Set<RelationShip.App> desiredAppRelations = command.appRelations();
-        Set<RelationShip.App> currentAppRelations = knownMutableAppRelations(
+        Set<RelationShip.App> currentAppRelations = knownAppRelations(
                 operations.relationsOf(SourceType.app, GLOBAL_APP_ID, SourceType.user, command.userId())
         );
         Set<String> currentLaboratoryIds = operations.entityIdsOf(
@@ -76,8 +76,10 @@ public class AuthService implements Auth {
         Set<String> laboratoriesToGrant = difference(command.laboratoryIds(), currentLaboratoryIds);
 
         // 先验证完整变更集，避免越权项出现在中途时留下部分授权写入。
-        appToRevoke.forEach(relation -> validateAppRelation(GLOBAL_APP_ID, relation, operator.getUserId()));
-        appToGrant.forEach(relation -> validateAppRelation(GLOBAL_APP_ID, relation, operator.getUserId()));
+        appToRevoke.forEach(relation -> validateAppRelation(
+                GLOBAL_APP_ID, relation, operator.getUserId(), "revoke"));
+        appToGrant.forEach(relation -> validateAppRelation(
+                GLOBAL_APP_ID, relation, operator.getUserId(), "grant"));
         laboratoriesToRevoke.forEach(id -> validateLaboratoryRelation(id, RelationShip.Laboratory.viewer, operator));
         laboratoriesToGrant.forEach(id -> validateLaboratoryRelation(id, RelationShip.Laboratory.viewer, operator));
 
@@ -97,10 +99,14 @@ public class AuthService implements Auth {
 
     @Override
     public void removeUser(String userId) {
+        UserContext operator = requireUserContext();
         String normalizedUserId = requireText(userId, "userId");
         Set<String> currentRelations = operations.relationsOf(
                 SourceType.app, GLOBAL_APP_ID, SourceType.user, normalizedUserId
         );
+        if (currentRelations.contains(RelationShip.App.super_admin.str())) {
+            requireSuperAdmin(operator.getUserId(), "revoke:" + RelationShip.App.super_admin.str());
+        }
         for (RelationShip.App relation : RelationShip.App.values()) {
             if (currentRelations.contains(relation.str())) {
                 operations.revoke(
@@ -119,10 +125,23 @@ public class AuthService implements Auth {
         ));
     }
 
-    private static Set<RelationShip.App> knownMutableAppRelations(Set<String> relations) {
+    @Override
+    public List<Permission> list(String userId) {
+        String normalizedUserId = requireText(userId, "userId");
+        Set<String> targetRelations = appRelationsOf(normalizedUserId);
+        List<Permission> permissions = new ArrayList<>();
+        for (RelationShip.App relation : RelationShip.App.values()) {
+            if (targetRelations.contains(relation.str())) {
+                permissions.add(relation);
+            }
+        }
+        return List.copyOf(permissions);
+    }
+
+    private static Set<RelationShip.App> knownAppRelations(Set<String> relations) {
         EnumSet<RelationShip.App> result = EnumSet.noneOf(RelationShip.App.class);
         for (RelationShip.App relation : RelationShip.App.values()) {
-            if (!PROTECTED_APP_RELATIONS.contains(relation) && relations.contains(relation.str())) {
+            if (relations.contains(relation.str())) {
                 result.add(relation);
             }
         }
@@ -138,9 +157,10 @@ public class AuthService implements Auth {
     private void validateGrantScope(SourceType entityType,
                                     String entityId,
                                     RelationShip relation,
-                                    UserContext operator) {
+                                    UserContext operator,
+                                    String operation) {
         if (entityType == SourceType.app) {
-            validateAppRelation(entityId, relation, operator.getUserId());
+            validateAppRelation(entityId, relation, operator.getUserId(), operation);
             return;
         }
         if (entityType == SourceType.laboratory) {
@@ -150,24 +170,36 @@ public class AuthService implements Auth {
         throw new AuthorizationConfigurationException("不支持向 " + entityType + " 资源写入 Relation");
     }
 
-    private void validateAppRelation(String entityId, RelationShip relation, String operatorId) {
+    private void validateAppRelation(String entityId, RelationShip relation,
+                                     String operatorId, String operation) {
         if (!GLOBAL_APP_ID.equals(entityId)) {
             throw new AuthorizationConfigurationException("App Relation 只能写入 app:" + GLOBAL_APP_ID);
         }
         if (!(relation instanceof RelationShip.App appRelation)) {
             throw new AuthorizationConfigurationException("app 资源只能写入 RelationShip.App");
         }
-        if (PROTECTED_APP_RELATIONS.contains(appRelation)) {
-            throw denied(SourceType.app, GLOBAL_APP_ID, "grant:" + appRelation.str());
-        }
 
-        Set<String> ownedRelations = operations.relationsOf(
-                SourceType.app, GLOBAL_APP_ID, SourceType.user, operatorId
-        );
+        Set<String> ownedRelations = appRelationsOf(operatorId);
         boolean superAdmin = ownedRelations.contains(RelationShip.App.super_admin.str());
-        if (!superAdmin && !ownedRelations.contains(appRelation.str())) {
-            throw denied(SourceType.app, GLOBAL_APP_ID, "grant:" + appRelation.str());
+        if (appRelation == RelationShip.App.super_admin) {
+            if (!superAdmin) {
+                throw denied(SourceType.app, GLOBAL_APP_ID, operation + ":" + appRelation.str());
+            }
+            return;
         }
+        if (!superAdmin && !ownedRelations.contains(appRelation.str())) {
+            throw denied(SourceType.app, GLOBAL_APP_ID, operation + ":" + appRelation.str());
+        }
+    }
+
+    private void requireSuperAdmin(String operatorId, String operation) {
+        if (!appRelationsOf(operatorId).contains(RelationShip.App.super_admin.str())) {
+            throw denied(SourceType.app, GLOBAL_APP_ID, operation);
+        }
+    }
+
+    private Set<String> appRelationsOf(String userId) {
+        return operations.relationsOf(SourceType.app, GLOBAL_APP_ID, SourceType.user, userId);
     }
 
     private static void validateLaboratoryRelation(String laboratoryId,

@@ -141,12 +141,10 @@ public class AuthClient implements AuthorizationOperations {
         String continuousToken = "";
         try {
             do {
-                var body = new ReadRelationshipsBody()
-                        .filter(new TupleFilter()
+                var body = relationshipReadBody(new TupleFilter()
                                 .entity(new EntityFilter().type(source.name()).ids(List.of(sourceId)))
-                                .subject(new SubjectFilter().type(target.name()).ids(List.of(targetId))))
-                        .pageSize(100L)
-                        .continuousToken(continuousToken);
+                                .subject(new SubjectFilter().type(target.name()).ids(List.of(targetId))),
+                        continuousToken);
                 var response = api.dataRelationshipsRead(tenantId, body);
                 if (response.getTuples() != null) {
                     response.getTuples().stream()
@@ -171,13 +169,11 @@ public class AuthClient implements AuthorizationOperations {
         String continuousToken = "";
         try {
             do {
-                var body = new ReadRelationshipsBody()
-                        .filter(new TupleFilter()
+                var body = relationshipReadBody(new TupleFilter()
                                 .entity(new EntityFilter().type(source.name()))
                                 .relation(relationShip.str())
-                                .subject(new SubjectFilter().type(target.name()).ids(List.of(targetId))))
-                        .pageSize(100L)
-                        .continuousToken(continuousToken);
+                                .subject(new SubjectFilter().type(target.name()).ids(List.of(targetId))),
+                        continuousToken);
                 var response = api.dataRelationshipsRead(tenantId, body);
                 if (response.getTuples() != null) {
                     response.getTuples().stream()
@@ -195,6 +191,14 @@ public class AuthClient implements AuthorizationOperations {
                     source, relationShip, target, targetId, e);
             throw new IllegalStateException("查询用户资源关系失败", e);
         }
+    }
+
+    static ReadRelationshipsBody relationshipReadBody(TupleFilter filter, String continuousToken) {
+        return new ReadRelationshipsBody()
+                .metadata(new RelationshipReadRequestMetadata().snapToken(""))
+                .filter(filter)
+                .pageSize(100L)
+                .continuousToken(continuousToken);
     }
 
     @Override

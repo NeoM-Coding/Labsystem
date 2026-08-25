@@ -1,12 +1,21 @@
 package xyz.jasenon.lab.audit.config;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.context.annotation.Import;
 import xyz.jasenon.lab.audit.api.model.AuditLogPageQuery;
 import xyz.jasenon.lab.auth.context.UserContext;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AuditAuthorizationConfigurationTests {
+
+    @Test
+    void auditAutoConfigurationImportsAuthorizationHandlers() {
+        Import imported = AuditAutoConfiguration.class.getAnnotation(Import.class);
+
+        assertTrue(java.util.List.of(imported.value()).contains(AuditAuthorizationConfiguration.class));
+    }
 
     @Test
     void mapsPageQueryToGlobalAuditPermission() {

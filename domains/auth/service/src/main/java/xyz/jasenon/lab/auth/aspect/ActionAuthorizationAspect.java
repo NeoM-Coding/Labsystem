@@ -3,12 +3,13 @@ package xyz.jasenon.lab.auth.aspect;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
 import xyz.jasenon.lab.auth.command.ActionCommand;
 import xyz.jasenon.lab.auth.context.UserContext;
 import xyz.jasenon.lab.auth.context.UserContextHolder;
 import xyz.jasenon.lab.auth.exception.AuthenticationRequiredException;
-import xyz.jasenon.lab.auth.exception.AuthorizationConfigurationException;
 import xyz.jasenon.lab.auth.exception.PermissionDeniedException;
 import xyz.jasenon.lab.auth.handler.ActionCommandHandlerRegistry;
 import xyz.jasenon.lab.auth.service.Auth;
@@ -19,6 +20,8 @@ import java.util.List;
 @Aspect
 @Order(90)
 public class ActionAuthorizationAspect {
+
+    private static final Logger log = LoggerFactory.getLogger(ActionAuthorizationAspect.class);
 
     private final ActionCommandHandlerRegistry registry;
     private final Auth auth;
@@ -41,9 +44,9 @@ public class ActionAuthorizationAspect {
                 .flatMap(java.util.Optional::stream)
                 .toList();
         if (commands.isEmpty()) {
-            throw new AuthorizationConfigurationException(
-                    joinPoint.getSignature().toShortString() + " 没有可处理的授权 DTO"
-            );
+            log.warn("authorization_handler_missing method={} argument_types={} action=allow",
+                    joinPoint.getSignature().toShortString(), argumentTypes(joinPoint.getArgs()));
+            return joinPoint.proceed();
         }
 
         for (ActionCommand command : commands) {
@@ -54,5 +57,12 @@ public class ActionAuthorizationAspect {
             }
         }
         return joinPoint.proceed();
+    }
+
+    private static List<String> argumentTypes(Object[] arguments) {
+        if (arguments == null || arguments.length == 0) return List.of();
+        return Arrays.stream(arguments)
+                .map(argument -> argument == null ? "null" : argument.getClass().getName())
+                .toList();
     }
 }

@@ -5,6 +5,7 @@ import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import xyz.jasenon.lab.audit.aspect.AuditLogAspect;
 import xyz.jasenon.lab.audit.handler.AuditHandlerRegistry;
 import xyz.jasenon.lab.audit.handler.AuditLogHandler;
@@ -15,6 +16,7 @@ import xyz.jasenon.lab.audit.persistence.mapper.AuditLogMapper;
 import java.util.List;
 
 @AutoConfiguration
+@Import(AuditAuthorizationConfiguration.class)
 @MapperScan(
         basePackages = "xyz.jasenon.lab.audit.persistence.mapper",
         sqlSessionFactoryRef = "sqlSessionFactory"

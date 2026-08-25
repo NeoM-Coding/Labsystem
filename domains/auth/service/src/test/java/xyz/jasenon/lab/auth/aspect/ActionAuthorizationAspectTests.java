@@ -12,11 +12,11 @@ import xyz.jasenon.lab.auth.command.RevokeCommand;
 import xyz.jasenon.lab.auth.command.UserAuthorizationCommand;
 import xyz.jasenon.lab.auth.context.UserContext;
 import xyz.jasenon.lab.auth.context.UserContextHolder;
-import xyz.jasenon.lab.auth.exception.AuthorizationConfigurationException;
 import xyz.jasenon.lab.auth.exception.PermissionDeniedException;
 import xyz.jasenon.lab.auth.handler.ActionCommandHandler;
 import xyz.jasenon.lab.auth.handler.ActionCommandHandlerRegistry;
 import xyz.jasenon.lab.auth.permission.Action;
+import xyz.jasenon.lab.auth.permission.Permission;
 import xyz.jasenon.lab.auth.service.Auth;
 
 import java.lang.reflect.Proxy;
@@ -25,6 +25,7 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -74,12 +75,12 @@ class ActionAuthorizationAspectTests {
     }
 
     @Test
-    void failsClosedWhenNoArgumentHasAnAuthorizationHandler() {
+    void proceedsWhenNoArgumentHasAnAuthorizationHandler() throws Throwable {
         JoinPointFixture fixture = joinPoint("unhandled");
 
-        assertThrows(AuthorizationConfigurationException.class,
-                () -> aspect.authorize(fixture.joinPoint()));
-        assertFalse(fixture.proceeded()[0]);
+        assertEquals("ok", aspect.authorize(fixture.joinPoint()));
+        assertTrue(fixture.proceeded()[0]);
+        assertNull(auth.lastCommand);
     }
 
     private static JoinPointFixture joinPoint(Object... arguments) {
@@ -142,6 +143,11 @@ class ActionAuthorizationAspectTests {
 
         @Override
         public void removeUser(String userId) {
+        }
+
+        @Override
+        public List<Permission> list(String userId) {
+            return List.of();
         }
 
     }

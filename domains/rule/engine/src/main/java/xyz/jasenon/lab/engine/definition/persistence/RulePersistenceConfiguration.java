@@ -17,7 +17,7 @@ import javax.sql.DataSource;
 @MapperScan(basePackages = {
         "xyz.jasenon.lab.engine.definition.persistence.mapper",
         "xyz.jasenon.lab.engine.alert.persistence.mapper"
-})
+}, sqlSessionFactoryRef = "sqlSessionFactory")
 @EnableConfigurationProperties(DataSourceProperties.class)
 @ConditionalOnProperty(
         prefix = "lab.rule-engine.persistence",

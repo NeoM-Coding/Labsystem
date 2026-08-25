@@ -1,2 +1,3 @@
 xyz.jasenon.lab.persistence.config.MybatisPlusConfig
 xyz.jasenon.lab.persistence.config.PersistenceJacksonConfiguration
+xyz.jasenon.lab.persistence.config.BusinessTransactionAutoConfiguration

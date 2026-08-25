@@ -280,7 +280,8 @@ services:
     environment:
       <<: *java-environment
       APP_JAR: /app/artifacts/rule-engine-0.0.1.jar
-      APP_HEALTH_PORT: ${RULE_ENGINE_SERVER_PORT:-3334}
+      # Rule Engine is a non-web Dubbo provider, so its Dubbo port is the process health port.
+      APP_HEALTH_PORT: ${RULE_ENGINE_DUBBO_PORT:-50053}
       RULE_ENGINE_SERVER_PORT: ${RULE_ENGINE_SERVER_PORT:-3334}
       RULE_ENGINE_DUBBO_PORT: ${RULE_ENGINE_DUBBO_PORT:-50053}
       RULE_ENGINE_DUBBO_QOS_PORT: ${RULE_ENGINE_DUBBO_QOS_PORT:-22223}

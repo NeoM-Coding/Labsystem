@@ -1,1 +1,2 @@
 xyz.jasenon.lab.observability.config.TracingAutoConfiguration
+xyz.jasenon.lab.observability.config.TraceHttpAutoConfiguration

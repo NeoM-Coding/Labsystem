@@ -11,8 +11,7 @@ class AESCryptoHandlerTests {
 
     @BeforeEach
     void setUp() {
-        MybatisHandlerConfig.AES_KEY = "0123456789abcdef";
-        handler = new AESCryptoHandler();
+        handler = new AESCryptoHandler("0123456789abcdef");
     }
 
     @Test

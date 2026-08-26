@@ -13,7 +13,14 @@ import java.sql.Types;
 
 public class AESCryptoHandler implements TypeHandler<String> {
 
-    private final AES aes = new AES(MybatisHandlerConfig.AES_KEY.getBytes(StandardCharsets.UTF_8));
+    private final AES aes;
+
+    public AESCryptoHandler(String aesKey) {
+        if (aesKey == null || aesKey.isBlank()) {
+            throw new IllegalArgumentException("AES key 不能为空");
+        }
+        this.aes = new AES(aesKey.getBytes(StandardCharsets.UTF_8));
+    }
 
     @Override
     public void setParameter(PreparedStatement ps, int i, String parameter, JdbcType jdbcType) throws SQLException {

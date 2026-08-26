@@ -6,10 +6,8 @@ import org.apache.ibatis.mapping.MappedStatement;
 import org.apache.ibatis.mapping.ResultMap;
 import org.apache.ibatis.mapping.ResultMapping;
 import org.apache.ibatis.session.Configuration;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import xyz.jasenon.lab.base.api.persistence.AESCryptoHandler;
-import xyz.jasenon.lab.base.api.persistence.MybatisHandlerConfig;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -20,11 +18,6 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 class UserMapperXmlTests {
 
     private static final String NAMESPACE = "xyz.jasenon.lab.base.mapper.UserMapper.";
-
-    @BeforeEach
-    void setUpEncryptionKey() {
-        MybatisHandlerConfig.AES_KEY = "0123456789abcdef";
-    }
 
     @Test
     void customUserQueriesDecodeEncryptedPhoneFields() throws IOException {
@@ -52,6 +45,8 @@ class UserMapperXmlTests {
 
     private Configuration parse(String resource) throws IOException {
         Configuration configuration = new Configuration();
+        configuration.getTypeHandlerRegistry()
+                .register(new AESCryptoHandler("0123456789abcdef"));
         try (InputStream input = Resources.getResourceAsStream(resource)) {
             new XMLMapperBuilder(
                     input,

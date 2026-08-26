@@ -29,7 +29,7 @@ public class LaboratoryAuthorizationService implements LaboratoryAuthorization {
         );
         try {
             operations.grant(
-                    SourceType.laboratory, normalizedLaboratoryId, RelationShip.Laboratory.viewer,
+                    SourceType.laboratory, normalizedLaboratoryId, RelationShip.Laboratory.owner,
                     SourceType.user, normalizedCreatorUserId
             );
         } catch (RuntimeException e) {
@@ -68,6 +68,60 @@ public class LaboratoryAuthorizationService implements LaboratoryAuthorization {
                 Action.Laboratory.can_view,
                 SourceType.user
         );
+    }
+
+    @Override
+    public LaboratoryMembers members(String laboratoryId) {
+        String id = requireText(laboratoryId, "laboratoryId");
+        return new LaboratoryMembers(
+                operations.subjectIdsOf(SourceType.laboratory, id,
+                        RelationShip.Laboratory.owner, SourceType.user),
+                operations.subjectIdsOf(SourceType.laboratory, id,
+                        RelationShip.Laboratory.viewer, SourceType.user)
+        );
+    }
+
+    @Override
+    public void replaceViewers(String laboratoryId, Set<String> viewerUserIds) {
+        String id = requireText(laboratoryId, "laboratoryId");
+        Set<String> requestedInput = viewerUserIds == null ? Set.of() : viewerUserIds.stream()
+                .map(userId -> requireText(userId, "viewerUserId"))
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        LaboratoryMembers members = members(id);
+        java.util.HashSet<String> requested = new java.util.HashSet<>(requestedInput);
+        // owner 已天然具备 can_view，避免再写一条冗余 viewer 关系。
+        requested.removeAll(members.ownerIds());
+        Set<String> current = members.viewerIds();
+        current.stream().filter(userId -> !requested.contains(userId)).sorted().forEach(userId ->
+                operations.revoke(SourceType.laboratory, id, RelationShip.Laboratory.viewer,
+                        SourceType.user, userId));
+        requested.stream().filter(userId -> !current.contains(userId)).sorted().forEach(userId ->
+                operations.grant(SourceType.laboratory, id, RelationShip.Laboratory.viewer,
+                        SourceType.user, userId));
+    }
+
+    @Override
+    public void reconcile(String laboratoryId, String ownerUserId, Set<String> managerUserIds) {
+        String id = requireText(laboratoryId, "laboratoryId");
+        String ownerId = requireText(ownerUserId, "ownerUserId");
+        operations.grant(SourceType.laboratory, id, RelationShip.Laboratory.app,
+                SourceType.app, GLOBAL_APP_ID);
+        replaceRelation(id, RelationShip.Laboratory.owner, Set.of(ownerId));
+        replaceRelation(id, RelationShip.Laboratory.manager,
+                managerUserIds == null ? Set.of() : managerUserIds);
+    }
+
+    private void replaceRelation(String laboratoryId, RelationShip.Laboratory relation,
+                                 Set<String> requestedIds) {
+        Set<String> requested = requestedIds.stream()
+                .map(id -> requireText(id, relation.str() + "UserId"))
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        Set<String> current = operations.subjectIdsOf(
+                SourceType.laboratory, laboratoryId, relation, SourceType.user);
+        current.stream().filter(id -> !requested.contains(id)).sorted().forEach(id ->
+                operations.revoke(SourceType.laboratory, laboratoryId, relation, SourceType.user, id));
+        requested.stream().filter(id -> !current.contains(id)).sorted().forEach(id ->
+                operations.grant(SourceType.laboratory, laboratoryId, relation, SourceType.user, id));
     }
 
     private static String requireText(String value, String name) {

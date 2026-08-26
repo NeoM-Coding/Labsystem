@@ -14,6 +14,8 @@ DATABASE_MIGRATIONS=(
     "$ROOT_DIR/sql/migrations/20260730_add_latest_telemetry_indexes.sql"
     "$ROOT_DIR/sql/migrations/20260731_allow_contact_credentials_null.sql"
     "$ROOT_DIR/sql/migrations/20260811_add_alert_log.sql"
+    "$ROOT_DIR/sql/migrations/20260825_add_compensation_tasks.sql"
+    "$ROOT_DIR/sql/migrations/20260825_add_laboratory_create_by.sql"
 )
 
 log() {

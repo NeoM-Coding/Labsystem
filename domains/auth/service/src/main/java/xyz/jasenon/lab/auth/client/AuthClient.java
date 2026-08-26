@@ -193,6 +193,38 @@ public class AuthClient implements AuthorizationOperations {
         }
     }
 
+    @Override
+    public Set<String> subjectIdsOf(SourceType source, String sourceId,
+                                    RelationShip relationShip, SourceType target) {
+        DataApi api = new DataApi(client);
+        Set<String> subjectIds = new LinkedHashSet<>();
+        String continuousToken = "";
+        try {
+            do {
+                var body = relationshipReadBody(new TupleFilter()
+                                .entity(new EntityFilter().type(source.name()).ids(List.of(sourceId)))
+                                .relation(relationShip.str())
+                                .subject(new SubjectFilter().type(target.name())),
+                        continuousToken);
+                var response = api.dataRelationshipsRead(tenantId, body);
+                if (response.getTuples() != null) {
+                    response.getTuples().stream()
+                            .map(Tuple::getSubject)
+                            .filter(java.util.Objects::nonNull)
+                            .map(Subject::getId)
+                            .filter(AuthClient::hasText)
+                            .forEach(subjectIds::add);
+                }
+                continuousToken = normalize(response.getContinuousToken());
+            } while (!continuousToken.isEmpty());
+            return Set.copyOf(subjectIds);
+        } catch (ApiException e) {
+            log.error("read relationship subjects error args:{} {} {} {}",
+                    source, sourceId, relationShip, target, e);
+            throw new IllegalStateException("查询资源用户关系失败", e);
+        }
+    }
+
     static ReadRelationshipsBody relationshipReadBody(TupleFilter filter, String continuousToken) {
         return new ReadRelationshipsBody()
                 .metadata(new RelationshipReadRequestMetadata().snapToken(""))

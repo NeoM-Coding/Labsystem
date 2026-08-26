@@ -14,4 +14,10 @@ public interface LaboratoryAuthorization {
     Set<String> visibleLaboratoryIds(String userId);
 
     Set<String> usersWhoCanView(String laboratoryId);
+
+    LaboratoryMembers members(String laboratoryId);
+
+    void replaceViewers(String laboratoryId, Set<String> viewerUserIds);
+
+    void reconcile(String laboratoryId, String ownerUserId, Set<String> managerUserIds);
 }

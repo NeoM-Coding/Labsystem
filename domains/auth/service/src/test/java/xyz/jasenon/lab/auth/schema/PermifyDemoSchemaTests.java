@@ -61,8 +61,11 @@ class PermifyDemoSchemaTests {
         assertTrue(schema.contains("action view_timetable = edu_timetable_manager or edu_timetable_viewer or super_admin"));
         assertTrue(schema.contains("action manage_laboratory = laboratory_manager or super_admin"));
         assertTrue(schema.contains("entity laboratory"));
+        assertTrue(schema.contains("relation owner @user"));
+        assertTrue(schema.contains("relation manager @user"));
         assertTrue(schema.contains("relation viewer @user"));
-        assertTrue(schema.contains("permission can_view = app.super_admin or viewer"));
+        assertTrue(schema.contains("permission can_view = app.super_admin or owner or manager or viewer"));
+        assertTrue(schema.contains("action laboratory_manage = app.super_admin or owner or manager"));
         assertFalse(schema.contains("view_timetable = edu_timetable_manager or edu_semester_viewer"));
     }
 

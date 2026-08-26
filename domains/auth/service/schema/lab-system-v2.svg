@@ -271,7 +271,7 @@
   <text x="1040" y="714" font-size="10" fill="#7c8d86">@user</text>
 
   <g data-entity="laboratory" transform="translate(1226 246)" filter="url(#shadow)">
-    <rect width="326" height="474" rx="24" fill="#ffffff" stroke="#d6deed"/>
+    <rect width="326" height="566" rx="24" fill="#ffffff" stroke="#d6deed"/>
     <path d="M 24 0 H 302 A 24 24 0 0 1 326 24 V 72 H 0 V 24 A 24 24 0 0 1 24 0"
           fill="url(#labHeader)"/>
     <text x="24" y="34" class="entity-title">laboratory</text>
@@ -283,22 +283,35 @@
       <text x="36" y="158" class="lab-identifier">app</text>
       <text x="286" y="158" text-anchor="end" class="relation-target">@app</text>
     </g>
-    <g data-definition="relation viewer @user">
+    <g data-definition="relation owner @user">
       <rect x="20" y="190" width="286" height="54" rx="12" fill="#f2f5fb"/>
-      <text x="36" y="222" class="lab-identifier">viewer</text>
+      <text x="36" y="222" class="lab-identifier">owner</text>
       <text x="286" y="222" text-anchor="end" class="relation-target">@user</text>
     </g>
-
-    <text x="22" y="282" class="section-title">派生权限</text>
-    <g data-definition="permission can_view = app.super_admin or viewer">
-      <rect x="20" y="298" width="286" height="98" rx="14" fill="#eaf0fb" stroke="#cfdaef"/>
-      <text x="36" y="330" class="lab-identifier">can_view</text>
-      <text x="36" y="356" class="lab-expression">app.super_admin</text>
-      <text x="36" y="376" class="lab-expression">or viewer</text>
+    <g data-definition="relation manager @user">
+      <text x="36" y="246" class="lab-identifier">manager</text>
+      <text x="286" y="246" text-anchor="end" class="relation-target">@user</text>
+    </g>
+    <g data-definition="relation viewer @user">
+      <rect x="20" y="254" width="286" height="54" rx="12" fill="#f2f5fb"/>
+      <text x="36" y="286" class="lab-identifier">viewer</text>
+      <text x="286" y="286" text-anchor="end" class="relation-target">@user</text>
     </g>
 
-    <rect x="20" y="416" width="286" height="34" rx="10" fill="#f1f4f9"/>
-    <text x="163" y="438" text-anchor="middle" class="legend">平台超管或实验室查看者可见</text>
+    <text x="22" y="340" class="section-title">派生权限与动作</text>
+    <g data-definition="permission can_view = app.super_admin or owner or manager or viewer">
+      <rect x="20" y="356" width="286" height="78" rx="14" fill="#eaf0fb" stroke="#cfdaef"/>
+      <text x="36" y="384" class="lab-identifier">can_view</text>
+      <text x="36" y="408" class="lab-expression">super_admin or owner or manager or viewer</text>
+    </g>
+    <g data-definition="action laboratory_manage = app.super_admin or owner or manager">
+      <rect x="20" y="444" width="286" height="58" rx="14" fill="#eaf0fb" stroke="#cfdaef"/>
+      <text x="36" y="468" class="lab-identifier">laboratory_manage</text>
+      <text x="36" y="489" class="lab-expression">app.super_admin or owner or manager</text>
+    </g>
+
+    <rect x="20" y="512" width="286" height="34" rx="10" fill="#f1f4f9"/>
+    <text x="163" y="534" text-anchor="middle" class="legend">owner 管成员，owner/viewer 可见</text>
   </g>
 
   <g transform="translate(1226 758)">

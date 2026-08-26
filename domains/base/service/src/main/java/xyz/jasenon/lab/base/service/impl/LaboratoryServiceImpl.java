@@ -14,10 +14,13 @@ import xyz.jasenon.lab.audit.api.annotation.Audited;
 import xyz.jasenon.lab.base.api.dto.LaboratoryCreate;
 import xyz.jasenon.lab.base.api.dto.LaboratoryDelete;
 import xyz.jasenon.lab.base.api.dto.LaboratoryEdit;
+import xyz.jasenon.lab.base.api.dto.LaboratoryMemberQuery;
+import xyz.jasenon.lab.base.api.dto.LaboratoryViewerUpdate;
 import xyz.jasenon.lab.base.api.model.Laboratory;
 import xyz.jasenon.lab.base.api.service.LaboratoryService;
 import xyz.jasenon.lab.base.api.validation.ValidationErrors;
 import xyz.jasenon.lab.base.api.vo.LaboratoryVO;
+import xyz.jasenon.lab.base.api.vo.LaboratoryMembersVO;
 import xyz.jasenon.lab.base.context.UserContextFactory;
 import xyz.jasenon.lab.base.mapper.LaboratoryMapper;
 import xyz.jasenon.lab.base.mapper.UserMapper;
@@ -25,6 +28,7 @@ import xyz.jasenon.lab.common.exception.BusinessException;
 import xyz.jasenon.lab.common.rpc.RpcResult;
 import xyz.jasenon.lab.common.util.Pair;
 import xyz.jasenon.lab.observability.annotation.Traced;
+import xyz.jasenon.lab.base.compensation.LaboratoryAuthorizationReconcileHandler;
 
 import java.util.List;
 import java.util.Optional;
@@ -82,13 +86,15 @@ public class LaboratoryServiceImpl extends ServiceImpl<LaboratoryMapper, Laborat
     public RpcResult<Laboratory> create(LaboratoryCreate command) {
         UserContext context = requireUserContext();
         Laboratory laboratory = from(command);
+        laboratory.setCreateBy(context.getUserId());
         ValidationErrors errors = laboratory.validate();
         if (errors.hasErrors()) {
             throw new BusinessException(BAD_REQUEST, String.join(",", errors.errors()));
         }
         save(laboratory);
         // 初始化失败时异常向外传播，由本地事务回滚数据库写入。
-        laboratoryAuthorization.initialize(laboratory.getId(), context.getUserId());
+        laboratoryAuthorization.reconcile(laboratory.getId(), laboratory.getCreateBy(),
+                LaboratoryAuthorizationReconcileHandler.managerIds(laboratory));
         Set<String> affectedUserIds = laboratoryAuthorization.usersWhoCanView(laboratory.getId());
         afterCommit(() -> refreshUserContexts(affectedUserIds));
         return RpcResult.success(laboratory);
@@ -107,11 +113,45 @@ public class LaboratoryServiceImpl extends ServiceImpl<LaboratoryMapper, Laborat
             throw new BusinessException(BAD_REQUEST, String.join(",", errors.errors()));
         }
         laboratory.setId(laboratoryId);
+        Laboratory existing = getById(laboratoryId);
+        if (existing == null) {
+            throw new BusinessException(404, "实验室不存在");
+        }
+        laboratory.setCreateBy(existing.getCreateBy());
         updateById(laboratory);
+        laboratoryAuthorization.reconcile(laboratoryId, existing.getCreateBy(),
+                LaboratoryAuthorizationReconcileHandler.managerIds(laboratory));
         // Context 缓存了名称、楼栋和组织，实验室信息变化后需要同步所有可见用户。
         Set<String> affectedUserIds = laboratoryAuthorization.usersWhoCanView(laboratoryId);
         afterCommit(() -> refreshUserContexts(affectedUserIds));
         return RpcResult.success(laboratory);
+    }
+
+    @Override
+    @ActionAuthorized
+    public RpcResult<LaboratoryMembersVO> members(LaboratoryMemberQuery query) {
+        requireLaboratory(query == null ? null : query.laboratoryId());
+        return RpcResult.success(memberView(query.laboratoryId()));
+    }
+
+    @Override
+    @Audited("laboratory.viewers.update")
+    @ActionAuthorized
+    @Transactional
+    public RpcResult<LaboratoryMembersVO> replaceViewers(LaboratoryViewerUpdate command) {
+        String laboratoryId = command == null ? null : command.laboratoryId();
+        requireLaboratory(laboratoryId);
+        Set<String> userIds = command.userIds();
+        if (!userIds.isEmpty() && userMapper.selectByIds(userIds).size() != userIds.size()) {
+            throw new BusinessException(BAD_REQUEST, "可见成员中包含不存在的用户");
+        }
+        Set<String> affectedBefore = laboratoryAuthorization.usersWhoCanView(laboratoryId);
+        laboratoryAuthorization.replaceViewers(laboratoryId, userIds);
+        Set<String> affectedAfter = laboratoryAuthorization.usersWhoCanView(laboratoryId);
+        java.util.HashSet<String> affected = new java.util.HashSet<>(affectedBefore);
+        affected.addAll(affectedAfter);
+        afterCommit(() -> refreshUserContexts(Set.copyOf(affected)));
+        return RpcResult.success(memberView(laboratoryId));
     }
 
     @Override
@@ -144,6 +184,29 @@ public class LaboratoryServiceImpl extends ServiceImpl<LaboratoryMapper, Laborat
                 action.run();
             }
         });
+    }
+
+    private void requireLaboratory(String laboratoryId) {
+        if (laboratoryId == null || laboratoryId.isBlank()) {
+            throw new BusinessException(BAD_REQUEST, "实验室 ID 不能为空");
+        }
+        if (getById(laboratoryId) == null) {
+            throw new BusinessException(404, "实验室不存在");
+        }
+    }
+
+    private LaboratoryMembersVO memberView(String laboratoryId) {
+        var members = laboratoryAuthorization.members(laboratoryId);
+        return new LaboratoryMembersVO(
+                users(members.ownerIds()),
+                users(members.viewerIds())
+        );
+    }
+
+    private List<xyz.jasenon.lab.base.api.model.User> users(Set<String> ids) {
+        return ids.isEmpty() ? List.of() : userMapper.selectByIds(ids).stream()
+                .map(xyz.jasenon.lab.base.api.model.User::mask)
+                .toList();
     }
 
     private void refreshUserContexts(Set<String> userIds) {

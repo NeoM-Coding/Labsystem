@@ -35,7 +35,8 @@ public interface Action extends Permission {
     }
 
     enum Laboratory implements Action {
-        can_view;
+        can_view,
+        laboratory_manage;
 
         @Override
         public String str() {

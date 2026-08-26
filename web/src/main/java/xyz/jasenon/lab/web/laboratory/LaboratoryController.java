@@ -15,9 +15,12 @@ import org.springframework.web.bind.annotation.RestController;
 import xyz.jasenon.lab.base.api.dto.LaboratoryDelete;
 import xyz.jasenon.lab.base.api.dto.LaboratoryCreate;
 import xyz.jasenon.lab.base.api.dto.LaboratoryEdit;
+import xyz.jasenon.lab.base.api.dto.LaboratoryMemberQuery;
+import xyz.jasenon.lab.base.api.dto.LaboratoryViewerUpdate;
 import xyz.jasenon.lab.base.api.model.Laboratory;
 import xyz.jasenon.lab.base.api.service.LaboratoryService;
 import xyz.jasenon.lab.base.api.vo.LaboratoryVO;
+import xyz.jasenon.lab.base.api.vo.LaboratoryMembersVO;
 import xyz.jasenon.lab.common.util.Pair;
 import xyz.jasenon.lab.common.util.R;
 import xyz.jasenon.lab.observability.annotation.Traced;
@@ -85,6 +88,23 @@ public class LaboratoryController {
         return DiyResponseEntity.of(R.success(
                 RpcClient.call(() -> laboratoryService.update(downstream))
         ));
+    }
+
+    @GetMapping("/{laboratoryId}/members")
+    @Operation(summary = "查询实验室成员", description = "返回 owner 与直接授权的 viewer；需要该实验室的 laboratory_manage 权限。")
+    public DiyResponseEntity<R<LaboratoryMembersVO>> members(@PathVariable String laboratoryId) {
+        return DiyResponseEntity.of(R.success(RpcClient.call(
+                () -> laboratoryService.members(new LaboratoryMemberQuery(laboratoryId)))));
+    }
+
+    @PutMapping("/{laboratoryId}/members")
+    @Operation(summary = "更新实验室可见成员", description = "整体替换直接 viewer，owner 不受影响；需要该实验室的 laboratory_manage 权限。")
+    public DiyResponseEntity<R<LaboratoryMembersVO>> replaceViewers(
+            @PathVariable String laboratoryId,
+            @RequestBody LaboratoryViewerUpdate command) {
+        var downstream = new LaboratoryViewerUpdate(laboratoryId, command.userIds());
+        return DiyResponseEntity.of(R.success(RpcClient.call(
+                () -> laboratoryService.replaceViewers(downstream))));
     }
 
     @DeleteMapping("/{laboratoryId}")

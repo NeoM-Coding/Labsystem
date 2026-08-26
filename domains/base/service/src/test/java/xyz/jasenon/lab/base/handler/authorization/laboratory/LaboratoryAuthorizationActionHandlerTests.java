@@ -7,6 +7,8 @@ import xyz.jasenon.lab.auth.permission.Action;
 import xyz.jasenon.lab.base.api.dto.LaboratoryCreate;
 import xyz.jasenon.lab.base.api.dto.LaboratoryDelete;
 import xyz.jasenon.lab.base.api.dto.LaboratoryEdit;
+import xyz.jasenon.lab.base.api.dto.LaboratoryMemberQuery;
+import xyz.jasenon.lab.base.api.dto.LaboratoryViewerUpdate;
 
 import java.util.Set;
 import java.util.List;
@@ -35,6 +37,21 @@ class LaboratoryAuthorizationActionHandlerTests {
             assertEquals(SourceType.app, command.entityType());
             assertEquals("global", command.entityId());
             assertEquals(Action.App.manage_laboratory, command.action());
+            assertEquals("operator", command.subjectId());
+        }
+    }
+
+    @Test
+    void memberOperationsRequireResourceOwnerOrSuperAdminAction() {
+        var query = new LaboratoryMemberQueryActionHandler().handle(
+                new LaboratoryMemberQuery("lab-2"), context);
+        var update = new LaboratoryViewerUpdateActionHandler().handle(
+                new LaboratoryViewerUpdate("lab-2", Set.of("user-2")), context);
+
+        for (var command : List.of(query, update)) {
+            assertEquals(SourceType.laboratory, command.entityType());
+            assertEquals("lab-2", command.entityId());
+            assertEquals(Action.Laboratory.laboratory_manage, command.action());
             assertEquals("operator", command.subjectId());
         }
     }

@@ -3,8 +3,11 @@ package xyz.jasenon.lab.base.api.service;
 import xyz.jasenon.lab.base.api.dto.LaboratoryCreate;
 import xyz.jasenon.lab.base.api.dto.LaboratoryDelete;
 import xyz.jasenon.lab.base.api.dto.LaboratoryEdit;
+import xyz.jasenon.lab.base.api.dto.LaboratoryMemberQuery;
+import xyz.jasenon.lab.base.api.dto.LaboratoryViewerUpdate;
 import xyz.jasenon.lab.base.api.model.Laboratory;
 import xyz.jasenon.lab.base.api.vo.LaboratoryVO;
+import xyz.jasenon.lab.base.api.vo.LaboratoryMembersVO;
 import xyz.jasenon.lab.common.util.Pair;
 import xyz.jasenon.lab.common.rpc.RpcResult;
 
@@ -21,6 +24,10 @@ public interface LaboratoryService {
     RpcResult<Laboratory> create(LaboratoryCreate command);
 
     RpcResult<Laboratory> update(LaboratoryEdit command);
+
+    RpcResult<LaboratoryMembersVO> members(LaboratoryMemberQuery query);
+
+    RpcResult<LaboratoryMembersVO> replaceViewers(LaboratoryViewerUpdate command);
 
     RpcResult<Void> delete(LaboratoryDelete command);
 

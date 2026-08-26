@@ -27,12 +27,49 @@ class LaboratoryAuthorizationServiceTests {
     }
 
     @Test
-    void initializeConnectsGlobalAppBeforeGrantingCreatorViewer() {
+    void initializeConnectsGlobalAppBeforeGrantingCreatorOwner() {
         service.initialize("lab-1", "creator");
 
         assertEquals(List.of(
                 "grant:laboratory:lab-1#app@app:global",
-                "grant:laboratory:lab-1#viewer@user:creator"
+                "grant:laboratory:lab-1#owner@user:creator"
+        ), operations.mutations);
+    }
+
+    @Test
+    void readsOwnersAndDirectViewersSeparately() {
+        operations.ownerIds = Set.of("owner-1");
+        operations.viewerIds = Set.of("viewer-1", "viewer-2");
+
+        assertEquals(new LaboratoryMembers(Set.of("owner-1"), Set.of("viewer-1", "viewer-2")),
+                service.members("lab-1"));
+    }
+
+    @Test
+    void replacesOnlyViewerRelations() {
+        operations.viewerIds = Set.of("keep", "remove");
+
+        service.replaceViewers("lab-1", Set.of("keep", "add"));
+
+        assertEquals(List.of(
+                "revoke:laboratory:lab-1#viewer@user:remove",
+                "grant:laboratory:lab-1#viewer@user:add"
+        ), operations.mutations);
+    }
+
+    @Test
+    void reconciliationAlignsOwnerAndManagersWithMysqlFacts() {
+        operations.ownerIds = Set.of("old-owner");
+        operations.managerIds = Set.of("keep-manager", "old-manager");
+
+        service.reconcile("lab-1", "new-owner", Set.of("keep-manager", "new-manager"));
+
+        assertEquals(List.of(
+                "grant:laboratory:lab-1#app@app:global",
+                "revoke:laboratory:lab-1#owner@user:old-owner",
+                "grant:laboratory:lab-1#owner@user:new-owner",
+                "revoke:laboratory:lab-1#manager@user:old-manager",
+                "grant:laboratory:lab-1#manager@user:new-manager"
         ), operations.mutations);
     }
 
@@ -71,6 +108,9 @@ class LaboratoryAuthorizationServiceTests {
         private final List<String> mutations = new ArrayList<>();
         private Set<String> visibleLaboratoryIds = Set.of();
         private Set<String> visibleUserIds = Set.of();
+        private Set<String> ownerIds = Set.of();
+        private Set<String> viewerIds = Set.of();
+        private Set<String> managerIds = Set.of();
         private String lastLookup;
 
         @Override
@@ -84,7 +124,17 @@ class LaboratoryAuthorizationServiceTests {
         @Override
         public boolean revoke(SourceType source, String sourceId, RelationShip relation,
                               SourceType target, String targetId) {
+            mutations.add("revoke:" + source + ":" + sourceId + "#" + relation.str()
+                    + "@" + target + ":" + targetId);
             return true;
+        }
+
+        @Override
+        public Set<String> subjectIdsOf(SourceType source, String sourceId,
+                                        RelationShip relation, SourceType target) {
+            if (relation == RelationShip.Laboratory.owner) return ownerIds;
+            if (relation == RelationShip.Laboratory.manager) return managerIds;
+            return viewerIds;
         }
 
         @Override

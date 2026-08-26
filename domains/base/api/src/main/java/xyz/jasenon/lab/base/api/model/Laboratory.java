@@ -38,6 +38,9 @@ public class Laboratory extends BaseEntity {
     @TableField(typeHandler = JacksonTypeHandler.class)
     private List<User> manager;
 
+    // 创建实验室的用户 ID；历史数据由数据库默认回填为 super-admin。
+    private String createBy;
+
     public ValidationErrors validate() {
         ValidationErrors errors = new ValidationErrors();
         if (isBlank(laboratoryName)) {

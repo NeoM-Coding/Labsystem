@@ -38,6 +38,13 @@ public interface AuthorizationOperations {
                             SourceType target,
                             String targetId);
 
+    default Set<String> subjectIdsOf(SourceType source,
+                                     String sourceId,
+                                     RelationShip relationShip,
+                                     SourceType target) {
+        throw new UnsupportedOperationException("subjectIdsOf 尚未实现");
+    }
+
     Set<String> lookupEntityIds(SourceType entityType,
                                 Permission permission,
                                 SourceType subjectType,

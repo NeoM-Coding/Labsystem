@@ -72,8 +72,14 @@ entity laboratory {
 
 	relation app @app
 
+	relation owner @user
+
+	relation manager @user
+
 	relation viewer @user
 
-	permission can_view = app.super_admin or viewer
+	permission can_view = app.super_admin or owner or manager or viewer
+
+	action laboratory_manage = app.super_admin or owner or manager
 
 }

@@ -17,6 +17,7 @@ public record LaboratoryVO(
         String laboratoryName,
         Map<String, Object> extra,
         List<User> managers,
+        User createBy,
         LocalDateTime createAt,
         LocalDateTime updateAt
 ) implements Serializable {
@@ -24,7 +25,7 @@ public record LaboratoryVO(
     @Serial
     private static final long serialVersionUID = 1L;
 
-    public static LaboratoryVO from(Laboratory laboratory) {
+    public static LaboratoryVO from(Laboratory laboratory, User creator) {
         Objects.requireNonNull(laboratory, "laboratory");
         List<User> managers = laboratory.getManager() == null
                 ? List.of()
@@ -39,6 +40,7 @@ public record LaboratoryVO(
                 laboratory.getLaboratoryName(),
                 laboratory.getExtra(),
                 managers,
+                creator == null ? null : creator.mask(),
                 laboratory.getCreateAt(),
                 laboratory.getUpdateAt()
         );

@@ -16,6 +16,7 @@ DATABASE_MIGRATIONS=(
     "$ROOT_DIR/sql/migrations/20260811_add_alert_log.sql"
     "$ROOT_DIR/sql/migrations/20260825_add_compensation_tasks.sql"
     "$ROOT_DIR/sql/migrations/20260825_add_laboratory_create_by.sql"
+    "$ROOT_DIR/sql/migrations/20260827_add_edu_bi_view.sql"
 )
 
 log() {

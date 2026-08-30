@@ -31,8 +31,11 @@ import xyz.jasenon.lab.observability.annotation.Traced;
 import xyz.jasenon.lab.base.compensation.LaboratoryAuthorizationReconcileHandler;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @DubboService
 @Traced("laboratory-service")
@@ -74,8 +77,23 @@ public class LaboratoryServiceImpl extends ServiceImpl<LaboratoryMapper, Laborat
         if (laboratoryIds.isEmpty()) {
             return RpcResult.success(List.of());
         }
-        return RpcResult.success(this.baseMapper.selectByIds(laboratoryIds).stream()
-                .map(LaboratoryVO::from)
+        List<Laboratory> laboratories = this.baseMapper.selectByIds(laboratoryIds);
+        Set<String> creatorIds = laboratories.stream()
+                .map(Laboratory::getCreateBy)
+                .filter(id -> id != null && !id.isBlank())
+                .collect(Collectors.toSet());
+        Map<String, xyz.jasenon.lab.base.api.model.User> creators = creatorIds.isEmpty()
+                ? Map.of()
+                : userMapper.selectByIds(creatorIds).stream()
+                        .collect(Collectors.toMap(
+                                xyz.jasenon.lab.base.api.model.User::getId,
+                                Function.identity()
+                        ));
+        return RpcResult.success(laboratories.stream()
+                .map(laboratory -> LaboratoryVO.from(
+                        laboratory,
+                        creators.get(laboratory.getCreateBy())
+                ))
                 .toList());
     }
 

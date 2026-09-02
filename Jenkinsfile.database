@@ -1,0 +1,79 @@
+pipeline {
+    agent any
+
+    parameters {
+        string(name: 'GIT_BRANCH', defaultValue: 'main', description: 'Remote branch containing migrations')
+        string(name: 'GITHUB_SHA', defaultValue: '', description: 'Optional commit SHA; takes precedence over GIT_BRANCH')
+    }
+
+    options {
+        skipDefaultCheckout(true)
+        timestamps()
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '50'))
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                script {
+                    def commitSha = params.GITHUB_SHA.trim()
+                    def branchName = params.GIT_BRANCH.trim().replaceFirst('^origin/', '')
+                    if (commitSha && !(commitSha ==~ /[0-9a-fA-F]{7,40}/)) {
+                        error('GITHUB_SHA must be a 7 to 40 character hexadecimal SHA')
+                    }
+                    if (!commitSha) {
+                        withEnv(["REQUESTED_BRANCH=${branchName}"]) {
+                            sh 'git check-ref-format --branch "$REQUESTED_BRANCH"'
+                        }
+                    }
+                    checkout([
+                        $class: 'GitSCM',
+                        branches: [[name: commitSha ?: "*/${branchName}"]],
+                        userRemoteConfigs: [[
+                            url: env.CLOUD_REPOSITORY_URL,
+                            credentialsId: 'lab-system-cloud-deploy-key',
+                            refspec: '+refs/heads/*:refs/remotes/origin/*'
+                        ]]
+                    ])
+                }
+            }
+        }
+
+        stage('Publish migrations') {
+            steps {
+                sh '''
+                  set -eu
+                  commit_sha="$(git rev-parse HEAD)"
+                  artifact_root="/var/lib/lab-system-deploy/artifacts/database"
+                  staging_dir="$artifact_root/.${commit_sha}.tmp"
+                  release_dir="$artifact_root/$commit_sha"
+
+                  rm -rf "$staging_dir"
+                  mkdir -p "$staging_dir"
+                  cp sql/migrations/*.sql "$staging_dir/"
+                  (cd "$staging_dir" && sha256sum -- *.sql > manifest.sha256)
+                  printf '%s\n' "$commit_sha" > "$staging_dir/commit"
+                  rm -rf "$release_dir"
+                  mv "$staging_dir" "$release_dir"
+                '''
+            }
+        }
+
+        stage('Migrate database') {
+            steps {
+                sh '''
+                  test -n "$LAB_DEPLOY_WEBHOOK_URL"
+                  test -r "$LAB_DEPLOY_WEBHOOK_TOKEN_FILE"
+                  set +x
+                  commit_sha="$(git rev-parse HEAD)"
+                  printf '{"commit":"%s"}' "$commit_sha" | curl --fail-with-body --show-error --silent \
+                    --header "Authorization: Bearer $(cat "$LAB_DEPLOY_WEBHOOK_TOKEN_FILE")" \
+                    --header "Content-Type: application/json" \
+                    --data-binary @- \
+                    "${LAB_DEPLOY_WEBHOOK_URL%/}/v1/deploy/database"
+                '''
+            }
+        }
+    }
+}

@@ -2,6 +2,7 @@ package xyz.jasenon.lab.observability.dubbo;
 
 import org.apache.dubbo.common.URL;
 import org.apache.dubbo.rpc.AppResponse;
+import org.apache.dubbo.rpc.AsyncRpcResult;
 import org.apache.dubbo.rpc.Invocation;
 import org.apache.dubbo.rpc.Invoker;
 import org.apache.dubbo.rpc.Result;
@@ -25,8 +26,10 @@ class RpcResultDubboFilterTests {
                 new BusinessException(403, "没有操作权限")
         )), new RpcInvocation());
 
-        RpcResult<?> rpcResult = (RpcResult<?>) result.getValue();
-        assertNull(result.getException());
+        assertEquals(AsyncRpcResult.class, result.getClass());
+        Result response = ((AsyncRpcResult) result).getAppResponse();
+        RpcResult<?> rpcResult = (RpcResult<?>) response.getValue();
+        assertNull(response.getException());
         assertFalse(rpcResult.successful());
         assertEquals(403, rpcResult.error().status());
         assertEquals("没有操作权限", rpcResult.error().message());
@@ -36,7 +39,8 @@ class RpcResultDubboFilterTests {
     void convertsSynchronousFilterFailureIntoFailureValue() {
         Result result = filter.invoke(throwingInvoker(), new RpcInvocation());
 
-        RpcResult<?> rpcResult = (RpcResult<?>) result.getValue();
+        assertEquals(AsyncRpcResult.class, result.getClass());
+        RpcResult<?> rpcResult = (RpcResult<?>) ((AsyncRpcResult) result).getAppResponse().getValue();
         assertFalse(rpcResult.successful());
         assertEquals(400, rpcResult.error().status());
     }
@@ -48,7 +52,8 @@ class RpcResultDubboFilterTests {
                         new BusinessException(404, "设备不存在"))
         )), new RpcInvocation());
 
-        RpcResult<?> rpcResult = (RpcResult<?>) result.getValue();
+        assertEquals(AsyncRpcResult.class, result.getClass());
+        RpcResult<?> rpcResult = (RpcResult<?>) ((AsyncRpcResult) result).getAppResponse().getValue();
         assertFalse(rpcResult.successful());
         assertEquals(404, rpcResult.error().status());
         assertEquals("设备不存在", rpcResult.error().message());

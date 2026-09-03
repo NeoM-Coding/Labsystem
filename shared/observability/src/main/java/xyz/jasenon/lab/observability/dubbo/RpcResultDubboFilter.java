@@ -2,7 +2,6 @@ package xyz.jasenon.lab.observability.dubbo;
 
 import org.apache.dubbo.common.constants.CommonConstants;
 import org.apache.dubbo.common.extension.Activate;
-import org.apache.dubbo.rpc.AppResponse;
 import org.apache.dubbo.rpc.AsyncRpcResult;
 import org.apache.dubbo.rpc.Filter;
 import org.apache.dubbo.rpc.Invocation;
@@ -23,9 +22,13 @@ public class RpcResultDubboFilter implements Filter {
                 return result.whenCompleteWithContext((response, failure) -> normalize(response, failure));
             }
             normalize(result, null);
-            return result;
+            return AsyncRpcResult.newDefaultAsyncResult(
+                    result.getValue(), result.getException(), invocation
+            );
         } catch (Throwable failure) {
-            return new AppResponse(RpcResult.failure(RpcErrors.from(failure)));
+            return AsyncRpcResult.newDefaultAsyncResult(
+                    RpcResult.failure(RpcErrors.from(failure)), invocation
+            );
         }
     }
 

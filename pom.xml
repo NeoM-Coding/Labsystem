@@ -58,11 +58,13 @@
         <module>domains/audit/service</module>
         <module>domains/base/api</module>
         <module>domains/edu/api</module>
+        <module>domains/bi/api</module>
         <module>domains/mqtt/service</module>
         <module>domains/auth/service</module>
         <module>web</module>
         <module>domains/base/service</module>
         <module>domains/edu/service</module>
+        <module>domains/bi/service</module>
         <module>domains/rule/engine</module>
     </modules>
     <packaging>pom</packaging>

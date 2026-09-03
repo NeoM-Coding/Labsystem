@@ -326,6 +326,29 @@ services:
       nacos:
         condition: service_healthy
 
+  bi-service:
+    <<: *java-service
+    environment:
+      <<: *java-environment
+      APP_JAR: /app/artifacts/bi-0.0.1.jar
+      # BI is a non-web Dubbo provider, so its Dubbo port is the process health port.
+      APP_HEALTH_PORT: ${BI_DUBBO_PORT:-50055}
+      BI_DUBBO_PORT: ${BI_DUBBO_PORT:-50055}
+      BI_DUBBO_QOS_PORT: ${BI_DUBBO_QOS_PORT:-22226}
+    volumes:
+      - ./tools/infra/java/hot-reload.sh:/opt/lab/hot-reload.sh:ro
+      - ./domains/bi/service/target:/app/artifacts:ro
+      - ${LOG_PATH:-./logs}:/app/logs
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      permify:
+        condition: service_started
+      nacos:
+        condition: service_healthy
+
   web-service:
     <<: *java-service
     environment:
@@ -346,6 +369,8 @@ services:
       permify:
         condition: service_started
       nacos:
+        condition: service_healthy
+      bi-service:
         condition: service_healthy
 
 volumes:

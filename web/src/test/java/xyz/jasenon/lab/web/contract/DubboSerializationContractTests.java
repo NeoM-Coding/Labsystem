@@ -9,6 +9,7 @@ import xyz.jasenon.lab.api.mqtt.MqttPollCo;
 import xyz.jasenon.lab.api.mqtt.MqttRuleIo;
 import xyz.jasenon.lab.api.mqtt.MqttTelemetryQuery;
 import xyz.jasenon.lab.audit.api.service.AuditLogService;
+import xyz.jasenon.lab.bi.api.EduDashboardService;
 import xyz.jasenon.lab.base.api.service.LaboratoryService;
 import xyz.jasenon.lab.base.api.service.UserService;
 import xyz.jasenon.lab.common.rpc.RpcResult;
@@ -53,7 +54,8 @@ class DubboSerializationContractTests {
             RuleAlertLogService.class,
             SemesterService.class,
             TimetableService.class,
-            AuditLogService.class
+            AuditLogService.class,
+            EduDashboardService.class
     );
 
     @Test

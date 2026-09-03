@@ -91,6 +91,7 @@ pipeline {
                   cp domains/mqtt/service/target/mqtt-0.0.1.jar "$staging_dir/"
                   cp domains/rule/engine/target/rule-engine-0.0.1.jar "$staging_dir/"
                   cp domains/edu/service/target/edu-0.0.1.jar "$staging_dir/"
+                  cp domains/bi/service/target/bi-0.0.1.jar "$staging_dir/"
                   cp web/target/web-0.0.1.jar "$staging_dir/"
                   printf '%s\n' "$commit_sha" > "$staging_dir/commit"
                   rm -rf "$release_dir"

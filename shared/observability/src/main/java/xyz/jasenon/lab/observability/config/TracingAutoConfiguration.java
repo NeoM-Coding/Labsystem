@@ -13,6 +13,17 @@ import xyz.jasenon.lab.observability.log.SafeArgumentRenderer;
 @ConditionalOnProperty(prefix = "lab.observability.tracing", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class TracingAutoConfiguration {
 
+    @Bean(destroyMethod = "close")
+    @ConditionalOnProperty(name = "lab.observability.tracing.otlp-enabled", havingValue = "true")
+    io.opentelemetry.sdk.OpenTelemetrySdk openTelemetrySdk(org.springframework.core.env.Environment env) {
+        return io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdk.builder()
+                .addPropertiesSupplier(() -> java.util.Map.of(
+                        "otel.service.name", env.getProperty("spring.application.name", "lab-system"),
+                        "otel.metrics.exporter", "none",
+                        "otel.logs.exporter", "none"))
+                .setResultAsGlobal().build().getOpenTelemetrySdk();
+    }
+
     @Bean
     @ConditionalOnMissingBean
     SafeArgumentRenderer safeArgumentRenderer(TracingProperties properties) {

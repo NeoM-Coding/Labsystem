@@ -22,12 +22,16 @@ public final class TraceContext {
 
     public static Scope open(String traceId, String requestId) {
         Map<String, String> previous = MDC.getCopyOfContextMap();
-        MDC.put(TRACE_ID, validOrGenerate(traceId, 16));
+        var span = io.opentelemetry.api.trace.Span.current().getSpanContext();
+        MDC.put(TRACE_ID, span.isValid() ? span.getTraceId() : validOrGenerate(traceId, 16));
+        if (span.isValid()) MDC.put("span_id", span.getSpanId());
         MDC.put(REQUEST_ID, validOrGenerate(requestId, 12));
         return new Scope(previous);
     }
 
     public static String traceId() {
+        var span = io.opentelemetry.api.trace.Span.current().getSpanContext();
+        if (span.isValid()) return span.getTraceId();
         return MDC.get(TRACE_ID);
     }
 

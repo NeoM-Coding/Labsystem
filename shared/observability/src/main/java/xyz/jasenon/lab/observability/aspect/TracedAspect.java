@@ -13,6 +13,7 @@ import xyz.jasenon.lab.auth.context.UserContext;
 import xyz.jasenon.lab.auth.context.UserContextHolder;
 import xyz.jasenon.lab.observability.annotation.Traced;
 import xyz.jasenon.lab.observability.context.TraceContext;
+import xyz.jasenon.lab.observability.context.Tracing;
 import xyz.jasenon.lab.observability.log.SafeArgumentRenderer;
 
 import java.lang.reflect.Method;
@@ -30,6 +31,12 @@ public class TracedAspect {
     @Around("@annotation(xyz.jasenon.lab.observability.annotation.Traced) || "
             + "@within(xyz.jasenon.lab.observability.annotation.Traced)")
     public Object trace(ProceedingJoinPoint joinPoint) throws Throwable {
+        Method method = resolveMethod(joinPoint);
+        return Tracing.operation(method.getDeclaringClass().getSimpleName() + "." + method.getName())
+                .invoke(() -> traceInvocation(joinPoint));
+    }
+
+    private Object traceInvocation(ProceedingJoinPoint joinPoint) throws Throwable {
         Method method = resolveMethod(joinPoint);
         Traced traced = AnnotatedElementUtils.findMergedAnnotation(method, Traced.class);
         if (traced == null) {
@@ -50,6 +57,16 @@ public class TracedAspect {
         try {
             log.info("trace_start operation={} args={}", operation, arguments);
             Object result = joinPoint.proceed();
+            if (result instanceof java.util.concurrent.CompletionStage<?> stage) {
+                var context = Tracing.capture();
+                stage.whenComplete((value, error) -> context.wrap(() -> {
+                    long duration = (System.nanoTime() - startedAt) / 1_000_000;
+                    if (error != null) log.error("trace_failure operation={} duration_ms={} error_type={}",
+                            operation, duration, error.getClass().getName());
+                    else log.info("trace_success operation={} duration_ms={}", operation, duration);
+                }).run());
+                return result;
+            }
             long elapsedMs = (System.nanoTime() - startedAt) / 1_000_000;
             if (traced.recordResult()) {
                 log.info("trace_success operation={} duration_ms={} result={}", operation, elapsedMs, renderer.render(result));

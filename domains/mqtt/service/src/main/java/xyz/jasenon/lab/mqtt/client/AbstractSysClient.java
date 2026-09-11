@@ -59,6 +59,15 @@ public abstract class AbstractSysClient<REQ extends Task> extends MqttClient {
     }
 
     private void execute(PendingRequest<REQ> request) {
+        request.traceContext().wrap(() -> xyz.jasenon.lab.observability.context.Tracing.operation("device.command")
+                .attribute("gateway.id", gatewayId)
+                .attribute("command.source", request.getType().name())
+                .attribute("command.queue_ms", request.queueMillis())
+                .run(() -> executeRequest(request))).run();
+    }
+
+    private void executeRequest(PendingRequest<REQ> request) {
+        request.captureTraceContext();
         this.current = request;
 
         try {
@@ -66,9 +75,11 @@ public abstract class AbstractSysClient<REQ extends Task> extends MqttClient {
             Object result = request.getFuture().get(request.getTimeout(), TimeUnit.MILLISECONDS);
             onResponse(result);
         } catch (TimeoutException e) {
+            xyz.jasenon.lab.observability.context.Tracing.failure(e);
             request.getFuture().completeExceptionally(e);
             onTimeout(request.getRequest(), e);
         } catch (Exception e) {
+            xyz.jasenon.lab.observability.context.Tracing.failure(e);
             request.getFuture().completeExceptionally(e);
             onError(request.getRequest(), e);
         } finally {
@@ -90,7 +101,8 @@ public abstract class AbstractSysClient<REQ extends Task> extends MqttClient {
     }
 
     public final PendingRequest<REQ> current(){
-        return this.current.clone();
+        PendingRequest<REQ> pending = this.current;
+        return pending == null ? null : pending.clone();
     }
 
     // 发送逻辑

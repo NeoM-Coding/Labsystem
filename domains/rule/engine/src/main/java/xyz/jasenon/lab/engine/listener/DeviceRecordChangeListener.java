@@ -22,6 +22,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import xyz.jasenon.lab.observability.context.Tracing;
 
 @Component
 public class DeviceRecordChangeListener {
@@ -58,6 +59,12 @@ public class DeviceRecordChangeListener {
 
     public void accept(DeviceRecordSnapshotEvent snapshot) {
         validate(snapshot);
+        Tracing.operation("rule.snapshot.consume").consumer(snapshot.getTraceHeaders())
+                .attribute("device.id", snapshot.getDeviceId()).attribute("event.id", snapshot.getEventId())
+                .run(() -> acceptFields(snapshot));
+    }
+
+    private void acceptFields(DeviceRecordSnapshotEvent snapshot) {
         RecordIdentity identity = new RecordIdentity(snapshot.getDeviceType(), snapshot.getDeviceId());
         Map<String, String> current = new LinkedHashMap<>(snapshot.getRecordFields());
         Map<String, String> previous = snapshots.put(identity, current);

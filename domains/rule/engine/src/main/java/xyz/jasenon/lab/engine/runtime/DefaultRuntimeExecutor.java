@@ -56,6 +56,14 @@ public class DefaultRuntimeExecutor implements RuntimeExecutor {
             RuntimeActionGroup actionGroup,
             Action action
     ) {
+        return xyz.jasenon.lab.observability.context.Tracing.operation("rule.action.execute")
+                .attribute("rule.runtime_id", runtime.runtimeId())
+                .attribute("rule.action_group", actionGroup.actionGroupId())
+                .async(() -> executeAction(runtime, actionGroup, action)).toCompletableFuture();
+    }
+
+    private CompletableFuture<ActionExecutionResult> executeAction(
+            Runtime runtime, RuntimeActionGroup actionGroup, Action action) {
         Objects.requireNonNull(runtime, "runtime");
         Objects.requireNonNull(actionGroup, "actionGroup");
         Objects.requireNonNull(action, "action");
@@ -108,7 +116,8 @@ public class DefaultRuntimeExecutor implements RuntimeExecutor {
         }
 
         // 将正常和异常完成都转换为结构化结果，避免异常 Future 打断 Runtime mailbox。
-        return future.handle((rpcResult, throwable) -> {
+        var completionContext = xyz.jasenon.lab.observability.context.Tracing.capture();
+        return future.handle((rpcResult, throwable) -> completionContext.get(() -> {
             if (throwable != null) {
                 return failure(
                         runtime,
@@ -150,7 +159,7 @@ public class DefaultRuntimeExecutor implements RuntimeExecutor {
                     task.getCommandLine()
             );
             return result;
-        });
+        }));
     }
 
     private CompletableFuture<ActionExecutionResult> executeReport(
@@ -183,6 +192,7 @@ public class DefaultRuntimeExecutor implements RuntimeExecutor {
             String targetId,
             Throwable throwable
     ) {
+        xyz.jasenon.lab.observability.context.Tracing.failure(throwable);
         String message = throwable.getMessage() == null
                 ? throwable.getClass().getSimpleName()
                 : throwable.getMessage();

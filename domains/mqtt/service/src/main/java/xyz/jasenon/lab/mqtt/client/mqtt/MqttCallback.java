@@ -62,18 +62,23 @@ public class MqttCallback implements MqttCallbackExtended {
     @Override
     public void messageArrived(String topic, MqttMessage mqttMessage) throws Exception {
         // 注意receive 对 client.current的消解问题
-        var task = client.current().clone();
+        var task = client.current();
 
         byte[] payload = mqttMessage.getPayload();
+        if (task == null) {
+            log.debug("ignore MQTT response without pending request, gateway-id:{}", client.gatewayId);
+            return;
+        }
         client.receive(new Task(client.gatewayId, payload));
 
         // 后置处理消息持久化
 
         if (MqttTask.Explainer.verifier(task.getRequest()
                 .getCommandLine().getCommand().getCheckType(), payload)){
-            AsyncExecutor.runAsyncIO(() -> {
-                MessageHandlerManager.persist(task, payload);
-            });
+            AsyncExecutor.runAsyncIO(task.traceContext().wrap(() ->
+                    xyz.jasenon.lab.observability.context.Tracing.operation("device.snapshot.process")
+                            .attribute("gateway.id", client.gatewayId)
+                            .run(() -> MessageHandlerManager.persist(task, payload))));
         }
     }
 

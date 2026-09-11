@@ -17,6 +17,7 @@ import java.time.Instant;
 import java.time.Duration;
 import java.util.Map;
 import java.util.LinkedHashMap;
+import xyz.jasenon.lab.observability.context.Tracing;
 
 public abstract class MessageHandler<R extends BaseRecord> {
 
@@ -84,6 +85,11 @@ public abstract class MessageHandler<R extends BaseRecord> {
     }
 
     private void publishSnapshot(String deviceId, Map<String, String> recordFields, Instant occurredAt) {
+        Tracing.operation("redis.snapshot.publish").producer().attribute("device.id", deviceId)
+                .run(() -> publishSnapshotEvent(deviceId, recordFields, occurredAt));
+    }
+
+    private void publishSnapshotEvent(String deviceId, Map<String, String> recordFields, Instant occurredAt) {
         DeviceRecordSnapshotEvent event = new DeviceRecordSnapshotEvent(
                 deviceType,
                 deviceId,
@@ -91,8 +97,12 @@ public abstract class MessageHandler<R extends BaseRecord> {
                 occurredAt
         );
         try {
+            event.setEventId(java.util.UUID.randomUUID().toString());
+            event.setTraceHeaders(Tracing.headers());
+            Tracing.attribute("event.id", event.getEventId());
             jedis.publish(RuleEngineChannels.DEVICE_RECORD_CHANGE, OBJECT_MAPPER.writeValueAsString(event));
         } catch (JsonProcessingException | RuntimeException e) {
+            Tracing.failure(e);
             log.warn("[MessageHandler] publish rule-engine snapshot failed, device-type:{}, device-id:{}", deviceType, deviceId, e);
         }
     }

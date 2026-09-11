@@ -18,10 +18,24 @@ public final class RuntimeActionGroupEvaluator {
             RuntimeActionGroup actionGroup,
             RuntimeSignal signal
     ) {
-        return isCandidate(actionGroup, signal)
-                && runtime.isActiveAt(clock.instant())
-                && runtime.deviceConditionSatisfied(actionGroup.deviceConditionGroupId())
-                && actionGroup.timeConditionGroup().allows(signal);
+        return xyz.jasenon.lab.observability.context.Tracing.operation("rule.evaluate")
+                .attribute("rule.runtime_id", runtime.runtimeId())
+                .attribute("rule.generation", runtime.generation())
+                .attribute("rule.action_group", actionGroup.actionGroupId()).get(() -> {
+            boolean candidate = isCandidate(actionGroup, signal);
+            boolean active = runtime.isActiveAt(clock.instant());
+            boolean device = runtime.deviceConditionSatisfied(actionGroup.deviceConditionGroupId());
+            boolean time = actionGroup.timeConditionGroup().allows(signal);
+            String reason = !candidate ? "not_candidate" : !active ? "runtime_inactive"
+                    : !device ? "device_condition_false" : !time ? "outside_time_window" : "matched";
+            xyz.jasenon.lab.observability.context.Tracing.attribute("rule.device_satisfied", device);
+            xyz.jasenon.lab.observability.context.Tracing.attribute("rule.time_satisfied", time);
+            xyz.jasenon.lab.observability.context.Tracing.attribute("rule.reason", reason);
+            org.slf4j.LoggerFactory.getLogger(RuntimeActionGroupEvaluator.class).info(
+                    "rule_decision runtime_id={} action_group={} reason={} device_satisfied={} time_satisfied={}",
+                    runtime.runtimeId(), actionGroup.actionGroupId(), reason, device, time);
+            return candidate && active && device && time;
+        });
     }
 
     public boolean isRuntimeActive(Runtime runtime) {

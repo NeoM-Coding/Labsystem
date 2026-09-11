@@ -139,9 +139,16 @@ public class Engine {
     }
 
     private void acceptDevice(DeviceEvent event) {
+        xyz.jasenon.lab.observability.context.Tracing.operation("rule.state.update")
+                .attribute("rule.event_key", event.getKey().toString()).run(() -> updateDevice(event));
+    }
+
+    private void updateDevice(DeviceEvent event) {
         topologyLock.readLock().lock();
         try {
             EvalUpdate update = evalForest.accept(event.getKey(), event.getValue());
+            xyz.jasenon.lab.observability.context.Tracing.attribute("rule.root_changed", update.changed());
+            xyz.jasenon.lab.observability.context.Tracing.attribute("rule.runtime_count", runtimes.size());
             if (!update.changed()) {
                 return;
             }

@@ -13,7 +13,6 @@ import java.util.Map;
 @Getter
 @Setter
 @NoArgsConstructor
-@AllArgsConstructor
 public class DeviceRecordSnapshotEvent {
 
     private DeviceType deviceType;
@@ -23,5 +22,16 @@ public class DeviceRecordSnapshotEvent {
     private Map<String, String> recordFields = new LinkedHashMap<>();
 
     private Instant occurredAt;
+
+    private String eventId;
+    private Map<String, String> traceHeaders = new LinkedHashMap<>();
+
+    public DeviceRecordSnapshotEvent(DeviceType deviceType, String deviceId,
+                                    Map<String, String> recordFields, Instant occurredAt) {
+        this.deviceType = deviceType;
+        this.deviceId = deviceId;
+        this.recordFields = recordFields;
+        this.occurredAt = occurredAt;
+    }
 
 }

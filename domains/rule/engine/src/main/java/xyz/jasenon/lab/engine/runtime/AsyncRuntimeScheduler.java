@@ -12,6 +12,7 @@ import xyz.jasenon.lab.engine.action.ReportAction;
 import xyz.jasenon.lab.engine.notification.RuleExecutionNotice;
 import xyz.jasenon.lab.engine.notification.RuleExecutionNoticePublisher;
 import xyz.jasenon.lab.observability.context.TraceContext;
+import xyz.jasenon.lab.observability.context.Tracing;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -140,7 +141,10 @@ public class AsyncRuntimeScheduler implements RuntimeScheduler {
 
         CompletableFuture<Void> execution;
         try {
-            execution = executeSatisfiedActionGroups(slot.runtime, signal);
+            execution = Tracing.operation("rule.schedule.execute").linked(slot.currentLinks)
+                    .attribute("rule.runtime_id", slot.runtime.runtimeId())
+                    .attribute("rule.link_count", slot.currentLinks.size())
+                    .async(() -> executeSatisfiedActionGroups(slot.runtime, signal)).toCompletableFuture();
         } catch (RuntimeException e) {
             execution = CompletableFuture.failedFuture(e);
         }
@@ -352,7 +356,10 @@ public class AsyncRuntimeScheduler implements RuntimeScheduler {
         private boolean stateDirty;
         private boolean allStateCandidates;
         private final Set<String> stateCandidateActionGroupIds = new HashSet<>();
-        private final Queue<RuntimeSignal.TimePointOccurred> timePoints = new ConcurrentLinkedQueue<>();
+        private record PointSignal(RuntimeSignal.TimePointOccurred signal, Tracing.Propagation context) {}
+        private final Queue<PointSignal> timePoints = new ConcurrentLinkedQueue<>();
+        private final Set<Tracing.Propagation> stateLinks = new LinkedHashSet<>();
+        private List<Tracing.Propagation> currentLinks = List.of();
         private final OccurrenceLedger occurrenceLedger = new OccurrenceLedger(1024);
         private final AtomicBoolean cancelled = new AtomicBoolean(false);
 
@@ -368,7 +375,7 @@ public class AsyncRuntimeScheduler implements RuntimeScheduler {
             if (signal instanceof RuntimeSignal.TimePointOccurred point) {
                 accepted = occurrenceLedger.markIfNew(point.event().occurrenceId());
                 if (accepted) {
-                    timePoints.add(point);
+                    timePoints.add(new PointSignal(point, Tracing.capture()));
                 }
             } else {
                 mergeStateChanged((RuntimeSignal.StateChanged) signal);
@@ -384,7 +391,9 @@ public class AsyncRuntimeScheduler implements RuntimeScheduler {
             if (stateSignal != null) {
                 return stateSignal;
             }
-            return timePoints.poll();
+            PointSignal point = timePoints.poll();
+            currentLinks = point != null && point.context().valid() ? List.of(point.context()) : List.of();
+            return point == null ? null : point.signal();
         }
 
         private boolean hasPendingSignals() {
@@ -399,12 +408,17 @@ public class AsyncRuntimeScheduler implements RuntimeScheduler {
                 stateDirty = false;
                 allStateCandidates = false;
                 stateCandidateActionGroupIds.clear();
+                stateLinks.clear();
             }
             timePoints.clear();
         }
 
         private void mergeStateChanged(RuntimeSignal.StateChanged stateChanged) {
             synchronized (stateLock) {
+                var context = Tracing.capture();
+                if (context.valid() && stateLinks.size() < 128) stateLinks.add(context);
+                Tracing.attribute("rule.schedule.merged", stateDirty);
+                Tracing.attribute("rule.schedule.in_flight", running.get());
                 stateDirty = true;
                 if (stateChanged.targetsAll()) {
                     allStateCandidates = true;
@@ -423,6 +437,8 @@ public class AsyncRuntimeScheduler implements RuntimeScheduler {
                 RuntimeSignal signal = allStateCandidates
                         ? RuntimeSignal.stateChanged()
                         : RuntimeSignal.stateChanged(Set.copyOf(stateCandidateActionGroupIds));
+                currentLinks = List.copyOf(stateLinks);
+                stateLinks.clear();
                 stateDirty = false;
                 allStateCandidates = false;
                 stateCandidateActionGroupIds.clear();

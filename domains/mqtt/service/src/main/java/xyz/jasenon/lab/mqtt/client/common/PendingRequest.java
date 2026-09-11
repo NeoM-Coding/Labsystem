@@ -6,6 +6,13 @@ import java.util.concurrent.CompletableFuture;
 
 
 public class PendingRequest<REQ extends Task> implements Cloneable {
+    private xyz.jasenon.lab.observability.context.Tracing.Propagation traceContext =
+            xyz.jasenon.lab.observability.context.Tracing.capture();
+    private final long queuedAt = System.nanoTime();
+
+    public xyz.jasenon.lab.observability.context.Tracing.Propagation traceContext() { return traceContext; }
+    public void captureTraceContext() { traceContext = xyz.jasenon.lab.observability.context.Tracing.capture(); }
+    public long queueMillis() { return (System.nanoTime() - queuedAt) / 1_000_000; }
 
     private CompletableFuture<Object> future;
 
@@ -66,12 +73,14 @@ public class PendingRequest<REQ extends Task> implements Cloneable {
         try {
             PendingRequest<REQ> copy = (PendingRequest<REQ>) super.clone();
 
-            return new PendingRequest<>(
+            PendingRequest<REQ> result = new PendingRequest<>(
                     copy.request,
                     copy.type,
                     copy.timeout,
                     copy.interval
             );
+            result.traceContext = copy.traceContext;
+            return result;
         } catch (CloneNotSupportedException e) {
             throw new AssertionError();
         }

@@ -63,15 +63,15 @@ lab.observability.tracing.otlp-enabled=true
 
 通过标准环境变量 `OTEL_EXPORTER_OTLP_ENDPOINT`、`OTEL_EXPORTER_OTLP_PROTOCOL`、
 `OTEL_TRACES_SAMPLER`、`OTEL_TRACES_SAMPLER_ARG` 设置采集端与采样。
-该组件使用 SDK 和已有 HTTP/Dubbo 过滤器，不应再同时初始化另一套全局 SDK。
-必须另行配置可用的 OTLP 接收端和 Grafana tracing 数据源；现有 Loki 只存储日志。
+该组件使用独立 SDK 和已有 HTTP/Dubbo 过滤器，不抢占 JVM 全局 OpenTelemetry，
+可避免 MySQL 驱动等第三方组件提前读取全局实例造成启动冲突。
 
 ## 启动日志平台
 
 在项目根目录运行：
 
 ```bash
-docker compose up -d loki alloy grafana
+docker compose up -d loki tempo alloy grafana
 ```
 
 应用日志默认写入项目根目录的 `logs/`，也可通过 `LOG_PATH` 修改。打开 `http://localhost:3000`，使用 `admin/admin` 登录 Grafana，在 Explore 中查询：
@@ -80,4 +80,10 @@ docker compose up -d loki alloy grafana
 {job="lab-system-cloud"} |= "trace_id=目标ID"
 ```
 
-Alloy UI 位于 `http://localhost:12345`，Loki readiness 地址为 `http://localhost:3100/ready`。该 Compose 仅适合本地开发；Loki 未开启认证，不能直接暴露到公网。
+查看链路时在 Grafana 的 Explore 中选择 `Tempo`，可以按服务名、Span 名或 Trace ID
+查询。Compose 默认让 Java 服务经 Alloy 的 `4318` 端口导出，采样率为 25%；
+Tempo 数据保留 24 小时。可通过 `OTEL_TRACES_SAMPLER_ARG` 和 Tempo 配置调整。
+
+Alloy UI 位于 `http://localhost:12345`，Tempo readiness 地址为
+`http://localhost:3200/ready`，Loki readiness 地址为 `http://localhost:3100/ready`。
+该 Compose 仅适合本地开发；这些服务未开启认证，不能直接暴露到公网。

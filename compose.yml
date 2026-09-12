@@ -49,6 +49,11 @@ x-java-service: &java-service
     TRACING_MAX_ARGUMENT_LENGTH: ${TRACING_MAX_ARGUMENT_LENGTH:-2048}
     TRACING_MAX_COLLECTION_SIZE: ${TRACING_MAX_COLLECTION_SIZE:-20}
     TRACING_MAX_DEPTH: ${TRACING_MAX_DEPTH:-3}
+    TRACING_OTLP_ENABLED: ${TRACING_OTLP_ENABLED:-true}
+    OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://alloy:4318}
+    OTEL_EXPORTER_OTLP_PROTOCOL: ${OTEL_EXPORTER_OTLP_PROTOCOL:-http/protobuf}
+    OTEL_TRACES_SAMPLER: ${OTEL_TRACES_SAMPLER:-parentbased_traceidratio}
+    OTEL_TRACES_SAMPLER_ARG: ${OTEL_TRACES_SAMPLER_ARG:-0.25}
     MQTT_REALTIME_COALESCE_WINDOW_MILLIS: ${MQTT_REALTIME_COALESCE_WINDOW_MILLIS:-200}
     WEBSOCKET_ALLOWED_ORIGINS: ${WEBSOCKET_ALLOWED_ORIGINS:-http://localhost:8989,http://127.0.0.1:8989}
     WEBSOCKET_SEND_TIME_LIMIT_MILLIS: ${WEBSOCKET_SEND_TIME_LIMIT_MILLIS:-10000}
@@ -205,6 +210,8 @@ services:
     command: run --server.http.listen-addr=0.0.0.0:12345 /etc/alloy/config.alloy
     ports:
       - "${ALLOY_PORT:-12345}:12345"
+      - "${OTLP_GRPC_PORT:-4317}:4317"
+      - "${OTLP_HTTP_PORT:-4318}:4318"
     volumes:
       - ./shared/observability/docker/config.alloy:/etc/alloy/config.alloy:ro
       - ${LOG_PATH:-./logs}:/var/log/lab-system:ro
@@ -212,6 +219,18 @@ services:
     depends_on:
       loki:
         condition: service_started
+      tempo:
+        condition: service_started
+
+  tempo:
+    image: ${TEMPO_IMAGE:-grafana/tempo:2.8.3}
+    restart: unless-stopped
+    command: -config.file=/etc/tempo/config.yml
+    ports:
+      - "${TEMPO_PORT:-3200}:3200"
+    volumes:
+      - ./shared/observability/docker/tempo.yml:/etc/tempo/config.yml:ro
+      - tempo-data:/var/tempo
 
   grafana:
     image: ${GRAFANA_IMAGE:-grafana/grafana:13.1.0}
@@ -227,6 +246,8 @@ services:
       - grafana-data:/var/lib/grafana
     depends_on:
       loki:
+        condition: service_started
+      tempo:
         condition: service_started
 
   base-service:
@@ -382,3 +403,4 @@ volumes:
   loki-data:
   alloy-data:
   grafana-data:
+  tempo-data:

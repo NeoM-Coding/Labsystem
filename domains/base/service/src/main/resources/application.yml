@@ -80,6 +80,7 @@ lab:
   observability:
     tracing:
       enabled: ${TRACING_ENABLED:true}
+      otlp-enabled: ${TRACING_OTLP_ENABLED:false}
       max-argument-length: ${TRACING_MAX_ARGUMENT_LENGTH:2048}
       max-collection-size: ${TRACING_MAX_COLLECTION_SIZE:20}
       max-depth: ${TRACING_MAX_DEPTH:3}

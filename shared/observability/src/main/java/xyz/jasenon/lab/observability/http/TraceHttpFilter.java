@@ -11,7 +11,6 @@ import xyz.jasenon.lab.observability.context.TraceContext;
 
 import java.io.IOException;
 import xyz.jasenon.lab.observability.context.Spans;
-import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.api.trace.StatusCode;
 
@@ -24,7 +23,7 @@ public class TraceHttpFilter extends OncePerRequestFilter {
         for (String name : java.util.List.of("traceparent", "tracestate")) {
             if (request.getHeader(name) != null) headers.put(name, request.getHeader(name));
         }
-        var span = GlobalOpenTelemetry.getTracer("lab-system").spanBuilder("HTTP " + request.getMethod())
+        var span = Spans.builder("HTTP " + request.getMethod())
                 .setParent(Spans.extract(headers)).setSpanKind(SpanKind.SERVER).startSpan();
         span.setAttribute("http.request.method", request.getMethod());
         try (var active = Spans.scope(span); TraceContext.Scope ignored = TraceContext.open(

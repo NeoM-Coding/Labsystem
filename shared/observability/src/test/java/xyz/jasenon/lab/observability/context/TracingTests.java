@@ -25,8 +25,9 @@ class TracingTests {
                 .addSpanProcessor(SimpleSpanProcessor.create(exporter)).build())
                 .setPropagators(ContextPropagators.create(W3CTraceContextPropagator.getInstance()))
                 .buildAndRegisterGlobal();
+        Spans.install(sdk);
     }
-    @AfterEach void cleanup() { sdk.close(); GlobalOpenTelemetry.resetForTest(); MDC.clear(); }
+    @AfterEach void cleanup() { sdk.close(); Spans.install(io.opentelemetry.api.OpenTelemetry.noop()); GlobalOpenTelemetry.resetForTest(); MDC.clear(); }
 
     @Test void nestedCallsRestoreMdcAndPropagateW3c() {
         MDC.put("trace_id", "outer");

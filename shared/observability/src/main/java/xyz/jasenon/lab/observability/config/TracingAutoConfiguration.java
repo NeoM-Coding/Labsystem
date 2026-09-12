@@ -7,6 +7,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import xyz.jasenon.lab.observability.aspect.TracedAspect;
 import xyz.jasenon.lab.observability.log.SafeArgumentRenderer;
+import xyz.jasenon.lab.observability.context.Spans;
 
 @AutoConfiguration
 @EnableConfigurationProperties(TracingProperties.class)
@@ -16,12 +17,14 @@ public class TracingAutoConfiguration {
     @Bean(destroyMethod = "close")
     @ConditionalOnProperty(name = "lab.observability.tracing.otlp-enabled", havingValue = "true")
     io.opentelemetry.sdk.OpenTelemetrySdk openTelemetrySdk(org.springframework.core.env.Environment env) {
-        return io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdk.builder()
+        var sdk = io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdk.builder()
                 .addPropertiesSupplier(() -> java.util.Map.of(
                         "otel.service.name", env.getProperty("spring.application.name", "lab-system"),
                         "otel.metrics.exporter", "none",
                         "otel.logs.exporter", "none"))
-                .setResultAsGlobal().build().getOpenTelemetrySdk();
+                .build().getOpenTelemetrySdk();
+        Spans.install(sdk);
+        return sdk;
     }
 
     @Bean

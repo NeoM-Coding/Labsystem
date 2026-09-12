@@ -9,7 +9,6 @@ import org.apache.dubbo.rpc.Result;
 import org.apache.dubbo.rpc.RpcException;
 import xyz.jasenon.lab.observability.context.TraceContext;
 import xyz.jasenon.lab.observability.context.Spans;
-import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.api.trace.SpanKind;
 
 @Activate(group = {CommonConstants.CONSUMER, CommonConstants.PROVIDER}, order = -200)
@@ -22,7 +21,7 @@ public class TraceDubboFilter implements Filter {
     public Result invoke(Invoker<?> invoker, Invocation invocation) throws RpcException {
         String side = invoker.getUrl().getParameter(CommonConstants.SIDE_KEY);
         boolean consumer = CommonConstants.CONSUMER_SIDE.equals(side);
-        var builder = GlobalOpenTelemetry.getTracer("lab-system").spanBuilder("rpc " + invocation.getMethodName())
+        var builder = Spans.builder("rpc " + invocation.getMethodName())
                 .setSpanKind(consumer ? SpanKind.CLIENT : SpanKind.SERVER);
         if (!consumer) {
             java.util.Map<String, String> headers = new java.util.HashMap<>();

@@ -1,6 +1,5 @@
 package xyz.jasenon.lab.observability.context;
 
-import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.context.Context;
@@ -73,7 +72,7 @@ public final class Tracing {
             root = true; links.addAll(causes); return this;
         }
         private Span start() {
-            var builder = GlobalOpenTelemetry.getTracer("lab-system").spanBuilder(name).setSpanKind(kind);
+            var builder = Spans.tracer().spanBuilder(name).setSpanKind(kind);
             if (root) builder.setNoParent();
             else if (parent != null) builder.setParent(parent);
             links.stream().filter(Propagation::valid).limit(128)

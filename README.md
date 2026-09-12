@@ -317,4 +317,3 @@ lab-system-cloud/
 - [可观测性与集中日志](shared/observability/README.md)
 - [UID Starter](shared/uid-springboot-starter/README.md)
 
-README 只保留当前代码仍可验证的文档入口。模块设计发生变化时，应先更新对应模块文档，再同步这里的能力摘要和链接。

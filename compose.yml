@@ -394,6 +394,12 @@ services:
       bi-service:
         condition: service_healthy
 
+networks:
+  default:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: br-lab-cloud
+
 volumes:
   mysql-data:
   permify-postgres-data:

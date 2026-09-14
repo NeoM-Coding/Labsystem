@@ -90,24 +90,28 @@ public class MqttTelemetryManager implements MqttTelemetryQuery {
         }
 
         Map<String, BaseRecord> result = new HashMap<>();
-        addIfPresent(result, missingByType.get(DeviceType.Access), latestRecordMapper::latestAccess);
-        addIfPresent(result, missingByType.get(DeviceType.AirCondition), latestRecordMapper::latestAirCondition);
-        addIfPresent(result, missingByType.get(DeviceType.CircuitBreak), latestRecordMapper::latestCircuitBreak);
-        addIfPresent(result, missingByType.get(DeviceType.Light), latestRecordMapper::latestLight);
-        addIfPresent(result, missingByType.get(DeviceType.Sensor), latestRecordMapper::latestSensor);
+        loadLatestPerDevice(result, missingByType.get(DeviceType.Access), latestRecordMapper::latestAccess);
+        loadLatestPerDevice(result, missingByType.get(DeviceType.AirCondition), latestRecordMapper::latestAirCondition);
+        loadLatestPerDevice(result, missingByType.get(DeviceType.CircuitBreak), latestRecordMapper::latestCircuitBreak);
+        loadLatestPerDevice(result, missingByType.get(DeviceType.Light), latestRecordMapper::latestLight);
+        loadLatestPerDevice(result, missingByType.get(DeviceType.Sensor), latestRecordMapper::latestSensor);
         return result;
     }
 
-    private static void addIfPresent(Map<String, BaseRecord> target,
-                                     List<String> deviceIds,
-                                     java.util.function.Function<List<String>, ? extends List<? extends BaseRecord>> loader) {
-        if (deviceIds != null && !deviceIds.isEmpty()) {
-            addAll(target, loader.apply(deviceIds));
+    private static void loadLatestPerDevice(
+            Map<String, BaseRecord> target,
+            List<String> deviceIds,
+            java.util.function.Function<String, ? extends BaseRecord> loader
+    ) {
+        if (deviceIds == null || deviceIds.isEmpty()) {
+            return;
         }
-    }
-
-    private static void addAll(Map<String, BaseRecord> target, List<? extends BaseRecord> records) {
-        records.forEach(record -> target.put(record.getDeviceId(), record));
+        for (String deviceId : deviceIds) {
+            BaseRecord record = loader.apply(deviceId);
+            if (record != null) {
+                target.put(record.getDeviceId(), record);
+            }
+        }
     }
 
     private DeviceTelemetrySnapshot fromRedis(Device device, Map<String, String> source) {

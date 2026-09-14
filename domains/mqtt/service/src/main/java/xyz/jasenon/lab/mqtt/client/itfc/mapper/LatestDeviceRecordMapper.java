@@ -8,18 +8,16 @@ import xyz.jasenon.lab.device.model.records.CircuitBreakRecord;
 import xyz.jasenon.lab.device.model.records.LightRecord;
 import xyz.jasenon.lab.device.model.records.SensorRecord;
 
-import java.util.List;
-
 @Mapper
 public interface LatestDeviceRecordMapper {
 
-    List<AccessRecord> latestAccess(@Param("device_ids") List<String> deviceIds);
+    AccessRecord latestAccess(@Param("device_id") String deviceId);
 
-    List<AirConditionRecord> latestAirCondition(@Param("device_ids") List<String> deviceIds);
+    AirConditionRecord latestAirCondition(@Param("device_id") String deviceId);
 
-    List<CircuitBreakRecord> latestCircuitBreak(@Param("device_ids") List<String> deviceIds);
+    CircuitBreakRecord latestCircuitBreak(@Param("device_id") String deviceId);
 
-    List<LightRecord> latestLight(@Param("device_ids") List<String> deviceIds);
+    LightRecord latestLight(@Param("device_id") String deviceId);
 
-    List<SensorRecord> latestSensor(@Param("device_ids") List<String> deviceIds);
+    SensorRecord latestSensor(@Param("device_id") String deviceId);
 }

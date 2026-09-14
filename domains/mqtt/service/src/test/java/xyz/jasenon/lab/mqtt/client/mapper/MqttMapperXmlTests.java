@@ -36,9 +36,9 @@ class MqttMapperXmlTests {
     }
 
     @Test
-    void latestTelemetryQueriesUseWindowRankingInsteadOfCorrelatedAntijoin() throws IOException {
+    void latestTelemetryQueriesUsePerDeviceIndexTopOne() throws IOException {
         Configuration configuration = parse("mapper/LatestDeviceRecordMapper.xml");
-        Map<String, Object> parameters = Map.of("device_ids", List.of("device-1"));
+        Map<String, Object> parameters = Map.of("device_id", "device-1");
 
         List.of(
                 "latestAccess",
@@ -53,9 +53,11 @@ class MqttMapperXmlTests {
                     .getBoundSql(parameters)
                     .getSql()
                     .replaceAll("\\s+", " ");
-            assertTrue(sql.contains("ROW_NUMBER() OVER"));
-            assertTrue(sql.contains("PARTITION BY r.device_id ORDER BY r.create_at DESC, r.id DESC"));
-            assertTrue(sql.contains("ranked.row_num = 1"));
+            assertTrue(sql.contains("r.device_id = ?"));
+            assertTrue(sql.contains("r.delete_at IS NULL"));
+            assertTrue(sql.contains("ORDER BY r.create_at DESC, r.id DESC"));
+            assertTrue(sql.contains("LIMIT 1"));
+            assertFalse(sql.contains("ROW_NUMBER() OVER"));
             assertFalse(sql.contains("NOT EXISTS"));
         });
     }

@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -63,7 +63,7 @@ class MqttTelemetryManagerTests {
         assertEquals(true, snapshot.record().get("opened"));
         assertEquals("auto", snapshot.record().get("mode"));
         assertNotNull(snapshot.occurredAt());
-        verify(latestRecordMapper, never()).latestSensor(anyList());
+        verify(latestRecordMapper, never()).latestSensor(anyString());
     }
 
     @Test
@@ -82,7 +82,7 @@ class MqttTelemetryManagerTests {
         record.setCreateAt(LocalDateTime.of(2026, 7, 23, 16, 0));
         when(deviceHelper.listByLaboratories(null, List.of("lab-1"))).thenReturn(List.of(sensor));
         when(redisBus.hgetAllBatch(List.of(key))).thenReturn(Map.of(key, Map.of()));
-        when(latestRecordMapper.latestSensor(List.of(sensor.getId()))).thenReturn(List.of(record));
+        when(latestRecordMapper.latestSensor(sensor.getId())).thenReturn(record);
 
         DeviceTelemetrySnapshot snapshot = manager.snapshots(List.of("lab-1")).data().get(0);
 
@@ -90,6 +90,7 @@ class MqttTelemetryManagerTests {
         assertEquals(22.4d, snapshot.record().get("temperature"));
         assertEquals("device-1", snapshot.deviceId());
         assertEquals("lab-1", snapshot.laboratoryId());
+        verify(latestRecordMapper).latestSensor(sensor.getId());
     }
 
     private static Sensor sensor() {

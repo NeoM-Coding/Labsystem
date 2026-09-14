@@ -5,87 +5,55 @@
 <mapper namespace="xyz.jasenon.lab.mqtt.client.itfc.mapper.LatestDeviceRecordMapper">
 
     <select id="latestAccess" resultType="xyz.jasenon.lab.device.model.records.AccessRecord">
-        SELECT ranked.id, ranked.device_id, ranked.address, ranked.opened, ranked.locked,
-               ranked.lock_status, ranked.delay_time, ranked.create_at, ranked.update_at, ranked.delete_at
-        FROM (
-            SELECT r.id, r.device_id, r.address, r.is_open AS opened, r.is_lock AS locked,
-                   r.lock_status, r.delay_time, r.create_at, r.update_at, r.delete_at,
-                   ROW_NUMBER() OVER (
-                       PARTITION BY r.device_id ORDER BY r.create_at DESC, r.id DESC
-                   ) AS row_num
-            FROM access_record r
-            WHERE r.delete_at IS NULL AND r.device_id IN
-            <foreach collection="device_ids" item="id" open="(" separator="," close=")">#{id}</foreach>
-        ) ranked
-        WHERE ranked.row_num = 1
+        SELECT r.id, r.device_id, r.address, r.is_open AS opened, r.is_lock AS locked,
+               r.lock_status, r.delay_time, r.create_at, r.update_at, r.delete_at
+        FROM access_record r
+        WHERE r.device_id = #{device_id}
+          AND r.delete_at IS NULL
+        ORDER BY r.create_at DESC, r.id DESC
+        LIMIT 1
     </select>
 
     <select id="latestAirCondition" resultType="xyz.jasenon.lab.device.model.records.AirConditionRecord">
-        SELECT ranked.id, ranked.device_id, ranked.address, ranked.self_id, ranked.opened, ranked.mode,
-               ranked.temperature, ranked.speed, ranked.room_temperature, ranked.error_code,
-               ranked.create_at, ranked.update_at, ranked.delete_at
-        FROM (
-            SELECT r.id, r.device_id, r.address, r.self_id, r.is_open AS opened, r.mode,
-                   r.temperature, r.speed, r.room_temperature, r.error_code,
-                   r.create_at, r.update_at, r.delete_at,
-                   ROW_NUMBER() OVER (
-                       PARTITION BY r.device_id ORDER BY r.create_at DESC, r.id DESC
-                   ) AS row_num
-            FROM air_condition_record r
-            WHERE r.delete_at IS NULL AND r.device_id IN
-            <foreach collection="device_ids" item="id" open="(" separator="," close=")">#{id}</foreach>
-        ) ranked
-        WHERE ranked.row_num = 1
+        SELECT r.id, r.device_id, r.address, r.self_id, r.is_open AS opened, r.mode,
+               r.temperature, r.speed, r.room_temperature, r.error_code,
+               r.create_at, r.update_at, r.delete_at
+        FROM air_condition_record r
+        WHERE r.device_id = #{device_id}
+          AND r.delete_at IS NULL
+        ORDER BY r.create_at DESC, r.id DESC
+        LIMIT 1
     </select>
 
     <select id="latestCircuitBreak" resultType="xyz.jasenon.lab.device.model.records.CircuitBreakRecord">
-        SELECT ranked.id, ranked.device_id, ranked.address, ranked.opened, ranked.fixed,
-               ranked.locked, ranked.voltage, ranked.current, ranked.power, ranked.energy,
-               ranked.leakage, ranked.temperature, ranked.create_at, ranked.update_at, ranked.delete_at
-        FROM (
-            SELECT r.id, r.device_id, r.address, r.is_open AS opened, r.is_fix AS fixed,
-                   r.is_lock AS locked, r.voltage, r.current, r.power, r.energy,
-                   r.leakage, r.temperature, r.create_at, r.update_at, r.delete_at,
-                   ROW_NUMBER() OVER (
-                       PARTITION BY r.device_id ORDER BY r.create_at DESC, r.id DESC
-                   ) AS row_num
-            FROM circuit_break_record r
-            WHERE r.delete_at IS NULL AND r.device_id IN
-            <foreach collection="device_ids" item="id" open="(" separator="," close=")">#{id}</foreach>
-        ) ranked
-        WHERE ranked.row_num = 1
+        SELECT r.id, r.device_id, r.address, r.is_open AS opened, r.is_fix AS fixed,
+               r.is_lock AS locked, r.voltage, r.current, r.power, r.energy,
+               r.leakage, r.temperature, r.create_at, r.update_at, r.delete_at
+        FROM circuit_break_record r
+        WHERE r.device_id = #{device_id}
+          AND r.delete_at IS NULL
+        ORDER BY r.create_at DESC, r.id DESC
+        LIMIT 1
     </select>
 
     <select id="latestLight" resultType="xyz.jasenon.lab.device.model.records.LightRecord">
-        SELECT ranked.id, ranked.device_id, ranked.address, ranked.self_id, ranked.opened,
-               ranked.locked, ranked.create_at, ranked.update_at, ranked.delete_at
-        FROM (
-            SELECT r.id, r.device_id, r.address, r.self_id, r.is_open AS opened,
-                   r.is_lock AS locked, r.create_at, r.update_at, r.delete_at,
-                   ROW_NUMBER() OVER (
-                       PARTITION BY r.device_id ORDER BY r.create_at DESC, r.id DESC
-                   ) AS row_num
-            FROM light_record r
-            WHERE r.delete_at IS NULL AND r.device_id IN
-            <foreach collection="device_ids" item="id" open="(" separator="," close=")">#{id}</foreach>
-        ) ranked
-        WHERE ranked.row_num = 1
+        SELECT r.id, r.device_id, r.address, r.self_id, r.is_open AS opened,
+               r.is_lock AS locked, r.create_at, r.update_at, r.delete_at
+        FROM light_record r
+        WHERE r.device_id = #{device_id}
+          AND r.delete_at IS NULL
+        ORDER BY r.create_at DESC, r.id DESC
+        LIMIT 1
     </select>
 
     <select id="latestSensor" resultType="xyz.jasenon.lab.device.model.records.SensorRecord">
-        SELECT ranked.id, ranked.device_id, ranked.address, ranked.self_id, ranked.temperature,
-               ranked.humidity, ranked.light, ranked.smoke,
-               ranked.create_at, ranked.update_at, ranked.delete_at
-        FROM (
-            SELECT r.id, r.device_id, r.address, r.self_id, r.temperature, r.humidity,
-                   r.light, r.smoke, r.create_at, r.update_at, r.delete_at,
-                   ROW_NUMBER() OVER (
-                       PARTITION BY r.device_id ORDER BY r.create_at DESC, r.id DESC
-                   ) AS row_num
-            FROM sensor_record r
-            WHERE r.delete_at IS NULL AND r.device_id IN
-            <foreach collection="device_ids" item="id" open="(" separator="," close=")">#{id}</foreach>
-        ) ranked
-        WHERE ranked.row_num = 1
+        SELECT r.id, r.device_id, r.address, r.self_id, r.temperature,
+               r.humidity, r.light, r.smoke,
+               r.create_at, r.update_at, r.delete_at
+        FROM sensor_record r
+        WHERE r.device_id = #{device_id}
+          AND r.delete_at IS NULL
+        ORDER BY r.create_at DESC, r.id DESC
+        LIMIT 1
     </select>
 </mapper>

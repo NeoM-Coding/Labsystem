@@ -9,6 +9,7 @@ import xyz.jasenon.lab.engine.action.Action;
 import xyz.jasenon.lab.engine.action.ActionExecutionResult;
 import xyz.jasenon.lab.engine.action.ControlAction;
 import xyz.jasenon.lab.engine.action.ReportAction;
+import xyz.jasenon.lab.engine.action.PollAction;
 import xyz.jasenon.lab.engine.notification.RuleExecutionNotice;
 import xyz.jasenon.lab.engine.notification.RuleExecutionNoticePublisher;
 import xyz.jasenon.lab.observability.context.TraceContext;
@@ -166,38 +167,70 @@ public class AsyncRuntimeScheduler implements RuntimeScheduler {
                         runtime.runtimeId(),
                         actionGroup.actionGroupId()
                 );
-                List<ScheduledAction> scheduledActions = new ArrayList<>();
-                int actionIndex = 0;
-                for (Action action : actionGroup.actions()) {
-                    if (!actionGroupEvaluator.isRuntimeActive(runtime)) {
-                        break;
-                    }
-                    CompletableFuture<ActionExecutionResult> execution;
-                    try {
-                        execution = runtimeExecutor.execute(runtime, actionGroup, action);
-                        if (execution == null) {
-                            throw new IllegalStateException("runtimeExecutor.execute returned null");
-                        }
-                    } catch (RuntimeException e) {
-                        execution = CompletableFuture.failedFuture(e);
-                    }
-                    int currentIndex = actionIndex++;
-                    CompletableFuture<ActionExecutionResult> normalized = execution.handle(
-                            (result, throwable) -> throwable == null && result != null
-                                    ? result
-                                    : unexpectedFailure(runtime, actionGroup, action, throwable)
-                    );
-                    scheduledActions.add(new ScheduledAction(currentIndex, action, normalized));
-                }
-                CompletableFuture<Void> completed = CompletableFuture.allOf(scheduledActions.stream()
-                                .map(ScheduledAction::result)
-                                .toArray(CompletableFuture[]::new))
-                        .thenRun(() -> publishNotice(runtime, actionGroup, matchedAt, traceId, scheduledActions));
+                List<ScheduledAction> scheduledActions = new CopyOnWriteArrayList<>();
+                List<Action> configuredActions = actionGroup.actions().stream()
+                        .filter(action -> !(action instanceof PollAction))
+                        .toList();
+                List<Action> pollActions = actionGroup.actions().stream()
+                        .filter(PollAction.class::isInstance)
+                        .toList();
+                CompletableFuture<Void> configured = executeActions(
+                        runtime, actionGroup, configuredActions, scheduledActions, 0
+                );
+                CompletableFuture<Void> completed = configured
+                        .thenCompose(ignored -> {
+                            if (!actionGroupEvaluator.isRuntimeActive(runtime)) {
+                                return CompletableFuture.completedFuture(null);
+                            }
+                            return executeActions(
+                                    runtime, actionGroup, pollActions, scheduledActions,
+                                    configuredActions.size()
+                            );
+                        })
+                        .thenRun(() -> publishNotice(
+                                runtime, actionGroup, matchedAt, traceId,
+                                scheduledActions.stream()
+                                        .sorted(java.util.Comparator.comparingInt(ScheduledAction::index))
+                                        .toList()
+                        ));
                 groupExecutions.add(completed);
             }
         }
         // 空 ActionGroup 也会完成聚合并发出条件命中通知。
         return CompletableFuture.allOf(groupExecutions.toArray(CompletableFuture[]::new));
+    }
+
+    private CompletableFuture<Void> executeActions(
+            Runtime runtime,
+            RuntimeActionGroup actionGroup,
+            List<Action> actions,
+            List<ScheduledAction> scheduledActions,
+            int startIndex
+    ) {
+        List<CompletableFuture<ActionExecutionResult>> executions = new ArrayList<>();
+        int index = startIndex;
+        for (Action action : actions) {
+            if (!actionGroupEvaluator.isRuntimeActive(runtime)) {
+                break;
+            }
+            CompletableFuture<ActionExecutionResult> execution;
+            try {
+                execution = runtimeExecutor.execute(runtime, actionGroup, action);
+                if (execution == null) {
+                    throw new IllegalStateException("runtimeExecutor.execute returned null");
+                }
+            } catch (RuntimeException exception) {
+                execution = CompletableFuture.failedFuture(exception);
+            }
+            CompletableFuture<ActionExecutionResult> normalized = execution.handle(
+                    (result, throwable) -> throwable == null && result != null
+                            ? result
+                            : unexpectedFailure(runtime, actionGroup, action, throwable)
+            );
+            scheduledActions.add(new ScheduledAction(index++, action, normalized));
+            executions.add(normalized);
+        }
+        return CompletableFuture.allOf(executions.toArray(CompletableFuture[]::new));
     }
 
     private ActionExecutionResult unexpectedFailure(
@@ -267,6 +300,8 @@ public class AsyncRuntimeScheduler implements RuntimeScheduler {
         String content = null;
         if (action instanceof ControlAction controlAction && controlAction.getControl() != null) {
             targetId = controlAction.getControl().getDeviceId();
+        } else if (action instanceof PollAction pollAction) {
+            targetId = pollAction.query().getDeviceId();
         } else if (action instanceof ReportAction reportAction) {
             userIds = reportAction.getUserIds() == null
                     ? List.of()

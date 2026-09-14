@@ -1,6 +1,7 @@
 package xyz.jasenon.lab.engine.runtime;
 
 import xyz.jasenon.lab.engine.eval.v2.EvalRootHandle;
+import xyz.jasenon.lab.engine.eval.v2.EvalRootKey;
 import xyz.jasenon.lab.engine.eval.v2.EvalForestRegistration;
 import xyz.jasenon.lab.engine.eval.v2.EvalUpdate;
 import xyz.jasenon.lab.engine.time.TimeConditionGroup;
@@ -15,6 +16,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
+import xyz.jasenon.lab.engine.definition.RuntimeRevision.TriggerMode;
 
 /**
  * 一条规则在 v2 中的业务运行上下文。
@@ -121,13 +123,17 @@ public final class Runtime implements AutoCloseable {
     /** 将全局 Forest 的变化结果收窄为本 Runtime 需要检查的动作组。 */
     public Set<String> actionGroupIdsFor(EvalUpdate update) {
         Objects.requireNonNull(update, "update");
-        Set<String> changedDeviceGroups = new HashSet<>();
-        update.changedResults().keySet().forEach(rootKey -> {
-            if (runtimeId.equals(rootKey.runtimeId())) {
-                changedDeviceGroups.add(rootKey.conditionGroupId());
+        Set<String> candidates = new HashSet<>();
+        for (RuntimeActionGroup group : actionGroups) {
+            EvalRootKey rootKey = new EvalRootKey(runtimeId, group.deviceConditionGroupId());
+            boolean relevant = group.triggerMode() == TriggerMode.RECONCILE
+                    ? update.affectedResults().containsKey(rootKey)
+                    : update.changedResults().containsKey(rootKey);
+            if (relevant) {
+                candidates.add(group.actionGroupId());
             }
-        });
-        return actionGroupIdsForDeviceGroups(changedDeviceGroups);
+        }
+        return Set.copyOf(candidates);
     }
 
     public Set<String> actionGroupIdsForDeviceGroups(Collection<String> groupIds) {

@@ -74,11 +74,9 @@ public class DeviceRecordChangeListener {
             return;
         }
 
-        current.forEach((field, value) -> {
-            if (!Objects.equals(previous.get(field), value)) {
-                publishFieldEvent(snapshot, field, value);
-            }
-        });
+        // 相同值仍是一条有效的设备观测：EDGE 会在 Forest 的布尔变化出口被过滤，
+        // RECONCILE 则利用这条观测脉冲重新检查当前成立的约束。
+        current.forEach((field, value) -> publishFieldEvent(snapshot, field, value));
     }
 
     /**

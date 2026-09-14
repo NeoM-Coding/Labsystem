@@ -37,7 +37,7 @@ class DeviceRecordChangeListenerTests {
     }
 
     @Test
-    void nextSnapshotPublishesOnlyChangedAndNewFields() {
+    void nextSnapshotPublishesChangedAndUnchangedFieldsAsObservations() {
         Engine engine = mock(Engine.class);
         DeviceRecordChangeListener listener = new DeviceRecordChangeListener(engine, mock(RedisBus.class), new ObjectMapper());
         listener.accept(snapshot(ordered("opened", "true", "roomTemperature", "27")));
@@ -46,9 +46,9 @@ class DeviceRecordChangeListenerTests {
         listener.accept(snapshot(ordered("opened", "true", "roomTemperature", "28", "errorCode", "0")));
 
         ArgumentCaptor<DeviceEvent> captor = ArgumentCaptor.forClass(DeviceEvent.class);
-        verify(engine, org.mockito.Mockito.times(2)).accept(captor.capture());
+        verify(engine, org.mockito.Mockito.times(3)).accept(captor.capture());
         List<String> fields = captor.getAllValues().stream().map(DeviceEvent::getField).sorted().toList();
-        assertEquals(List.of("errorCode", "roomTemperature"), fields);
+        assertEquals(List.of("errorCode", "opened", "roomTemperature"), fields);
         verifyNoMoreInteractions(engine);
     }
 

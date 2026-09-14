@@ -4,12 +4,14 @@ import org.springframework.stereotype.Component;
 import xyz.jasenon.lab.engine.action.Action;
 import xyz.jasenon.lab.engine.action.ControlAction;
 import xyz.jasenon.lab.engine.action.ReportAction;
+import xyz.jasenon.lab.engine.action.PollAction;
 import xyz.jasenon.lab.engine.definition.RuntimeRevision.ActionDefinition;
 import xyz.jasenon.lab.engine.definition.RuntimeRevision.ActionGroupDefinition;
 import xyz.jasenon.lab.engine.definition.RuntimeRevision.DeviceConditionDefinition;
 import xyz.jasenon.lab.engine.definition.RuntimeRevision.DeviceConditionGroupDefinition;
 import xyz.jasenon.lab.engine.definition.RuntimeRevision.TimeConditionDefinition;
 import xyz.jasenon.lab.engine.definition.RuntimeRevision.TimeConditionGroupDefinition;
+import xyz.jasenon.lab.device.model.DeviceType;
 import xyz.jasenon.lab.engine.eval.EvalNode;
 import xyz.jasenon.lab.engine.eval.LogicType;
 import xyz.jasenon.lab.engine.event.DeviceEventKey;
@@ -43,6 +45,7 @@ public class RuntimeRevisionCompiler {
         String runtimeId = requireText(revision.runtimeId(), "runtimeId");
 
         Map<String, EvalNode> deviceChains = new LinkedHashMap<>();
+        Map<String, Set<ConditionDevice>> conditionDevices = new LinkedHashMap<>();
         Set<String> constantTrueGroups = new LinkedHashSet<>();
         for (DeviceConditionGroupDefinition definition : revision.deviceConditionGroups()) {
             String groupId = requireText(definition.groupId(), "device condition group id");
@@ -55,6 +58,9 @@ public class RuntimeRevisionCompiler {
             } else {
                 deviceChains.put(groupId, chain);
             }
+            conditionDevices.put(groupId, definition.conditions().stream()
+                    .map(condition -> new ConditionDevice(condition.deviceType(), condition.deviceId()))
+                    .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new)));
         }
         Map<String, TimeConditionGroup> timeGroups = index(
                 revision.timeConditionGroups(),
@@ -87,13 +93,20 @@ public class RuntimeRevisionCompiler {
                     "timeConditionGroupId",
                     actionGroupId
             );
-            List<Action> actions = definition.actions().stream()
+            List<Action> configuredActions = definition.actions().stream()
                     .map(action -> compileAction(actionGroupId, action))
                     .toList();
+            List<Action> actions = new ArrayList<>(configuredActions);
+            if (configuredActions.stream().anyMatch(ControlAction.class::isInstance)) {
+                conditionDevices.getOrDefault(deviceGroupId, Set.of()).stream()
+                        .map(device -> new PollAction(device.deviceType(), device.deviceId()))
+                        .forEach(actions::add);
+            }
             actionGroups.add(new RuntimeActionGroup(
                     actionGroupId,
                     deviceGroupId,
                     timeGroup,
+                    definition.triggerMode(),
                     actions
             ));
         }
@@ -246,5 +259,13 @@ public class RuntimeRevisionCompiler {
             throw new IllegalArgumentException(name + " must not be blank");
         }
         return value;
+    }
+
+    private record ConditionDevice(DeviceType deviceType, String deviceId) {
+
+        private ConditionDevice {
+            Objects.requireNonNull(deviceType, "deviceType");
+            deviceId = requireText(deviceId, "deviceId");
+        }
     }
 }

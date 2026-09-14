@@ -152,16 +152,15 @@ public class Engine {
             if (!update.changed()) {
                 return;
             }
-            Map<String, Set<String>> groupsByRuntime = new LinkedHashMap<>();
-            update.changedResults().keySet().forEach(rootKey -> groupsByRuntime
-                    .computeIfAbsent(rootKey.runtimeId(), ignored -> ConcurrentHashMap.newKeySet())
-                    .add(rootKey.conditionGroupId()));
-            groupsByRuntime.forEach((runtimeId, groupIds) -> {
+            Set<String> affectedRuntimeIds = update.affectedResults().keySet().stream()
+                    .map(EvalRootKey::runtimeId)
+                    .collect(java.util.stream.Collectors.toUnmodifiableSet());
+            affectedRuntimeIds.forEach(runtimeId -> {
                 Runtime runtime = runtimes.get(runtimeId);
                 if (runtime == null || !runtime.isActiveAt(lifecycleManager.now())) {
                     return;
                 }
-                Set<String> candidates = runtime.actionGroupIdsForDeviceGroups(groupIds);
+                Set<String> candidates = runtime.actionGroupIdsFor(update);
                 if (!candidates.isEmpty()) {
                     runtimeScheduler.schedule(runtime, RuntimeSignal.stateChanged(candidates));
                 }

@@ -1,6 +1,7 @@
 package xyz.jasenon.lab.engine.runtime;
 
 import xyz.jasenon.lab.engine.action.Action;
+import xyz.jasenon.lab.engine.definition.RuntimeRevision.TriggerMode;
 import xyz.jasenon.lab.engine.time.TimeConditionGroup;
 
 import java.util.List;
@@ -12,7 +13,22 @@ public final class RuntimeActionGroup {
     private final String actionGroupId;
     private final String deviceConditionGroupId;
     private final TimeConditionGroup timeConditionGroup;
+    private final TriggerMode triggerMode;
     private final List<Action> actions;
+
+    public RuntimeActionGroup(
+            String actionGroupId,
+            String deviceConditionGroupId,
+            TimeConditionGroup timeConditionGroup,
+            TriggerMode triggerMode,
+            List<Action> actions
+    ) {
+        this.actionGroupId = requireText(actionGroupId, "actionGroupId");
+        this.deviceConditionGroupId = requireText(deviceConditionGroupId, "deviceConditionGroupId");
+        this.timeConditionGroup = Objects.requireNonNull(timeConditionGroup, "timeConditionGroup");
+        this.triggerMode = triggerMode == null ? TriggerMode.EDGE : triggerMode;
+        this.actions = actions == null ? List.of() : List.copyOf(actions);
+    }
 
     public RuntimeActionGroup(
             String actionGroupId,
@@ -20,10 +36,7 @@ public final class RuntimeActionGroup {
             TimeConditionGroup timeConditionGroup,
             List<Action> actions
     ) {
-        this.actionGroupId = requireText(actionGroupId, "actionGroupId");
-        this.deviceConditionGroupId = requireText(deviceConditionGroupId, "deviceConditionGroupId");
-        this.timeConditionGroup = Objects.requireNonNull(timeConditionGroup, "timeConditionGroup");
-        this.actions = actions == null ? List.of() : List.copyOf(actions);
+        this(actionGroupId, deviceConditionGroupId, timeConditionGroup, TriggerMode.EDGE, actions);
     }
 
     public String actionGroupId() {
@@ -40,6 +53,10 @@ public final class RuntimeActionGroup {
 
     public TimeConditionGroup timeConditionGroup() {
         return timeConditionGroup;
+    }
+
+    public TriggerMode triggerMode() {
+        return triggerMode;
     }
 
     public List<Action> actions() {

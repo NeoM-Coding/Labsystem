@@ -127,6 +127,7 @@ public record RuntimeRevision(
             String actionGroupId,
             String deviceConditionGroupId,
             String timeConditionGroupId,
+            TriggerMode triggerMode,
             List<ActionDefinition> actions
     ) implements Serializable {
 
@@ -134,8 +135,24 @@ public record RuntimeRevision(
         private static final long serialVersionUID = 1L;
 
         public ActionGroupDefinition {
+            triggerMode = triggerMode == null ? TriggerMode.EDGE : triggerMode;
             actions = immutableList(actions);
         }
+
+        public ActionGroupDefinition(
+                String actionGroupId,
+                String deviceConditionGroupId,
+                String timeConditionGroupId,
+                List<ActionDefinition> actions
+        ) {
+            this(actionGroupId, deviceConditionGroupId, timeConditionGroupId,
+                    TriggerMode.EDGE, actions);
+        }
+    }
+
+    public enum TriggerMode {
+        EDGE,
+        RECONCILE
     }
 
     public record ActionDefinition(

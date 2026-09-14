@@ -74,6 +74,9 @@ public class DefaultRuntimeExecutor implements RuntimeExecutor {
         if (action instanceof ReportAction reportAction) {
             return executeReport(runtime, actionGroup, reportAction);
         }
+        if (action instanceof PollAction pollAction) {
+            return submitPoll(runtime, actionGroup, pollAction);
+        }
         return CompletableFuture.completedFuture(failure(
                 runtime,
                 actionGroup,
@@ -81,6 +84,55 @@ public class DefaultRuntimeExecutor implements RuntimeExecutor {
                 null,
                 new IllegalArgumentException("unsupported action type: " + action.getClass().getName())
         ));
+    }
+
+    private CompletableFuture<ActionExecutionResult> submitPoll(
+            Runtime runtime,
+            RuntimeActionGroup actionGroup,
+            PollAction action
+    ) {
+        MqttTaskDto query = action.query();
+        try {
+            CompletableFuture<RpcResult<MqttResponseDto>> response =
+                    Objects.requireNonNull(mqttIo, "mqttIo").asyncSend(query);
+            if (response == null) {
+                throw new IllegalStateException("mqttIo.asyncSend returned null");
+            }
+            // 设备响应会经 MessageHandler 发布快照；这里只观察失败，不把等待时间
+            // 纳入 Runtime mailbox 的单飞生命周期。
+            response.whenComplete((result, throwable) -> {
+                Throwable failure = throwable;
+                if (failure == null) {
+                    try {
+                        RpcClient.require(result);
+                    } catch (RuntimeException exception) {
+                        failure = exception;
+                    }
+                }
+                if (failure != null) {
+                    log.warn(
+                            "[RuleEngine] detached condition poll failed, runtime-id:{}, "
+                                    + "action-group-id:{}, device-id:{}",
+                            runtime.runtimeId(), actionGroup.actionGroupId(),
+                            query.getDeviceId(), unwrap(failure)
+                    );
+                }
+            });
+            return CompletableFuture.completedFuture(ActionExecutionResult.success(
+                    runtime.runtimeId(),
+                    actionGroup.actionGroupId(),
+                    action.is(),
+                    "condition device poll submitted, device-id:" + query.getDeviceId()
+            ));
+        } catch (RuntimeException exception) {
+            return CompletableFuture.completedFuture(failure(
+                    runtime,
+                    actionGroup,
+                    action,
+                    query.getDeviceId(),
+                    exception
+            ));
+        }
     }
 
     private CompletableFuture<ActionExecutionResult> executeControl(

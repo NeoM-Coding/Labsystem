@@ -9,6 +9,7 @@ public interface Action {
 
     enum ActionType {
         Control,
-        Report
+        Report,
+        Poll
     }
 }

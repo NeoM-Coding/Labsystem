@@ -3,6 +3,8 @@ package xyz.jasenon.lab.engine.runtime;
 import org.junit.jupiter.api.Test;
 import xyz.jasenon.lab.engine.action.Action;
 import xyz.jasenon.lab.engine.action.ActionExecutionResult;
+import xyz.jasenon.lab.engine.action.PollAction;
+import xyz.jasenon.lab.device.model.DeviceType;
 import xyz.jasenon.lab.engine.eval.v2.EvalForest;
 import xyz.jasenon.lab.engine.event.TimeEvent;
 import xyz.jasenon.lab.engine.event.TimeSignal;
@@ -150,6 +152,39 @@ class AsyncRuntimeSchedulerTests {
             assertEquals("runtime-notice", notices.get(0).runtimeId());
             assertEquals("notice", notices.get(0).actionGroupId());
             assertEquals(1, notices.get(0).actions().size());
+        } finally {
+            scheduler.shutdown();
+            runtime.close();
+        }
+    }
+
+    @Test
+    void submitsConditionPollOnlyAfterConfiguredActionsComplete() throws Exception {
+        CompletableFuture<ActionExecutionResult> controlCompletion = new CompletableFuture<>();
+        CountDownLatch controlStarted = new CountDownLatch(1);
+        CountDownLatch pollSubmitted = new CountDownLatch(1);
+        List<Action.ActionType> order = new CopyOnWriteArrayList<>();
+        RuntimeExecutor executor = (runtime, group, action) -> {
+            order.add(action.is());
+            if (action instanceof PollAction) {
+                pollSubmitted.countDown();
+                return CompletableFuture.completedFuture(success(runtime, group, action));
+            }
+            controlStarted.countDown();
+            return controlCompletion;
+        };
+        AsyncRuntimeScheduler scheduler = scheduler(executor);
+        PollAction poll = new PollAction(DeviceType.AirCondition, "ac-1");
+        Runtime runtime = runtime("runtime-poll-order", List.of(group("a", CONTROL, poll)));
+        try {
+            scheduler.schedule(runtime);
+            assertTrue(controlStarted.await(2, TimeUnit.SECONDS));
+            assertEquals(1L, pollSubmitted.getCount());
+
+            controlCompletion.complete(success(runtime, runtime.actionGroup("a"), CONTROL));
+
+            assertTrue(pollSubmitted.await(2, TimeUnit.SECONDS));
+            assertEquals(List.of(Action.ActionType.Control, Action.ActionType.Poll), order);
         } finally {
             scheduler.shutdown();
             runtime.close();

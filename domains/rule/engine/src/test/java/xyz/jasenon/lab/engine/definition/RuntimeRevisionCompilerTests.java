@@ -4,6 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import xyz.jasenon.lab.device.model.DeviceType;
 import xyz.jasenon.lab.engine.action.ReportAction;
+import xyz.jasenon.lab.engine.action.ControlAction;
+import xyz.jasenon.lab.engine.action.PollAction;
+import xyz.jasenon.lab.api.mqtt.dto.MqttTaskDto;
 import xyz.jasenon.lab.engine.definition.RuntimeRevision.ActionDefinition;
 import xyz.jasenon.lab.engine.definition.RuntimeRevision.ActionType;
 import xyz.jasenon.lab.engine.definition.RuntimeRevision.ActionGroupDefinition;
@@ -11,6 +14,8 @@ import xyz.jasenon.lab.engine.definition.RuntimeRevision.DeviceConditionDefiniti
 import xyz.jasenon.lab.engine.definition.RuntimeRevision.DeviceConditionGroupDefinition;
 import xyz.jasenon.lab.engine.definition.RuntimeRevision.TimeConditionGroupDefinition;
 import xyz.jasenon.lab.engine.definition.RuntimeRevision.ReportType;
+import xyz.jasenon.lab.engine.definition.RuntimeRevision.TriggerMode;
+import xyz.jasenon.lab.mqtt.protocol.command.CommandLine;
 import xyz.jasenon.lab.engine.eval.LogicType;
 import xyz.jasenon.lab.engine.eval.Operator;
 import java.util.List;
@@ -87,7 +92,7 @@ class RuntimeRevisionCompilerTests {
     }
 
     @Test
-    void treatsLegacyJsonWithoutEnabledAsEnabled() throws Exception {
+    void appliesDefaultsToLegacyJson() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
         RuntimeRevision original = revision(new ActionGroupDefinition(
                 "notify-user",
@@ -97,10 +102,41 @@ class RuntimeRevisionCompilerTests {
         ));
         var json = objectMapper.valueToTree(original);
         ((com.fasterxml.jackson.databind.node.ObjectNode) json).remove("enabled");
+        ((com.fasterxml.jackson.databind.node.ObjectNode) json.get("actionGroups").get(0))
+                .remove("triggerMode");
 
         RuntimeRevision restored = objectMapper.treeToValue(json, RuntimeRevision.class);
 
         assertTrue(restored.isEnabled());
+        assertEquals(TriggerMode.EDGE, restored.actionGroups().get(0).triggerMode());
+    }
+
+    @Test
+    void compilesConditionDevicePollsAfterConfiguredControlActions() {
+        MqttTaskDto control = MqttTaskDto.of(
+                CommandLine.CLOSE_AIR_CONDITION_RS485,
+                new int[0],
+                DeviceType.AirCondition,
+                "ac-target"
+        );
+        ActionDefinition definition = new ActionDefinition(
+                ActionType.Control, control, List.of(), Set.of(), null
+        );
+        RuntimePlan plan = compiler.compile(revision(new ActionGroupDefinition(
+                "keep-cool",
+                "hot-room",
+                "always",
+                TriggerMode.RECONCILE,
+                List.of(definition)
+        )));
+
+        var actionGroup = plan.actionGroups().get(0);
+        assertEquals(TriggerMode.RECONCILE, actionGroup.triggerMode());
+        assertTrue(actionGroup.actions().get(0) instanceof ControlAction);
+        PollAction poll = (PollAction) actionGroup.actions().get(1);
+        assertEquals("ac-1", poll.query().getDeviceId());
+        assertEquals(CommandLine.REQUEST_AIR_CONDITION_DATA_RS485,
+                poll.query().getCommandLine());
     }
 
     private static RuntimeRevision revision(ActionGroupDefinition... actionGroups) {

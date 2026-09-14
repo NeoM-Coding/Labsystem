@@ -4,6 +4,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import xyz.jasenon.lab.device.model.DeviceType;
 import xyz.jasenon.lab.engine.definition.RuntimePlan;
+import xyz.jasenon.lab.engine.definition.RuntimeRevision.TriggerMode;
 import xyz.jasenon.lab.engine.eval.EvalNode;
 import xyz.jasenon.lab.engine.eval.LogicType;
 import xyz.jasenon.lab.engine.eval.Operator;
@@ -57,6 +58,23 @@ class EngineTests {
         assertEquals(2, scheduler.signals.size());
         assertEquals(1, forest.eventSourceCount());
         assertEquals(2, forest.predicateCount());
+    }
+
+    @Test
+    void repeatedObservationRoutesOnlyReconcileActionGroups() {
+        RuntimePlan edge = plan("runtime-edge", "warm", "edge-action", "26");
+        RuntimePlan reconcile = withTriggerMode(
+                plan("runtime-reconcile", "warm", "reconcile-action", "26"),
+                TriggerMode.RECONCILE
+        );
+        engine.register(edge);
+        engine.register(reconcile);
+
+        engine.accept(event("30"));
+        scheduler.clear();
+        engine.accept(event("30"));
+
+        assertEquals(Set.of("runtime-reconcile"), scheduler.runtimeIds());
     }
 
     @Test
@@ -181,6 +199,19 @@ class EngineTests {
                 "roomTemperature",
                 value,
                 Instant.now()
+        );
+    }
+
+    private static RuntimePlan withTriggerMode(RuntimePlan plan, TriggerMode triggerMode) {
+        RuntimeActionGroup original = plan.actionGroups().get(0);
+        return new RuntimePlan(
+                plan.runtimeId(), plan.lifetime(), plan.deviceChains(), plan.constantTrueGroups(),
+                plan.timeConditionGroups(),
+                List.of(new RuntimeActionGroup(
+                        original.actionGroupId(), original.deviceConditionGroupId(),
+                        original.timeConditionGroup(), triggerMode, original.actions()
+                )),
+                plan.requiredEventKeys()
         );
     }
 

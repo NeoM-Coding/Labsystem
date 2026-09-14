@@ -227,7 +227,7 @@ public final class EvalForest {
         try {
             EventSourceNode source = eventSources.get(eventKey);
             if (source == null) {
-                return new EvalUpdate(eventKey, Map.of());
+                return new EvalUpdate(eventKey, Map.of(), Map.of());
             }
 
             Map<EvalRootKey, RootDelta> batch = new LinkedHashMap<>();
@@ -242,7 +242,13 @@ public final class EvalForest {
                         changed.put(rootKey, latest);
                     }
                 });
-                return new EvalUpdate(eventKey, changed);
+                Map<EvalRootKey, Boolean> affected = new LinkedHashMap<>();
+                registrations.values().forEach(registration -> {
+                    if (registration.referencedSources().containsKey(eventKey)) {
+                        affected.put(registration.key(), registration.root().value());
+                    }
+                });
+                return new EvalUpdate(eventKey, affected, changed);
             } finally {
                 activeBatch.remove();
             }

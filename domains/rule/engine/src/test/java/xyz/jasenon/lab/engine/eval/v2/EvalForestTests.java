@@ -130,6 +130,19 @@ class EvalForestTests {
     }
 
     @Test
+    void reportsAnObservationAsAffectedEvenWhenTheRootDoesNotChange() {
+        EvalForest forest = new EvalForest();
+        EvalRootKey rootKey = key("warm");
+        forest.register(rootKey, chain(node("1", Operator.GT, "26", LogicType.AND, false)));
+
+        forest.accept(TEMPERATURE, "30");
+        EvalUpdate repeated = forest.accept(TEMPERATURE, "30");
+
+        assertFalse(repeated.changed());
+        assertEquals(java.util.Map.of(rootKey, true), repeated.affectedResults());
+    }
+
+    @Test
     void suppressesTransientRootChangesWithinOneEventBatch() {
         EvalNode first = node("a", Operator.GT, "20", null, true);
         EvalNode second = node("b", Operator.ST, "20", LogicType.OR, false);

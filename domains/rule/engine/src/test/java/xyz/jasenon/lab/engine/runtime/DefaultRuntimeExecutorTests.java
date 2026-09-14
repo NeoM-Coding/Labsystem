@@ -22,6 +22,7 @@ import xyz.jasenon.lab.engine.eval.Operator;
 import xyz.jasenon.lab.engine.event.DeviceEvent;
 import xyz.jasenon.lab.engine.event.DeviceEventKey;
 import xyz.jasenon.lab.engine.time.TimeConditionGroup;
+import xyz.jasenon.lab.mqtt.protocol.command.CommandLine;
 
 import java.time.Instant;
 import java.util.EnumSet;
@@ -117,6 +118,33 @@ class DefaultRuntimeExecutorTests {
         assertTrue(result.message().contains("not implemented"));
         assertEquals(0, tracker.successCount());
         assertEquals(0, tracker.failureCount());
+    }
+
+    @Test
+    void pollSubmissionDoesNotWaitForTheDeviceResponse() {
+        MqttRuleIo mqttIo = mock(MqttRuleIo.class);
+        DefaultRuntimeExecutor executor = new DefaultRuntimeExecutor(
+                new ActionExecutionTracker(), mqttIo
+        );
+        CompletableFuture<RpcResult<MqttResponseDto>> pendingResponse = new CompletableFuture<>();
+        when(mqttIo.asyncSend(org.mockito.ArgumentMatchers.any(MqttTaskDto.class)))
+                .thenReturn(pendingResponse);
+        RuntimeActionGroup actionGroup = actionGroup("group-1");
+        Runtime runtime = runtime("runtime-1", actionGroup);
+
+        ActionExecutionResult result = executor.execute(
+                runtime,
+                actionGroup,
+                new PollAction(DeviceType.AirCondition, "ac-1")
+        ).join();
+
+        assertEquals(ActionExecutionResult.Status.SUCCESS, result.status());
+        assertEquals(Action.ActionType.Poll, result.actionType());
+        assertTrue(!pendingResponse.isDone());
+        verify(mqttIo).asyncSend(org.mockito.ArgumentMatchers.argThat(task ->
+                task.getCommandLine() == CommandLine.REQUEST_AIR_CONDITION_DATA_RS485
+                        && "ac-1".equals(task.getDeviceId())
+        ));
     }
 
     @Nested

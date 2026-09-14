@@ -68,12 +68,15 @@ class EngineTests {
                 TriggerMode.RECONCILE
         );
         engine.register(edge);
-        engine.register(reconcile);
+        Runtime reconcileRuntime = engine.register(reconcile);
+        assertEquals(TriggerMode.RECONCILE,
+                reconcileRuntime.actionGroups().get(0).triggerMode());
 
         engine.accept(event("30"));
         scheduler.clear();
         engine.accept(event("30"));
 
+        assertTrue(reconcileRuntime.deviceConditionSatisfied("warm"));
         assertEquals(Set.of("runtime-reconcile"), scheduler.runtimeIds());
     }
 

@@ -149,7 +149,9 @@ public class Engine {
             EvalUpdate update = evalForest.accept(event.getKey(), event.getValue());
             xyz.jasenon.lab.observability.context.Tracing.attribute("rule.root_changed", update.changed());
             xyz.jasenon.lab.observability.context.Tracing.attribute("rule.runtime_count", runtimes.size());
-            if (!update.changed()) {
+            // An unchanged observation is still a pulse for RECONCILE groups.
+            // EDGE groups continue to be filtered by Runtime.actionGroupIdsFor(update).
+            if (!update.affected()) {
                 return;
             }
             Set<String> affectedRuntimeIds = update.affectedResults().keySet().stream()

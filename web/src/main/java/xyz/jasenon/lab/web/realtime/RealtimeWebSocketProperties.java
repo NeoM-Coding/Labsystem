@@ -10,7 +10,8 @@ public class RealtimeWebSocketProperties {
 
     private List<String> allowedOrigins = new ArrayList<>(List.of(
             "http://localhost:8989",
-            "http://127.0.0.1:8989"
+            "http://127.0.0.1:8989",
+            "http://localhost:5173"
     ));
     private int sendTimeLimitMillis = 10_000;
     private int sendBufferBytes = 1_048_576;

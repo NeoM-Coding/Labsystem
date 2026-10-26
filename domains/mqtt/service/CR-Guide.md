@@ -242,7 +242,7 @@ MqttCallback.messageArrived()
 ## 六、测试覆盖
 
 - [ ] `MqttClientMatchTests` — 请求/响应匹配逻辑
-- [ ] `MqttClientSendIT` — 集成测试（需 MQTT Broker）
+- [ ] `MqttClientMatchTests` — 请求与响应匹配单元测试（无需 MQTT Broker）
 - [ ] `MqttDeviceManagerTests` — 设备 CRUD 边界
 - [ ] `MqttGatewayManagerTests` — 网关 CRUD 边界
 - [ ] `MqttTelemetryManagerTests` — 遥测查询 Redis/DB 回退

@@ -260,11 +260,7 @@ lab-system-cloud/
 ./mvnw clean verify
 ```
 
-默认验证不要求外部 MQTT Broker。准备好真实外部依赖后，可运行集成测试：
-
-```bash
-./mvnw clean verify -Pexternal-tests
-```
+`domains/` 仅保留模块功能单元测试，不启动 Spring 容器，不连接数据库、Redis、Permify 或 MQTT Broker。测试范围与运行方式见 [domains/TESTING.md](domains/TESTING.md)。
 
 ### 常见开发流程
 

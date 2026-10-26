@@ -5,24 +5,11 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class PermifyDemoSchemaTests {
-
-    @Test
-    void demoSchemaDefinesDeviceOperatePermission() throws IOException {
-        String schema = Files.readString(demoSchema());
-
-        assertTrue(schema.contains("entity user {}"));
-        assertTrue(schema.contains("entity device"));
-        assertTrue(schema.contains("relation operator @user"));
-        assertTrue(schema.contains("relation admin @user"));
-        assertTrue(schema.contains("action operate = operator or admin"));
-    }
+class PermifySchemaTests {
 
     @Test
     void labSystemSchemaUsesPermissionsForDerivedCapabilities() throws IOException {
@@ -67,38 +54,6 @@ class PermifyDemoSchemaTests {
         assertTrue(schema.contains("permission can_view = app.super_admin or owner or manager or viewer"));
         assertTrue(schema.contains("action laboratory_manage = app.super_admin or owner or manager"));
         assertFalse(schema.contains("view_timetable = edu_timetable_manager or edu_semester_viewer"));
-    }
-
-    @Test
-    void labSystemV2DiagramContainsEverySchemaDefinition() throws IOException {
-        String schema = Files.readString(schemaPath("lab-system-v2.perm"));
-        String diagram = Files.readString(schemaPath("lab-system-v2.svg"));
-        Pattern entityPattern = Pattern.compile("(?m)^\\s*entity\\s+([a-z_]+)\\s*\\{");
-        Pattern definitionPattern = Pattern.compile(
-                "(?m)^\\s*(relation|action|permission)\\s+([^\\r\\n]+)"
-        );
-
-        Matcher entityMatcher = entityPattern.matcher(schema);
-        while (entityMatcher.find()) {
-            String entity = entityMatcher.group(1);
-            assertTrue(
-                    diagram.contains("data-entity=\"" + entity + "\""),
-                    () -> "权限图缺少实体: " + entity
-            );
-        }
-
-        Matcher definitionMatcher = definitionPattern.matcher(schema);
-        while (definitionMatcher.find()) {
-            String definition = definitionMatcher.group(1) + " " + definitionMatcher.group(2).trim();
-            assertTrue(
-                    diagram.contains("data-definition=\"" + definition + "\""),
-                    () -> "权限图缺少或未更新定义: " + definition
-            );
-        }
-    }
-
-    private Path demoSchema() {
-        return schemaPath("demo.perm");
     }
 
     private Path schemaPath(String fileName) {

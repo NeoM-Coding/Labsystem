@@ -1,177 +1,234 @@
 package xyz.jasenon.lab.engine.infrastructure.persistence;
 
-import com.baomidou.mybatisplus.autoconfigure.MybatisPlusAutoConfiguration;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
-import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.jdbc.Sql;
-import xyz.jasenon.lab.device.model.DeviceType;
+import org.mockito.ArgumentCaptor;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 import xyz.jasenon.lab.engine.Engine;
-import xyz.jasenon.lab.engine.RuleEngineApplication;
+import xyz.jasenon.lab.engine.compiler.RuntimeRevisionCompiler;
 import xyz.jasenon.lab.engine.definition.RuntimeRevision;
-import xyz.jasenon.lab.engine.definition.RuntimeRevision.ActionGroupDefinition;
-import xyz.jasenon.lab.engine.definition.RuntimeRevision.DeviceConditionDefinition;
-import xyz.jasenon.lab.engine.definition.RuntimeRevision.DeviceConditionGroupDefinition;
-import xyz.jasenon.lab.engine.definition.RuntimeRevision.TimeConditionGroupDefinition;
-import xyz.jasenon.lab.engine.eval.LogicType;
-import xyz.jasenon.lab.engine.eval.Operator;
-import xyz.jasenon.lab.engine.runtime.RuntimeSnapshot;
+import xyz.jasenon.lab.engine.execution.ActionDispatcher;
+import xyz.jasenon.lab.engine.infrastructure.persistence.mapper.RuleRuntimeMapper;
+import xyz.jasenon.lab.engine.infrastructure.persistence.mapper.RuleRuntimeRevisionMapper;
+import xyz.jasenon.lab.engine.infrastructure.persistence.model.CurrentRuntimeRevision;
+import xyz.jasenon.lab.engine.infrastructure.persistence.model.RuleRuntimeEntity;
+import xyz.jasenon.lab.engine.infrastructure.persistence.model.RuleRuntimeRevisionEntity;
+import xyz.jasenon.lab.engine.scheduling.EngineOptions;
+import xyz.jasenon.lab.engine.scheduling.TimeScheduler;
 
+import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
-@SpringBootTest(
-        classes = RuleEngineApplication.class,
-        webEnvironment = SpringBootTest.WebEnvironment.NONE,
-        properties = {
-                "spring.datasource.url=jdbc:h2:mem:runtime_mapper;MODE=MySQL;DB_CLOSE_DELAY=-1",
-                "spring.datasource.username=sa",
-                "spring.datasource.password=",
-                "spring.sql.init.mode=always",
-                "spring.sql.init.schema-locations=classpath:db/runtime-persistence-schema.sql",
-                "lab.redis.enabled=false",
-                "lab.rule-engine.persistence.enabled=true",
-                "lab.rule-engine.simple-test.enabled=false",
-                "dubbo.registry.address=N/A",
-                "dubbo.config-center.address=N/A",
-                "dubbo.provider.export=false",
-                "spring.profiles.active=test",
-                "fun.uid.assigner-mode=none"
-        }
-)
-@Sql(
-        statements = {
-                "DELETE FROM rule_runtime_revision",
-                "DELETE FROM rule_runtime"
-        },
-        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD
-)
-@ImportAutoConfiguration({DataSourceAutoConfiguration.class, MybatisPlusAutoConfiguration.class})
+/** Tests the persistence lifecycle with isolated mapper and transaction boundaries. */
 class RuntimePersistHelperTests {
-
-    @Autowired
+    private final RuleRuntimeMapper runtimeMapper = mock(RuleRuntimeMapper.class);
+    private final RuleRuntimeRevisionMapper revisionMapper = mock(RuleRuntimeRevisionMapper.class);
+    private final PlatformTransactionManager transactions = mock(PlatformTransactionManager.class);
+    private final ObjectMapper json = new ObjectMapper().findAndRegisterModules();
+    private Engine engine;
+    private TimeScheduler timers;
+    private ActionDispatcher actions;
     private RuntimePersistHelper helper;
 
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
+    @BeforeEach
+    void setUp() {
+        EngineOptions options = new EngineOptions();
+        options.setWorkers(1);
+        options.setExecutionThreads(1);
+        actions = new ActionDispatcher((runtime, group, action) -> {
+            throw new AssertionError("Persistence tests must not execute device actions");
+        }, notice -> {}, options);
+        timers = new TimeScheduler();
+        engine = new Engine(actions, timers, options);
+        when(transactions.getTransaction(any(TransactionDefinition.class)))
+                .thenAnswer(invocation -> new SimpleTransactionStatus());
+        helper = new RuntimePersistHelper(runtimeMapper, revisionMapper, json, transactions,
+                new RuntimeRevisionCompiler(), engine);
+    }
 
-    @Autowired
-    private Engine engine;
-
-    private static RuntimeRevision revision(
-            String runtimeId,
-            boolean enabled,
-            String threshold
-    ) {
-        return new RuntimeRevision(
-                runtimeId,
-                enabled,
-                null,
-                null,
-                List.of(new DeviceConditionGroupDefinition(
-                        "hot-room",
-                        List.of(new DeviceConditionDefinition(
-                                "temperature",
-                                DeviceType.AirCondition,
-                                "ac-1",
-                                "roomTemperature",
-                                Operator.GT,
-                                threshold,
-                                LogicType.AND
-                        ))
-                )),
-                List.of(new TimeConditionGroupDefinition("always", List.of())),
-                List.of(new ActionGroupDefinition(
-                        "report-temperature",
-                        "hot-room",
-                        "always",
-                        List.of()
-                ))
-        );
+    @AfterEach
+    void tearDown() {
+        engine.close();
+        timers.close();
+        actions.close();
     }
 
     @Test
-    void appendsImmutableRevisionForUpdateEnableAndDisable() {
-        assertTrue(helper.register(revision("runtime-1", true, "26")));
-        RuntimeSnapshot registered = engine.runtime("runtime-1").orElseThrow();
-        assertFalse(helper.register(revision("runtime-1", true, "26")));
-        assertEquals(1, revisionCount("runtime-1"));
-        assertTrue(helper.fetch().get(0).isEnabled());
+    void registersInitialRevisionAndSynchronizesEngineAfterCommit() throws Exception {
+        when(runtimeMapper.insert(any(RuleRuntimeEntity.class))).thenReturn(1);
+        when(revisionMapper.insert(any(RuleRuntimeRevisionEntity.class))).thenReturn(1);
+        doAnswer(invocation -> {
+            assertTrue(engine.runtime("runtime-1").isEmpty());
+            return null;
+        }).when(transactions).commit(any());
+
+        assertTrue(helper.register(revision(true)));
+
+        var saved = ArgumentCaptor.forClass(RuleRuntimeRevisionEntity.class);
+        verify(revisionMapper).insert(saved.capture());
+        assertEquals(1, saved.getValue().getRevisionNo());
+        assertEquals("runtime-1", saved.getValue().getRuntimeId());
+        assertEquals(revision(true), json.readValue(saved.getValue().getDefinition(), RuntimeRevision.class));
+        assertTrue(engine.runtime("runtime-1").isPresent());
+    }
+
+    @Test
+    void duplicateRegistrationDoesNotPublishToEngine() {
+        when(runtimeMapper.insert(any(RuleRuntimeEntity.class)))
+                .thenThrow(new DuplicateKeyException("duplicate runtime"));
+
+        assertFalse(helper.register(revision(true)));
+
+        verifyNoInteractions(revisionMapper);
+        verify(transactions).rollback(any());
+        assertTrue(engine.runtime("runtime-1").isEmpty());
+    }
+
+    @Test
+    void failedRevisionWriteRollsBackAndDoesNotPublishToEngine() {
+        when(runtimeMapper.insert(any(RuleRuntimeEntity.class))).thenReturn(1);
+        when(revisionMapper.insert(any(RuleRuntimeRevisionEntity.class))).thenReturn(0);
+
+        assertThrows(IllegalStateException.class, () -> helper.register(revision(true)));
+
+        verify(transactions).rollback(any());
+        verify(transactions, never()).commit(any());
+        assertTrue(engine.runtime("runtime-1").isEmpty());
+    }
+
+    @Test
+    void failedCommitDoesNotPublishToEngine() {
+        when(runtimeMapper.insert(any(RuleRuntimeEntity.class))).thenReturn(1);
+        when(revisionMapper.insert(any(RuleRuntimeRevisionEntity.class))).thenReturn(1);
+        doThrow(new IllegalStateException("commit failed")).when(transactions).commit(any());
+
+        assertThrows(IllegalStateException.class, () -> helper.register(revision(true)));
+        assertTrue(engine.runtime("runtime-1").isEmpty());
+    }
+
+    @Test
+    void updateAppendsRevisionAndPublishesItsNumber() {
+        when(runtimeMapper.lockCurrentRevision("runtime-1")).thenReturn(3);
+        when(revisionMapper.insert(any(RuleRuntimeRevisionEntity.class))).thenReturn(1);
+        when(runtimeMapper.publishRevision("runtime-1", true, "PUBLISHED", 4, null, null)).thenReturn(1);
+
+        assertTrue(helper.update("runtime-1", revision(true)));
+
+        var saved = ArgumentCaptor.forClass(RuleRuntimeRevisionEntity.class);
+        verify(revisionMapper).insert(saved.capture());
+        assertEquals(4, saved.getValue().getRevisionNo());
+        assertTrue(engine.runtime("runtime-1").isPresent());
+    }
+
+    @Test
+    void missingRuntimeCannotBeUpdatedOrEnabled() {
+        when(runtimeMapper.lockCurrentRevision("runtime-1")).thenReturn(null);
+        assertFalse(helper.update("runtime-1", revision(true)));
+        assertFalse(helper.enable("runtime-1"));
+        verifyNoInteractions(revisionMapper);
+        assertEquals(0, engine.runtimeCount());
+    }
+
+    @Test
+    void unchangedEnabledStateDoesNotAppendRevision() throws Exception {
+        when(runtimeMapper.lockCurrentRevision("runtime-1")).thenReturn(2);
+        when(revisionMapper.selectCurrent("runtime-1")).thenReturn(row(revision(true)));
+
+        assertTrue(helper.enable("runtime-1"));
+
+        verify(revisionMapper, never()).insert(any(RuleRuntimeRevisionEntity.class));
+        verify(runtimeMapper, never()).publishEnabledRevision(anyString(), anyBoolean(), anyString(), anyInt());
+        assertTrue(engine.runtime("runtime-1").isPresent());
+    }
+
+    @Test
+    void disableAppendsRevisionAndRemovesRuntimeFromEngine() throws Exception {
+        engine.register(new RuntimeRevisionCompiler().compile(revision(true)));
+        when(runtimeMapper.lockCurrentRevision("runtime-1")).thenReturn(2);
+        when(revisionMapper.selectCurrent("runtime-1")).thenReturn(row(revision(true)));
+        when(revisionMapper.insert(any(RuleRuntimeRevisionEntity.class))).thenReturn(1);
+        when(runtimeMapper.publishEnabledRevision("runtime-1", false, "DISABLED", 3)).thenReturn(1);
 
         assertTrue(helper.disable("runtime-1"));
-        assertEquals(2, revisionCount("runtime-1"));
-        assertFalse(helper.fetch().get(0).isEnabled());
+
+        var saved = ArgumentCaptor.forClass(RuleRuntimeRevisionEntity.class);
+        verify(revisionMapper).insert(saved.capture());
+        assertEquals(3, saved.getValue().getRevisionNo());
+        assertFalse(json.readValue(saved.getValue().getDefinition(), RuntimeRevision.class).isEnabled());
         assertTrue(engine.runtime("runtime-1").isEmpty());
+    }
 
-        assertTrue(helper.enable("runtime-1"));
-        assertEquals(3, revisionCount("runtime-1"));
-        assertTrue(helper.fetch().get(0).isEnabled());
-        RuntimeSnapshot reenabled = engine.runtime("runtime-1").orElseThrow();
-        assertNotSame(registered, reenabled);
-        assertTrue(helper.enable("runtime-1"));
-        assertEquals(3, revisionCount("runtime-1"));
+    @Test
+    void removesRuntimeOnlyWhenMetadataWasDeleted() {
+        engine.register(new RuntimeRevisionCompiler().compile(revision(true)));
+        when(runtimeMapper.softDelete("runtime-1")).thenReturn(0, 1);
 
-        assertTrue(helper.update("runtime-1", revision("runtime-1", true, "30")));
-        assertNotSame(reenabled, engine.runtime("runtime-1").orElseThrow());
-        assertEquals(4, revisionCount("runtime-1"));
-        assertEquals(
-                "30",
-                helper.fetch().get(0)
-                        .deviceConditionGroups().get(0)
-                        .conditions().get(0)
-                        .value()
-        );
-
+        assertFalse(helper.remove("runtime-1"));
+        assertTrue(engine.runtime("runtime-1").isPresent());
         assertTrue(helper.remove("runtime-1"));
         assertTrue(engine.runtime("runtime-1").isEmpty());
-        assertTrue(helper.fetch().isEmpty());
-        assertEquals(4, revisionCount("runtime-1"));
     }
 
     @Test
-    void restoresOnlyEnabledRuntimeAfterServiceRestart() {
-        assertTrue(helper.register(revision("enabled-runtime", true, "26")));
-        assertTrue(helper.register(revision("disabled-runtime", false, "26")));
-
-        engine.remove("enabled-runtime");
-        engine.remove("disabled-runtime");
-        helper.restoreEnabledRuntimes();
-
-        assertTrue(engine.runtime("enabled-runtime").isPresent());
-        assertTrue(engine.runtime("disabled-runtime").isEmpty());
-    }
-
-    private int revisionCount(String runtimeId) {
-        return jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM rule_runtime_revision WHERE runtime_id = ?",
-                Integer.class,
-                runtimeId
-        );
-    }
-
-    @Test
-    void rejectsTimePointPublicationAndSkipsLegacyRestore() throws Exception {
-        var base = revision("legacy-point", true, "26");
+    void restoreSkipsInvalidRevisionsAndRestoresTimePoints() throws Exception {
+        RuntimeRevision expired = new RuntimeRevision("expired", true, null, Instant.EPOCH,
+                List.of(), List.of(), List.of());
         var point = new RuntimeRevision.TimeConditionDefinition("point", RuntimeRevision.TimeConditionType.TIME_POINT,
-                null, null, java.util.Set.of(), "UTC", null, null, java.time.LocalTime.NOON);
-        var legacy = new RuntimeRevision(base.runtimeId(), true, null, null, base.deviceConditionGroups(),
-                List.of(new TimeConditionGroupDefinition("always", List.of(point))), base.actionGroups());
-        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> helper.register(legacy));
-        assertEquals(0, revisionCount("legacy-point"));
-        String json = new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules().writeValueAsString(legacy);
-        jdbcTemplate.update("INSERT INTO rule_runtime(id,runtime_id,runtime_name,owner_id,enabled,status,published_revision_no) VALUES(?,?,?,?,?,?,?)",
-                "legacy-meta", "legacy-point", "legacy-point", "system", true, "PUBLISHED", 1);
-        jdbcTemplate.update("INSERT INTO rule_runtime_revision(id,runtime_id,revision_no,schema_version,definition,created_by) VALUES(?,?,?,?,?,?)",
-                "legacy-revision", "legacy-point", 1, 1, json, "system");
+                null, null, Set.of(), "UTC", null, null, java.time.LocalTime.NOON);
+        RuntimeRevision unsupported = new RuntimeRevision("legacy", true, null, null, List.of(),
+                List.of(new RuntimeRevision.TimeConditionGroupDefinition("always", List.of(point))), List.of());
+        CurrentRuntimeRevision malformed = row(revision(true));
+        malformed.setDefinition("invalid-json");
+        when(revisionMapper.selectAllCurrent()).thenReturn(List.of(
+                row(revision(false)), row(expired), malformed, row(unsupported),
+                row(new RuntimeRevision("enabled", true, null, null, List.of(), List.of(), List.of()))));
+
         helper.restoreEnabledRuntimes();
-        assertTrue(engine.runtime("legacy-point").isEmpty());
-        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> helper.enable("legacy-point"));
-        assertTrue(helper.disable("legacy-point"));
-        assertFalse(helper.fetch().stream().filter(r -> r.runtimeId().equals("legacy-point")).findFirst().orElseThrow().isEnabled());
+
+        assertEquals(2, engine.runtimeCount());
+        assertTrue(engine.runtime("enabled").isPresent());
+        assertTrue(engine.runtime("legacy").isPresent());
     }
 
+    @Test
+    void rejectsMismatchedRuntimeIdBeforeWriting() {
+        assertThrows(IllegalArgumentException.class, () -> helper.update("other", revision(true)));
+        verifyNoInteractions(runtimeMapper, revisionMapper, transactions);
+    }
+
+    @Test
+    void publishesTimePointWithoutChangingStoredFormat() {
+        var point = new RuntimeRevision.TimeConditionDefinition("point", RuntimeRevision.TimeConditionType.TIME_POINT,
+                null, null, Set.of(), "UTC", null, null, java.time.LocalTime.NOON);
+        var unsupported = new RuntimeRevision("runtime-1", true, null, null, List.of(),
+                List.of(new RuntimeRevision.TimeConditionGroupDefinition("always", List.of(point))), List.of());
+
+        when(runtimeMapper.insert(any(RuleRuntimeEntity.class))).thenReturn(1);
+        when(revisionMapper.insert(any(RuleRuntimeRevisionEntity.class))).thenReturn(1);
+        assertTrue(helper.register(unsupported));
+        assertTrue(engine.runtime("runtime-1").isPresent());
+        verify(transactions).commit(any());
+    }
+
+    private RuntimeRevision revision(boolean enabled) {
+        return new RuntimeRevision("runtime-1", enabled, null, null, List.of(), List.of(), List.of());
+    }
+
+    private CurrentRuntimeRevision row(RuntimeRevision revision) throws Exception {
+        var row = new CurrentRuntimeRevision();
+        row.setRuntimeId(revision.runtimeId());
+        row.setEnabled(revision.isEnabled());
+        row.setDefinition(json.writeValueAsString(revision));
+        return row;
+    }
 }

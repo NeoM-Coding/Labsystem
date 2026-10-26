@@ -1,6 +1,0 @@
-lab:
-  rule-engine:
-    persistence:
-      enabled: false
-    simple-test:
-      enabled: false

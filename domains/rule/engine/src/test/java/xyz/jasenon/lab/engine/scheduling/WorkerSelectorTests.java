@@ -114,7 +114,7 @@ class WorkerSelectorTests {
         var window = new xyz.jasenon.lab.engine.time.TimeWindowCondition("w",
                 xyz.jasenon.lab.engine.time.CalendarConstraint.everyDay(java.time.ZoneOffset.UTC),
                 java.time.LocalTime.of(1, 0), java.time.LocalTime.of(2, 0));
-        var times = Map.of("t", List.of(window));
+        var times = Map.of("t", List.<xyz.jasenon.lab.engine.time.TimeCondition>of(window));
         first.install(new RuntimePlan("a", base.lifetime(), base.conditionGroups(), times,
                 base.actionGroups(), base.bindings()), 1, 16).join();
         second.install(new RuntimePlan("b", base.lifetime(), base.conditionGroups(), times,

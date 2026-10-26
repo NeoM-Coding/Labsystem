@@ -17,6 +17,9 @@ import xyz.jasenon.lab.engine.eval.Operator;
 import xyz.jasenon.lab.engine.event.DeviceEvent;
 import xyz.jasenon.lab.engine.event.DeviceEventKey;
 import xyz.jasenon.lab.engine.event.TimeWindowStatusEvent;
+import xyz.jasenon.lab.engine.event.TimePointEvent;
+import xyz.jasenon.lab.engine.time.TimePointCondition;
+import xyz.jasenon.lab.engine.time.TimeCondition;
 import xyz.jasenon.lab.engine.execution.ActionDispatcher;
 import xyz.jasenon.lab.engine.plan.RuntimePlan;
 import xyz.jasenon.lab.engine.plan.RuntimePlan.ActionSpec;
@@ -80,8 +83,8 @@ class V3EngineTests {
         actions.close();
     }
 
-    RuntimePlan plan(String id, TriggerMode mode, List<TimeWindowCondition> windows, Lifetime life) {
-        return new RuntimePlan(id, life, Map.of("d", List.of(P)), Map.of("t", windows), Map.of("a", REPORT), List.of(new Binding("b", "d", "t", "a", mode)));
+    RuntimePlan plan(String id, TriggerMode mode, List<? extends TimeCondition> windows, Lifetime life) {
+        return new RuntimePlan(id, life, Map.of("d", List.of(P)), Map.of("t", List.copyOf(windows)), Map.of("a", REPORT), List.of(new Binding("b", "d", "t", "a", mode)));
     }
 
     RuntimePlan plan(TriggerMode mode) {
@@ -304,11 +307,219 @@ class V3EngineTests {
     }
 
     @Test
-    void timePointDefinitionsAreRejectedBeforeInstall() {
+    void timePointDefinitionsCompileBeforeInstall() {
         var point = new TimeConditionDefinition("point", TimeConditionType.TIME_POINT, null, null, Set.of(), "UTC", null, null, LocalTime.NOON);
         var revision = new RuntimeRevision("r", null, null, List.of(), List.of(new TimeConditionGroupDefinition("t", List.of(point))), List.of());
-        var e = assertThrows(IllegalArgumentException.class, () -> new RuntimeRevisionCompiler().compile(revision));
-        assertTrue(e.getMessage().contains("TIME_POINT"));
+        var plan = new RuntimeRevisionCompiler().compile(revision);
+        assertFalse(plan.timeGroups().get("t").get(0).isWindow());
+    }
+
+    RuntimePlan pointPlan(TriggerMode mode) {
+        return plan("r", mode, List.of(new TimePointCondition("point",
+                CalendarConstraint.everyDay(ZoneOffset.UTC), LocalTime.NOON)), new Lifetime(null, null));
+    }
+
+    TimePointEvent pointEvent(long generation, Instant at) {
+        return new TimePointEvent("r", generation, generation, Set.of(RuntimeInstance.windowKey("t", "point")), Map.of(), at);
+    }
+
+    @Test
+    void pointEdgesResetDeduplicateAndRemainQueuedWhileBusy() {
+        block = true;
+        long generation = engine.register(pointPlan(TriggerMode.EDGE)).generation();
+        observe("1");
+        Instant first = Instant.now();
+        engine.accept(pointEvent(generation, first));
+        eventually(1);
+        assertFalse(engine.inspect("r").roots().get("b"));
+        engine.accept(pointEvent(generation, first));
+        engine.accept(pointEvent(generation, first.plusNanos(1)));
+        assertEquals(1, engine.inspect("r").pendingDecisions());
+        complete(0);
+        eventually(2);
+    }
+
+    @Test
+    void pointReconcileSubmitsBeforeResetButDropsBusyPulseAfterReset() {
+        block = true;
+        long generation = engine.register(pointPlan(TriggerMode.RECONCILE)).generation();
+        observe("1");
+        Instant first = Instant.now();
+        engine.accept(pointEvent(generation, first));
+        eventually(1);
+        engine.accept(pointEvent(generation, first.plusNanos(1)));
+        assertFalse(engine.inspect("r").roots().get("b"));
+        complete(0);
+        await().atMost(Duration.ofSeconds(3)).until(() -> !engine.inspect("r").executing());
+        assertEquals(1, calls.get());
+        engine.accept(pointEvent(generation, Instant.now()));
+        eventually(2);
+    }
+
+    @Test
+    void pointDoesNotBypassDeviceRootOrGenerationFence() {
+        long old = engine.register(pointPlan(TriggerMode.EDGE)).generation();
+        engine.accept(pointEvent(old, Instant.now()));
+        assertEquals(0, calls.get());
+        long current = engine.register(pointPlan(TriggerMode.EDGE)).generation();
+        observe("1");
+        engine.accept(pointEvent(old, Instant.now()));
+        assertEquals(0, calls.get());
+        engine.accept(pointEvent(current, Instant.now()));
+        eventually(1);
+        engine.remove("r");
+        engine.accept(pointEvent(current, Instant.now()));
+        assertEquals(1, calls.get());
+    }
+
+    @Test
+    void windowTrueMasksPointEdgeAndWindowExitWithPointHasNoIntermediateEdge() {
+        RuntimePlan p = pointPlan(TriggerMode.EDGE);
+        var window = new TimeWindowCondition("window", CalendarConstraint.everyDay(ZoneOffset.UTC),
+                LocalTime.MIN, LocalTime.MAX);
+        p = new RuntimePlan(p.runtimeId(), p.lifetime(), p.conditionGroups(),
+                Map.of("t", List.of(window, new TimePointCondition("point", CalendarConstraint.everyDay(ZoneOffset.UTC), LocalTime.NOON))),
+                p.actionGroups(), p.bindings());
+        long generation = engine.register(p).generation();
+        observe("1");
+        eventually(1);
+        Instant now = Instant.now();
+        engine.accept(pointEvent(generation, now));
+        assertEquals(1, calls.get());
+        engine.accept(new TimePointEvent("r", generation, generation, Set.of(RuntimeInstance.windowKey("t", "point")),
+                Map.of(RuntimeInstance.windowKey("t", "window"), false), now.plusNanos(1)));
+        assertFalse(engine.inspect("r").roots().get("b"));
+        assertEquals(1, calls.get());
+    }
+
+    @Test
+    void pulseResetRunsWhenSubmissionThrowsAndSimultaneousPointsDecideOnce() {
+        RuntimePlan base = pointPlan(TriggerMode.EDGE);
+        RuntimePlan p = new RuntimePlan("r", base.lifetime(), base.conditionGroups(),
+                Map.of("t", List.of(new TimePointCondition("point", CalendarConstraint.everyDay(ZoneOffset.UTC), LocalTime.NOON),
+                        new TimePointCondition("other", CalendarConstraint.everyDay(ZoneOffset.UTC), LocalTime.NOON))),
+                base.actionGroups(), base.bindings());
+        RuntimeInstance runtime = new RuntimeInstance(p, 1, 4);
+        Instant now = Instant.now();
+        runtime.windows(new TimeWindowStatusEvent("r", 1, 1, Map.of(), now), now, true);
+        runtime.observe(new DeviceEvent(KEY.deviceType(), KEY.deviceId(), KEY.field(), "1", now), now);
+        var event = new TimePointEvent("r", 1, 1, Set.of(RuntimeInstance.windowKey("t", "point"),
+                RuntimeInstance.windowKey("t", "other")), Map.of(), now);
+        assertThrows(IllegalStateException.class, () -> runtime.pulse(event, now, () -> { throw new IllegalStateException(); }));
+        assertFalse(runtime.snapshot(now).roots().get("b"));
+        assertEquals(1, runtime.snapshot(now).pendingDecisions());
+    }
+
+    @Test
+    void windowStatusCannotTurnAPointLeafIntoPersistentTrue() {
+        long generation = engine.register(pointPlan(TriggerMode.EDGE)).generation();
+        observe("1");
+        engine.accept(new TimeWindowStatusEvent("r", generation, generation,
+                Map.of(RuntimeInstance.windowKey("t", "point"), true), Instant.now()));
+        assertFalse(engine.inspect("r").roots().get("b"));
+        assertEquals(0, calls.get());
+    }
+
+    @Test
+    void reconcileUnderActiveWindowCoalescesPointRequestsWithoutSelfLoop() {
+        block = true;
+        RuntimePlan base = pointPlan(TriggerMode.RECONCILE);
+        var window = new TimeWindowCondition("window", CalendarConstraint.everyDay(ZoneOffset.UTC),
+                LocalTime.MIN, LocalTime.MAX);
+        RuntimePlan p = new RuntimePlan("r", base.lifetime(), base.conditionGroups(),
+                Map.of("t", List.of(window, new TimePointCondition("point", CalendarConstraint.everyDay(ZoneOffset.UTC), LocalTime.NOON))),
+                base.actionGroups(), base.bindings());
+        long generation = engine.register(p).generation();
+        observe("1");
+        eventually(1);
+        engine.accept(pointEvent(generation, Instant.now()));
+        engine.accept(pointEvent(generation, Instant.now()));
+        complete(0);
+        eventually(2);
+        complete(1);
+        await().atMost(Duration.ofSeconds(3)).until(() -> !engine.inspect("r").executing());
+        assertEquals(2, calls.get());
+    }
+
+    @Test
+    void delayedPointUsesCurrentWindowSampleAndDoesNotReplayTwice() {
+        long generation = engine.register(pointPlan(TriggerMode.EDGE)).generation();
+        observe("1");
+        Instant scheduled = Instant.now();
+        // A newer window sample must not make the older scheduled occurrence disappear.
+        engine.accept(new TimeWindowStatusEvent("r", generation, generation, Map.of(), scheduled.plusMillis(1)));
+        engine.accept(new TimePointEvent("r", generation, generation, Set.of(RuntimeInstance.windowKey("t", "point")),
+                Map.of(), scheduled, scheduled.plusMillis(2)));
+        eventually(1);
+        engine.accept(new TimePointEvent("r", generation, generation, Set.of(RuntimeInstance.windowKey("t", "point")),
+                Map.of(), scheduled, scheduled.plusMillis(3)));
+        assertEquals(1, calls.get());
+        assertFalse(engine.inspect("r").roots().get("b"));
+    }
+
+    @Test
+    void activationBatchIncludesOtherBindingsAndPendingAndExpiryFencePulses() {
+        RuntimePlan base = pointPlan(TriggerMode.EDGE);
+        Instant from = Instant.now().plusSeconds(60), until = from.plusSeconds(60);
+        var p = new RuntimePlan("r", new Lifetime(from, until), Map.of("d", List.of()),
+                Map.of("t", base.timeGroups().get("t"), "always", List.of()), base.actionGroups(),
+                List.of(base.bindings().get(0), new Binding("constant", "d", "always", "a", TriggerMode.EDGE)));
+        RuntimeInstance runtime = new RuntimeInstance(p, 1, 4);
+        runtime.windows(new TimeWindowStatusEvent("r", 1, 1, Map.of(), from.minusSeconds(1)), from.minusSeconds(1), true);
+        runtime.pulse(pointEvent(1, from.minusSeconds(1)), from.minusSeconds(1), () -> {});
+        assertEquals(0, runtime.snapshot(from.minusSeconds(1)).pendingDecisions());
+        runtime.pulse(pointEvent(1, from), from, true, () -> {});
+        assertEquals(1, runtime.snapshot(from).pendingDecisions());
+        assertFalse(runtime.snapshot(from).roots().get("b"));
+        assertTrue(runtime.snapshot(from).roots().get("constant"));
+        runtime.pulse(pointEvent(1, until.minusNanos(1)), until, () -> {});
+        assertFalse(runtime.valid());
+        assertEquals(0, runtime.snapshot(until).pendingDecisions());
+    }
+
+    @Test
+    void pointCalendarSkipsHistoryAndHonorsDateWeekdayAndZone() {
+        var point = new TimePointCondition("p", new CalendarConstraint(LocalDate.of(2026, 10, 26),
+                LocalDate.of(2026, 10, 27), Set.of(DayOfWeek.MONDAY), ZoneId.of("Asia/Shanghai")), LocalTime.of(21, 0));
+        Instant at = Instant.parse("2026-10-26T13:00:00Z");
+        assertEquals(at, point.nextTransitionAfter(at.minusNanos(1)).orElseThrow().scheduledAt());
+        assertTrue(point.nextTransitionAfter(at).isEmpty());
+        assertFalse(point.isWindowActive(at));
+    }
+
+    @Test
+    void schedulerDeliversPointAndRetriesTheSameImmutableBatch() throws Exception {
+        Instant scheduled = Instant.now().plusMillis(200);
+        var point = new TimePointCondition("p", CalendarConstraint.everyDay(ZoneOffset.UTC),
+                scheduled.atZone(ZoneOffset.UTC).toLocalTime());
+        RuntimePlan p = new RuntimePlan("timer", new Lifetime(null, null), Map.of(), Map.of("t", List.of(point)), Map.of(), List.of());
+        List<TimeScheduler.Tick> attempts = new CopyOnWriteArrayList<>();
+        CountDownLatch delivered = new CountDownLatch(1);
+        var handle = timers.prepare(p, Instant.now(), tick -> {
+            attempts.add(tick);
+            if (attempts.size() == 1) return false;
+            delivered.countDown();
+            return true;
+        });
+        try {
+            assertTrue(delivered.await(3, TimeUnit.SECONDS));
+            assertSame(attempts.get(0), attempts.get(1));
+            assertEquals(scheduled, attempts.get(0).scheduledAt());
+            assertEquals(Set.of(RuntimeInstance.windowKey("t", "p")), attempts.get(0).pointIds());
+        } finally { handle.cancel(); }
+    }
+
+    @Test
+    void internalTimerDispatchesPointAndSnapshotIsAlreadyReset() {
+        Instant at = Instant.now().plusMillis(300);
+        RuntimePlan p = pointPlan(TriggerMode.EDGE);
+        p = new RuntimePlan("r", p.lifetime(), p.conditionGroups(),
+                Map.of("t", List.of(new TimePointCondition("point", CalendarConstraint.everyDay(ZoneOffset.UTC),
+                        at.atZone(ZoneOffset.UTC).toLocalTime()))), p.actionGroups(), p.bindings());
+        engine.register(p);
+        observe("1");
+        eventually(1);
+        assertFalse(engine.inspect("r").roots().get("b"));
     }
 
     @Test

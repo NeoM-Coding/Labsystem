@@ -6,7 +6,7 @@ import java.util.Optional;
 /**
  * 从属于可复用 TimeConditionGroup、可以计算下一时间边界的条件。
  */
-public interface TimeCondition {
+public sealed interface TimeCondition permits TimeWindowCondition, TimePointCondition {
 
     String conditionId();
 

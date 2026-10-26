@@ -77,6 +77,7 @@ public final class WorkerLoop implements AutoCloseable {
                 for (RuntimeInstance runtime : selector.select(event)) {
                     if (!runtime.valid()) continue;
                     if (event instanceof DeviceEvent device) runtime.observe(device, now);
+                    else if (event instanceof TimePointEvent point) runtime.pulse(point, now, () -> attempt(runtime));
                     else runtime.windows((TimeWindowStatusEvent) event, now, false);
                     publish(runtime);
                 }
@@ -85,7 +86,7 @@ public final class WorkerLoop implements AutoCloseable {
         });
     }
 
-    public CompletableFuture<RuntimeSnapshot> synchronizeTime(String id, long generation) {
+    public CompletableFuture<RuntimeSnapshot> synchronizeTime(String id, long generation, TimeScheduler.Tick tick) {
         return submit(() -> {
             RuntimeInstance runtime = selector.find(id);
             return runtime == null || runtime.generation != generation || room(runtime);
@@ -94,8 +95,14 @@ public final class WorkerLoop implements AutoCloseable {
             if (runtime == null || runtime.generation != generation) return null;
             Instant now = Instant.now();
             boolean activation = runtime.snapshot(now).state().equals("PENDING") && !runtime.plan.lifetime().pending(now);
-            runtime.windows(new TimeWindowStatusEvent(id, generation, runtime.timerToken,
-                    timers.statuses(runtime.plan, now), now), now, activation);
+            if (tick.pointIds().isEmpty()) {
+                runtime.windows(new TimeWindowStatusEvent(id, generation, runtime.timerToken,
+                        timers.statuses(runtime.plan, now), now), now, activation);
+            } else {
+                // Activate without evaluating an intermediate time root; the batch owns the decision.
+                runtime.pulse(new TimePointEvent(id, generation, runtime.timerToken, tick.pointIds(),
+                        timers.statuses(runtime.plan, now), tick.scheduledAt(), now), now, activation, () -> attempt(runtime));
+            }
             publish(runtime);
             return runtime.snapshot(now);
         });
@@ -148,17 +155,18 @@ public final class WorkerLoop implements AutoCloseable {
         while ((completion = completions.poll()) != null) completion.run();
         for (var iterator = runnable.iterator(); iterator.hasNext();) {
             RuntimeInstance runtime = iterator.next();
-            runtime.pump(dispatcher, () -> {
-                completions.add(() -> {
-                    runtime.completed();
-                    touch(runtime);
-                });
-                wake.release();
-            }, Instant.now());
+            attempt(runtime);
             if (selector.find(runtime.plan.runtimeId()) == runtime)
                 snapshotSink.accept(runtime.snapshot(Instant.now()));
             if (!runtime.needsPump()) iterator.remove();
         }
+    }
+
+    private void attempt(RuntimeInstance runtime) {
+        runtime.pump(dispatcher, () -> {
+            completions.add(() -> { runtime.completed(); touch(runtime); });
+            wake.release();
+        }, Instant.now());
     }
 
     private <T> void execute(Job<T> job) {

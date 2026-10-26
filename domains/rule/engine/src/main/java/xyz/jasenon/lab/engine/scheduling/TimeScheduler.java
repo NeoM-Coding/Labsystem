@@ -12,7 +12,9 @@ import java.util.Map;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.function.BooleanSupplier;
+import java.util.function.Function;
+import java.util.Set;
+import java.util.LinkedHashSet;
 
 /**
  * Only timer intents cross threads. Window state is always applied by the owning worker.
@@ -30,13 +32,13 @@ public final class TimeScheduler implements AutoCloseable {
         timer.setRemoveOnCancelPolicy(true);
     }
 
-    public Handle prepare(RuntimePlan plan, Instant now, BooleanSupplier deliver) {
+    public Handle prepare(RuntimePlan plan, Instant now, Function<Tick, Boolean> deliver) {
         Handle handle = new Handle();
         arm(handle, plan, now, deliver);
         return handle;
     }
 
-    public void arm(Handle handle, RuntimePlan plan, Instant now, BooleanSupplier deliver) {
+    public void arm(Handle handle, RuntimePlan plan, Instant now, Function<Tick, Boolean> deliver) {
         Instant next = null;
         if (plan.lifetime().pending(now)) next = plan.lifetime().activeFrom();
         else if (!plan.lifetime().expired(now)) {
@@ -48,19 +50,30 @@ public final class TimeScheduler implements AutoCloseable {
                         next = transition.get().scheduledAt();
                 }
         }
-        if (next != null)
-            handle.task(timer.schedule(() -> deliverOrRetry(handle, deliver), Math.max(0, Duration.between(Instant.now(), next).toMillis()), TimeUnit.MILLISECONDS));
+        if (next != null) {
+            Set<String> points = new LinkedHashSet<>();
+            Instant scheduled = next;
+            plan.timeGroups().forEach((group, conditions) -> conditions.stream().filter(c -> !c.isWindow()).forEach(c -> {
+                // Pending activation may coincide exactly with a point.
+                c.nextTransitionAfter(scheduled.minusNanos(1)).filter(t -> t.scheduledAt().equals(scheduled))
+                        .ifPresent(t -> points.add(RuntimeInstance.windowKey(group, c.conditionId())));
+            }));
+            Tick tick = new Tick(scheduled, points);
+            Duration remaining = Duration.between(Instant.now(), scheduled);
+            long delay = Math.max(0, remaining.toMillis() + (remaining.getNano() % 1_000_000 == 0 ? 0 : 1));
+            handle.task(timer.schedule(() -> deliverOrRetry(handle, deliver, tick), delay, TimeUnit.MILLISECONDS));
+        }
     }
 
-    private void deliverOrRetry(Handle handle, BooleanSupplier deliver) {
+    private void deliverOrRetry(Handle handle, Function<Tick, Boolean> deliver, Tick tick) {
         if (handle.cancelled) return;
-        if (!deliver.getAsBoolean())
-            handle.task(timer.schedule(() -> deliverOrRetry(handle, deliver), 10, TimeUnit.MILLISECONDS));
+        if (!deliver.apply(tick))
+            handle.task(timer.schedule(() -> deliverOrRetry(handle, deliver, tick), 10, TimeUnit.MILLISECONDS));
     }
 
     public Map<String, Boolean> statuses(RuntimePlan plan, Instant at) {
         Map<String, Boolean> values = new LinkedHashMap<>();
-        plan.timeGroups().forEach((id, windows) -> windows.forEach(w -> values.put(RuntimeInstance.windowKey(id, w.conditionId()), w.isWindowActive(at))));
+        plan.timeGroups().forEach((id, windows) -> windows.stream().filter(w -> w.isWindow()).forEach(w -> values.put(RuntimeInstance.windowKey(id, w.conditionId()), w.isWindowActive(at))));
         return Map.copyOf(values);
     }
 
@@ -68,6 +81,10 @@ public final class TimeScheduler implements AutoCloseable {
     @PreDestroy
     public void close() {
         timer.shutdownNow();
+    }
+
+    public record Tick(Instant scheduledAt, Set<String> pointIds) {
+        public Tick { pointIds = Set.copyOf(pointIds); }
     }
 
     public static final class Handle {

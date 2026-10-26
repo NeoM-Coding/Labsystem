@@ -5,13 +5,12 @@ import xyz.jasenon.lab.engine.action.Action;
 import xyz.jasenon.lab.engine.action.ReportAction;
 import xyz.jasenon.lab.engine.definition.RuntimeRevision;
 import xyz.jasenon.lab.engine.definition.RuntimeRevision.ActionType;
-import xyz.jasenon.lab.engine.definition.RuntimeRevision.TimeConditionType;
 import xyz.jasenon.lab.engine.eval.LogicType;
 import xyz.jasenon.lab.engine.event.DeviceEventKey;
 import xyz.jasenon.lab.engine.plan.RuntimePlan;
 import xyz.jasenon.lab.engine.plan.RuntimePlan.*;
 import xyz.jasenon.lab.engine.time.CalendarConstraint;
-import xyz.jasenon.lab.engine.time.TimeWindowCondition;
+import xyz.jasenon.lab.engine.time.*;
 
 import java.time.ZoneId;
 import java.util.*;
@@ -43,16 +42,18 @@ public final class RuntimeRevisionCompiler {
             }
             unique(devices, id, predicates);
         }
-        Map<String, List<TimeWindowCondition>> times = new LinkedHashMap<>();
+        Map<String, List<TimeCondition>> times = new LinkedHashMap<>();
         for (var group : revision.timeConditionGroups()) {
-            List<TimeWindowCondition> windows = new ArrayList<>();
+            List<TimeCondition> windows = new ArrayList<>();
             Set<String> ids = new HashSet<>();
             for (var c : group.conditions()) {
-                if (c.type() != TimeConditionType.WINDOW)
-                    throw new IllegalArgumentException("TIME_POINT is no longer supported in v3; replace with WINDOW or remove it: " + c.conditionId());
                 if (!ids.add(text(c.conditionId())))
                     throw new IllegalArgumentException("duplicate time condition: " + c.conditionId());
-                windows.add(new TimeWindowCondition(c.conditionId(), new CalendarConstraint(c.startDate(), c.endDate(), c.weekdays(), ZoneId.of(text(c.zoneId()))), Objects.requireNonNull(c.startTime()), Objects.requireNonNull(c.endTime())));
+                CalendarConstraint calendar = new CalendarConstraint(c.startDate(), c.endDate(), c.weekdays(), ZoneId.of(text(c.zoneId())));
+                windows.add(switch (Objects.requireNonNull(c.type())) {
+                    case WINDOW -> new TimeWindowCondition(c.conditionId(), calendar, Objects.requireNonNull(c.startTime()), Objects.requireNonNull(c.endTime()));
+                    case TIME_POINT -> new TimePointCondition(c.conditionId(), calendar, Objects.requireNonNull(c.timePoint()));
+                });
             }
             unique(times, text(group.groupId()), windows);
         }

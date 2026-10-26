@@ -10,7 +10,7 @@ import xyz.jasenon.lab.engine.definition.RuntimeRevision.TriggerMode;
 import xyz.jasenon.lab.engine.eval.LogicType;
 import xyz.jasenon.lab.engine.eval.Operator;
 import xyz.jasenon.lab.engine.event.DeviceEventKey;
-import xyz.jasenon.lab.engine.time.TimeWindowCondition;
+import xyz.jasenon.lab.engine.time.TimeCondition;
 import xyz.jasenon.lab.mqtt.protocol.command.CommandLine;
 
 import java.time.Instant;
@@ -21,7 +21,7 @@ import java.util.*;
  */
 public record RuntimePlan(String runtimeId, Lifetime lifetime,
                           Map<String, List<Predicate>> conditionGroups,
-                          Map<String, List<TimeWindowCondition>> timeGroups,
+                          Map<String, List<TimeCondition>> timeGroups,
                           Map<String, ActionGroup> actionGroups, List<Binding> bindings) {
     public RuntimePlan {
         if (runtimeId == null || runtimeId.isBlank()) throw new IllegalArgumentException("runtimeId required");

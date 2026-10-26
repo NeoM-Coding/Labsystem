@@ -1,3 +1,3 @@
 package xyz.jasenon.lab.engine.event;
 
-public enum TimeSignal {WINDOW_ENTER, WINDOW_EXIT}
+public enum TimeSignal {WINDOW_ENTER, WINDOW_EXIT, TIME_POINT}

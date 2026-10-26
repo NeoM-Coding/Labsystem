@@ -42,7 +42,7 @@ public final class EngineEventLoop implements AutoCloseable {
         long generation = generations.incrementAndGet();
         return ingress.submit(() -> {
             TimeScheduler.Handle handle = timers.prepare(plan, Instant.now(),
-                    () -> ingress.internal(() -> tick(plan.runtimeId(), generation)));
+                    tick -> ingress.internal(() -> tick(plan.runtimeId(), generation, tick)));
             try {
                 RuntimeSnapshot installed = owner(plan.runtimeId())
                         .install(plan, generation, options.getPendingCapacity()).join();
@@ -71,7 +71,7 @@ public final class EngineEventLoop implements AutoCloseable {
 
     public CompletableFuture<Void> accept(EngineEvent event) {
         Objects.requireNonNull(event);
-        if (!(event instanceof DeviceEvent) && !(event instanceof TimeWindowStatusEvent))
+        if (!(event instanceof DeviceEvent) && !(event instanceof TimeWindowStatusEvent) && !(event instanceof TimePointEvent))
             throw new IllegalArgumentException("unsupported event: " + event.getClass().getName());
         return ingress.submit(() -> broadcast(event)).thenCompose(result -> result);
     }
@@ -94,20 +94,20 @@ public final class EngineEventLoop implements AutoCloseable {
         return CompletableFuture.allOf(deliveries.toArray(CompletableFuture[]::new));
     }
 
-    private void tick(String id, long generation) {
+    private void tick(String id, long generation, TimeScheduler.Tick tick) {
         Route route = routes.get(id);
         if (route == null || route.generation() != generation) return;
         if (route.plan().lifetime().expired(Instant.now())) {
             removeAtIngress(id);
             return;
         }
-        RuntimeSnapshot snapshot = owner(id).synchronizeTime(id, generation).join();
+        RuntimeSnapshot snapshot = owner(id).synchronizeTime(id, generation, tick).join();
         if (snapshot != null && snapshot.state().equals("EXPIRED")) {
             removeAtIngress(id);
             return;
         }
         timers.arm(route.timer(), route.plan(), Instant.now(),
-                () -> ingress.internal(() -> tick(id, generation)));
+                next -> ingress.internal(() -> tick(id, generation, next)));
     }
 
     public Optional<RuntimeSnapshot> runtime(String id) {

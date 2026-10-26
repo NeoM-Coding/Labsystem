@@ -5,6 +5,7 @@ import xyz.jasenon.lab.engine.eval.ConditionTree;
 import xyz.jasenon.lab.engine.event.DeviceEvent;
 import xyz.jasenon.lab.engine.event.DeviceEventKey;
 import xyz.jasenon.lab.engine.event.TimeWindowStatusEvent;
+import xyz.jasenon.lab.engine.event.TimePointEvent;
 import xyz.jasenon.lab.engine.execution.ActionDispatcher;
 import xyz.jasenon.lab.engine.execution.ExecutionContext;
 import xyz.jasenon.lab.engine.execution.ExecutionRequest;
@@ -31,6 +32,8 @@ public final class RuntimeInstance {
     private final Map<String, Binding> bindings = new LinkedHashMap<>();
     private final Deque<ExecutionRequest> pending = new ArrayDeque<>();
     private final Set<String> reconcile = new LinkedHashSet<>();
+    private final Map<String, Set<String>> pointIndex = new HashMap<>();
+    private final Map<String, Instant> lastPoints = new HashMap<>();
     private final int capacity;
     private boolean active, executing;
     private long sequence;
@@ -47,11 +50,13 @@ public final class RuntimeInstance {
         for (Binding b : plan.bindings()) {
             bindings.put(b.id(), b);
             var windows = plan.timeGroups().get(b.timeGroupId());
-            List<String> ids = windows.stream().map(w -> windowKey(b.timeGroupId(), w.conditionId())).toList();
+            List<String> ids = windows.stream().filter(w -> w.isWindow()).map(w -> windowKey(b.timeGroupId(), w.conditionId())).toList();
+            List<String> pointIds = windows.stream().filter(w -> !w.isWindow()).map(w -> windowKey(b.timeGroupId(), w.conditionId())).toList();
             ConditionTree tree = sharedTrees.computeIfAbsent(new TreeKey(b.conditionGroupId(), b.timeGroupId()),
-                    key -> new ConditionTree(plan.conditionGroups().get(b.conditionGroupId()), ids));
+                    key -> new ConditionTree(plan.conditionGroups().get(b.conditionGroupId()), ids, pointIds));
             trees.put(b.id(), tree);
             tree.eventKeys().forEach(k -> deviceIndex.computeIfAbsent(k, x -> new LinkedHashSet<>()).add(b.id()));
+            pointIds.forEach(k -> pointIndex.computeIfAbsent(k, x -> new LinkedHashSet<>()).add(b.id()));
             ids.forEach(k -> windowIndex.computeIfAbsent(k, x -> new LinkedHashSet<>()).add(b.id()));
         }
     }
@@ -105,6 +110,55 @@ public final class RuntimeInstance {
             changed.addAll(candidates);
         }
         decide(changed, before, activation, "window", now);
+    }
+
+    private void activate(Instant now) {
+        active = valid() && !plan.lifetime().pending(now) && !plan.lifetime().expired(now);
+    }
+
+    /** Apply and reset in one worker turn, including submission while the pulse is true. */
+    public void pulse(TimePointEvent event, Instant now, Runnable submit) {
+        pulse(event, now, false, submit);
+    }
+
+    public void pulse(TimePointEvent event, Instant now, boolean activation, Runnable submit) {
+        if (event.generation() != generation || event.timerToken() != timerToken || !valid()
+                || plan.lifetime().pending(event.scheduledAt())) return;
+        Set<String> fresh = new LinkedHashSet<>();
+        for (String id : event.conditionIds()) {
+            if (pointIndex.containsKey(id) && event.scheduledAt().isAfter(lastPoints.getOrDefault(id, Instant.MIN))) {
+                fresh.add(id);
+                lastPoints.put(id, event.scheduledAt());
+            }
+        }
+        Set<String> pulsedBindings = new LinkedHashSet<>();
+        fresh.forEach(id -> pulsedBindings.addAll(pointIndex.get(id)));
+        Set<String> candidates = new LinkedHashSet<>(pulsedBindings);
+        event.statuses().keySet().forEach(id -> candidates.addAll(windowIndex.getOrDefault(id, Set.of())));
+        if (activation) {
+            activate(now);
+            candidates.addAll(bindings.keySet());
+        }
+        Map<String, Boolean> before = values(candidates);
+        Set<ConditionTree> affected = Collections.newSetFromMap(new IdentityHashMap<>());
+        candidates.forEach(id -> affected.add(trees.get(id)));
+        Set<ConditionTree> changed = Collections.newSetFromMap(new IdentityHashMap<>());
+        try {
+            boolean applyWindows = !event.occurredAt().isBefore(lastWindowAt);
+            if (applyWindows) {
+                affected.forEach(tree -> { if (tree.windows(event.statuses())) changed.add(tree); });
+                lastWindowAt = event.occurredAt();
+            }
+            affected.forEach(tree -> tree.pulses(fresh, true));
+            Set<String> eligible = new LinkedHashSet<>();
+            candidates.forEach(id -> {
+                if (activation || changed.contains(trees.get(id)) || pulsedBindings.contains(id)) eligible.add(id);
+            });
+            decide(eligible, before, activation, "time-point", now);
+            submit.run();
+        } finally {
+            affected.forEach(tree -> tree.pulses(fresh, false));
+        }
     }
 
     private Map<String, Boolean> values(Collection<String> ids) {

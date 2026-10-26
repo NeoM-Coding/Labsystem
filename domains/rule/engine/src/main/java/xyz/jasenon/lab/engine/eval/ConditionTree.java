@@ -12,9 +12,14 @@ public final class ConditionTree {
     private final Map<DeviceEventKey, List<Leaf>> devices = new HashMap<>();
     private final Map<DeviceEventKey, String> observations = new HashMap<>();
     private final Map<String, Node> windows = new HashMap<>();
+    private final Map<String, PulseLeaf> points = new HashMap<>();
     private final Node root;
 
     public ConditionTree(List<Predicate> predicates, List<String> windowIds) {
+        this(predicates, windowIds, List.of());
+    }
+
+    public ConditionTree(List<Predicate> predicates, List<String> windowIds, List<String> pointIds) {
         Node device = null;
         for (Predicate p : predicates) {
             Node leaf = new Node(false);
@@ -26,6 +31,11 @@ public final class ConditionTree {
             Node leaf = new Node(false);
             windows.put(id, leaf);
             time = time == null ? leaf : new Node(LogicType.OR, time, leaf);
+        }
+        for (String id : pointIds) {
+            PulseLeaf pulse = new PulseLeaf(new Node(false));
+            points.put(id, pulse);
+            time = time == null ? pulse.node() : new Node(LogicType.OR, time, pulse.node());
         }
         root = new Node(LogicType.AND, device == null ? new Node(true) : device, time == null ? new Node(true) : time);
     }
@@ -64,6 +74,15 @@ public final class ConditionTree {
         }
         return changed;
     }
+
+    public void pulses(Set<String> ids, boolean value) {
+        ids.forEach(id -> {
+            PulseLeaf leaf = points.get(id);
+            if (leaf != null) leaf.node().set(value);
+        });
+    }
+
+    private record PulseLeaf(Node node) {}
 
     private record Leaf(Predicate predicate, Node node) {
     }

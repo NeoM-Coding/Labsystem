@@ -11,7 +11,7 @@ flowchart TD
     Compiler --> Plan[不可变 RuntimePlan]
     Plan --> Lifetime[Lifetime]
     Plan --> Devices[设备条件组]
-    Plan --> Windows[窗口条件组]
+    Plan --> Windows[时间条件组：Window OR TimePoint]
     Plan --> Actions[动作组]
     Plan --> Binding[Binding 列表]
     Binding --> Devices
@@ -32,7 +32,7 @@ Plan 集合及动作参数防御性复制；可变 MQTT DTO 在执行边界重�
 ```mermaid
 flowchart TD
     Device[DeviceEvent] --> Ingress[入口有界队列]
-    Window[TimeWindowStatusEvent] --> Ingress
+    Window[TimeWindowStatusEvent / TimePointEvent] --> Ingress
     Management[注册 / 替换 / 注销] --> Ingress
     Ingress --> EventLoop[单线程 EventLoop]
     EventLoop --> Broadcast[所有 Worker 入队后确认广播]
@@ -71,8 +71,9 @@ Worker 只跟进有待执行请求的实例，动作完成通过独立通道唤�
 flowchart BT
     A[设备谓词 A] --> Devices[v0 严格左折叠设备树]
     B[设备谓词 B] --> Devices
-    W1[窗口 A 状态] --> Windows[窗口 OR 子树]
+    W1[窗口 A 状态] --> Windows[时间条件 OR 子树]
     W2[窗口 B 状态] --> Windows
+    Point[时间点脉冲叶子] --> Windows
     Devices --> Root[AND 根]
     Windows --> Root
     Root --> Policy[Binding 的 TriggerPolicy]
@@ -80,7 +81,7 @@ flowchart BT
     Policy --> Reconcile[RECONCILE：相关事件且根为 true]
 ```
 
-叶子初始 false；空设备组或空窗口组对应常量 true。不从 Redis 或内存恢复设备状态，不重放旧观测。
+叶子初始 false；空设备组或空时间组对应常量 true。不从 Redis 或内存恢复设备状态，不重放旧观测。
 
 一次事件先记录 before，再更新所有命中叶子，最后读取 after 决策。传播遇到结果不变立即停止，但 affected 信息仍保留。相同值的新设备观测可以驱动
 RECONCILE；重复窗口通知、旧窗口时间戳不驱动动作。调度器批量提交当前窗口状态，窗口交接不暴露中间根。
@@ -95,8 +96,20 @@ Runtime 单飞跨 generation 保持。旧动作未结束时，新版本不会启
 
 ## 时间和生命周期
 
-**没有 TimePoint。** 枚举和旧字段仅用于读取旧数据；编译器拒绝创建、修改和启用含 TIME_POINT
-的规则。恢复时记录原因并跳过，旧规则仍能读取、停用；前端提示删除或明确转换为窗口。
+时间条件组只支持 OR：完整根为设备条件 AND（Window OR TimePoint …）。TimePoint 定义沿用已有
+日期、星期、时区和 timePoint 字段，支持创建、修改、启用及恢复，不需要迁移数据。只有时间点的组平时为 false。
+
+定时器将同一计划时刻到达的时间点合并为不可变批次，携带 generation、timerToken、计划时间与条件标识。
+Worker 在单个命令内记录旧根、更新当前窗口、将命中脉冲叶子置 true、应用根触发策略并尝试提交执行，
+最后在 finally 中复位；复位不判断触发策略，不等待外部动作，不创建复位定时任务，快照始终在复位后发布。
+
+- EDGE 仅完整根 false→true 时保留 FIFO 决策；有效窗口已使根为 true 时，时间点不额外触发。
+- RECONCILE 空闲时在复位前尝试提交。忙碌或执行池拒绝时保留合并候选，之后重查最新根；
+  若只靠脉冲成立，复位后候选失效。动作完成不会自动生成新脉冲。
+- 每个时间点只保留本 generation 最近一次计划时间，用于拒绝重复或更旧的到达，空间随条件数有界。
+- 注册/恢复不补发历史时间点。已安排批次延迟消费时仍处理该批次，但检查消费时的窗口和生命周期；
+  后续调度从当前时钟继续，不补造错过的批次。投递拒绝时重试同一个不可变批次。
+- 同刻窗口边界与脉冲合并处理，避免窗口交接产生中间根；旧 generation/token 的回调无效。
 
 - 生命周期 `[activeFrom, activeUntil)`；Pending 更新设备状态但不执行动作。
 - 激活先初始化窗口，再检查当前条件一次；设备未知谓词仍为 false。

@@ -44,6 +44,11 @@ final class RuntimeSelector {
                 return List.of(runtime);
             return List.of();
         }
+        if (event instanceof TimePointEvent point) {
+            RuntimeInstance runtime = runtimes.get(point.runtimeId());
+            return runtime != null && runtime.generation == point.generation() && runtime.timerToken == point.timerToken()
+                    ? List.of(runtime) : List.of();
+        }
         throw new IllegalArgumentException("unsupported event: " + event.getClass().getName());
     }
 

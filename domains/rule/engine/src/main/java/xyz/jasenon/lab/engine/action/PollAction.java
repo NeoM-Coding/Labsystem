@@ -24,15 +24,6 @@ public final class PollAction implements Action {
         this.query = MqttTaskDto.of(queryCommand(deviceType), new int[0], deviceType, deviceId);
     }
 
-    public MqttTaskDto query() {
-        return query;
-    }
-
-    @Override
-    public ActionType is() {
-        return ActionType.Poll;
-    }
-
     private static CommandLine queryCommand(DeviceType deviceType) {
         return switch (deviceType) {
             case Access -> CommandLine.REQUEST_ACCESS_DATA;
@@ -41,5 +32,14 @@ public final class PollAction implements Action {
             case Light -> CommandLine.REQUEST_LIGHT_DATA;
             case Sensor -> CommandLine.REQUEST_SENSOR_DATA;
         };
+    }
+
+    public MqttTaskDto query() {
+        return query;
+    }
+
+    @Override
+    public ActionType is() {
+        return ActionType.Poll;
     }
 }

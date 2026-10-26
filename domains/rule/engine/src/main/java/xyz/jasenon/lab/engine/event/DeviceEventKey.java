@@ -16,6 +16,13 @@ public final class DeviceEventKey implements EventKey {
         this.field = requireText(field, "field");
     }
 
+    private static String requireText(String value, String name) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(name + " must not be blank");
+        }
+        return value;
+    }
+
     public DeviceType deviceType() {
         return deviceType;
     }
@@ -59,12 +66,5 @@ public final class DeviceEventKey implements EventKey {
     @Override
     public String toString() {
         return asString();
-    }
-
-    private static String requireText(String value, String name) {
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException(name + " must not be blank");
-        }
-        return value;
     }
 }

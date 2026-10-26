@@ -14,12 +14,6 @@ public record ActionExecutionResult(
         Instant completedAt
 ) {
 
-    public enum Status {
-        SUCCESS,
-        FAILED,
-        NOT_IMPLEMENTED
-    }
-
     public static ActionExecutionResult success(
             String runtimeId,
             String actionGroupId,
@@ -66,5 +60,11 @@ public record ActionExecutionResult(
                 message,
                 Instant.now()
         );
+    }
+
+    public enum Status {
+        SUCCESS,
+        FAILED,
+        NOT_IMPLEMENTED
     }
 }

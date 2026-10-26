@@ -6,7 +6,7 @@ import xyz.jasenon.lab.device.model.DeviceType;
 
 @Getter
 @Setter
-public class EvalNode  {
+public class EvalNode {
 
     // 节点id
     private String nodeId;

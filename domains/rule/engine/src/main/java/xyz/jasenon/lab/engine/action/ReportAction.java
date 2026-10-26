@@ -17,20 +17,20 @@ import java.util.Set;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class ReportAction implements Action{
+public class ReportAction implements Action {
 
     private String actionGroupId;
     private List<String> userIds = new ArrayList<>();
     private Set<ReportType> types = EnumSet.noneOf(ReportType.class);
     private String content;
 
-    public enum ReportType {
-        SMS,
-        SMTP
-    }
-
     @Override
     public ActionType is() {
         return ActionType.Report;
+    }
+
+    public enum ReportType {
+        SMS,
+        SMTP
     }
 }

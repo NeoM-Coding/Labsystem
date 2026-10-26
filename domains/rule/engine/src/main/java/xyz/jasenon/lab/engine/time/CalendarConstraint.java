@@ -9,7 +9,7 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * 时间窗口和 TimePoint 共用的日期范围、星期和时区约束。
+ * 时间窗口的日期范围、星期和时区约束。
  *
  * <p>同一个 CalendarConstraint 内的约束按 AND 关系判断。</p>
  */

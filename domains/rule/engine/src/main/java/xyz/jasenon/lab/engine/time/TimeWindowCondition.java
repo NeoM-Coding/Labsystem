@@ -37,6 +37,29 @@ public final class TimeWindowCondition implements TimeCondition {
         }
     }
 
+    private static TimeTransition earlierAfter(
+            TimeTransition current,
+            TimeSignal signal,
+            Instant candidate,
+            Instant instant
+    ) {
+        if (!candidate.isAfter(instant)) {
+            return current;
+        }
+        if (current == null || candidate.isBefore(current.scheduledAt())) {
+            return new TimeTransition(signal, candidate);
+        }
+        return current;
+    }
+
+    private static String requireText(String value, String name) {
+        Objects.requireNonNull(value, name);
+        if (value.isBlank()) {
+            throw new IllegalArgumentException(name + " must not be blank");
+        }
+        return value;
+    }
+
     @Override
     public String conditionId() {
         return conditionId;
@@ -92,28 +115,5 @@ public final class TimeWindowCondition implements TimeCondition {
         // 跨天时间处理
         LocalDate endDate = endTime.isAfter(startTime) ? date : date.plusDays(1);
         return ZonedDateTime.of(endDate, endTime, calendar.zoneId());
-    }
-
-    private static TimeTransition earlierAfter(
-            TimeTransition current,
-            TimeSignal signal,
-            Instant candidate,
-            Instant instant
-    ) {
-        if (!candidate.isAfter(instant)) {
-            return current;
-        }
-        if (current == null || candidate.isBefore(current.scheduledAt())) {
-            return new TimeTransition(signal, candidate);
-        }
-        return current;
-    }
-
-    private static String requireText(String value, String name) {
-        Objects.requireNonNull(value, name);
-        if (value.isBlank()) {
-            throw new IllegalArgumentException(name + " must not be blank");
-        }
-        return value;
     }
 }

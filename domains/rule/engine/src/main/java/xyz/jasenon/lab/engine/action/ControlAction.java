@@ -13,7 +13,7 @@ import xyz.jasenon.lab.api.mqtt.dto.MqttTaskDto;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class ControlAction implements Action{
+public class ControlAction implements Action {
 
     private String actionGroupId;
     private MqttTaskDto control;

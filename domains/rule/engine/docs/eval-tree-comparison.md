@@ -119,21 +119,22 @@ Root.apply(true)
 = ((A AND B) OR C) AND D
 ```
 
-注意：图中顶层标签的准确含义是先运行左子树，再运行右子树。Java 实现为 `leftValue.then(rightValue)`，也就是数学记法中的 `right ∘ left`。
+注意：图中顶层标签的准确含义是先运行左子树，再运行右子树。Java 实现为 `leftValue.then(rightValue)`，也就是数学记法中的
+`right ∘ left`。
 
 ## 3. 核心区别
 
-| 维度 | EvalNode 原始左倾表达 | EvalForest 当前结构 |
-|---|---|---|
-| 输入表示 | `next` 串起谓词，`logicToPrev` 保存与前项关系 | 仍接收同一条 EvalNode 链作为编译输入 |
-| 内部节点 | 概念上是 AND / OR 运算节点 | `CompositeNode`，只负责 `BooleanTransform` 函数复合 |
-| 叶子 | 谓词布尔值 A/B/C/D | `LeafTransformNode`，值是完整一元布尔函数 `(onFalse, onTrue)` |
-| 树形 | 完全左倾 | `buildBalanced` 递归二分得到平衡树 |
-| 结合依据 | 按链顺序左结合 | 函数复合满足结合律，可以平衡化；叶子顺序不能交换 |
-| 结果入口 | 最上层 AND 节点的结果 | `RootNode` 对最终 transform 执行 `apply(true)` |
-| 更新方式 | 直观上沿左倾累计路径重算 | EventSource → Predicate → Leaf → Composite → Root 观察者传播 |
-| 共享能力 | EvalNode 本身是一条表达式私有链 | 相同事件源与相同谓词可被森林中的多个表达式共享 |
-| 高度 | O(n) | O(log n) |
+| 维度   | EvalNode 原始左倾表达                   | EvalForest 当前结构                                         |
+|------|-----------------------------------|---------------------------------------------------------|
+| 输入表示 | `next` 串起谓词，`logicToPrev` 保存与前项关系 | 仍接收同一条 EvalNode 链作为编译输入                                 |
+| 内部节点 | 概念上是 AND / OR 运算节点                | `CompositeNode`，只负责 `BooleanTransform` 函数复合             |
+| 叶子   | 谓词布尔值 A/B/C/D                     | `LeafTransformNode`，值是完整一元布尔函数 `(onFalse, onTrue)`      |
+| 树形   | 完全左倾                              | `buildBalanced` 递归二分得到平衡树                               |
+| 结合依据 | 按链顺序左结合                           | 函数复合满足结合律，可以平衡化；叶子顺序不能交换                                |
+| 结果入口 | 最上层 AND 节点的结果                     | `RootNode` 对最终 transform 执行 `apply(true)`               |
+| 更新方式 | 直观上沿左倾累计路径重算                      | EventSource → Predicate → Leaf → Composite → Root 观察者传播 |
+| 共享能力 | EvalNode 本身是一条表达式私有链              | 相同事件源与相同谓词可被森林中的多个表达式共享                                 |
+| 高度   | O(n)                              | O(log n)                                                |
 
 ## 4. 为什么 AND/OR 混合时仍能平衡
 

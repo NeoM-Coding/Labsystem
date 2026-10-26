@@ -1,6 +1,9 @@
+> 当前 v3 已采用入口广播、WorkerLoop 本地 Selector。以下历史描述中涉及 Engine 集中路由的部分已被替代，最新链路见 [runtime-v3.md](docs/runtime-v3.md)。
+
 # Rule Engine 模块架构说明
 
-本文档说明 `lab-system-cloud/domains/rule/engine` 模块的职责边界、规则模型、编译流程、事件路由、运行时调度、时间条件、动作执行、持久化恢复，以及它和 `domains/mqtt/service` 模块之间的协作方式。
+本文档说明 `lab-system-cloud/domains/rule/engine` 模块的职责边界、规则模型、编译流程、事件路由、运行时调度、时间条件、动作执行、持久化恢复，以及它和
+`domains/mqtt/service` 模块之间的协作方式。
 
 ## 模块定位
 
@@ -45,18 +48,18 @@ flowchart LR
 
 ## 包结构与主要类
 
-| 包 | 主要职责 |
-| --- | --- |
-| `service` | `SmartStrategyService` 的 Dubbo 实现 |
-| `definition` | `RuntimeRevision` 编译成 `Runtime` |
-| `definition.persistence` | 策略 metadata、不可变 revision、启动恢复 |
-| `runtime` | Runtime 生命周期、调度器、执行器、运行时状态 |
-| `event` | 设备事件、时间事件、事件路由 |
-| `eval` | 设备条件表达式、字段类型解析和值比较 |
-| `time` | 时间条件、时间窗口、时间点、日历约束、调度 |
-| `action` | ActionGroup、ControlAction、ReportAction、执行结果 |
-| `listener` | Redis 设备遥测快照监听与事件重放 |
-| `authorization` | 智能策略相关权限配置 |
+| 包                        | 主要职责                                        |
+|--------------------------|---------------------------------------------|
+| `service`                | `SmartStrategyService` 的 Dubbo 实现           |
+| `definition`             | `RuntimeRevision` 编译成 `Runtime`             |
+| `definition.persistence` | 策略 metadata、不可变 revision、启动恢复               |
+| `runtime`                | Runtime 生命周期、调度器、执行器、运行时状态                  |
+| `event`                  | 设备事件、时间事件、事件路由                              |
+| `eval`                   | 设备条件表达式、字段类型解析和值比较                          |
+| `time`                   | 时间条件、时间窗口、时间点、日历约束、调度                       |
+| `action`                 | ActionGroup、ControlAction、ReportAction、执行结果 |
+| `listener`               | Redis 设备遥测快照监听与事件重放                         |
+| `authorization`          | 智能策略相关权限配置                                  |
 
 ## 规则定义模型
 
@@ -491,7 +494,8 @@ flowchart TD
 
 ## 设备事件监听
 
-`DeviceRecordChangeListener` 监听 Redis channel `RuleEngineChannels.DEVICE_RECORD_CHANGE`，消息来自 MQTT 模块的 `MessageHandler.publishSnapshot`。
+`DeviceRecordChangeListener` 监听 Redis channel `RuleEngineChannels.DEVICE_RECORD_CHANGE`，消息来自 MQTT 模块的
+`MessageHandler.publishSnapshot`。
 
 它不会对每条快照的每个字段都重复推演，而是维护 `RecordIdentity(deviceType, deviceId) -> fields` 的内存快照：
 
@@ -544,14 +548,14 @@ flowchart LR
 
 主要配置位于 `domains/rule/engine/src/main/resources/application.yaml`：
 
-| 配置 | 含义 |
-| --- | --- |
-| `lab.rule-engine.persistence.enabled` | 是否启用策略持久化与 Dubbo 服务 |
-| `lab.rule-engine.simple-test.enabled` | 是否启用简单测试链路 |
-| `dubbo.consumer.check=false` | 启动时不强制要求 MQTT provider 在线 |
-| `dubbo.consumer.retries=0` | 规则动作 RPC 不自动重试，避免重复控制 |
-| `lab.redis.*` | 设备事件监听和快照重放依赖 Redis |
-| `lab.auth.permify.*` | 策略管理权限校验 |
+| 配置                                    | 含义                        |
+|---------------------------------------|---------------------------|
+| `lab.rule-engine.persistence.enabled` | 是否启用策略持久化与 Dubbo 服务       |
+| `lab.rule-engine.simple-test.enabled` | 是否启用简单测试链路                |
+| `dubbo.consumer.check=false`          | 启动时不强制要求 MQTT provider 在线 |
+| `dubbo.consumer.retries=0`            | 规则动作 RPC 不自动重试，避免重复控制     |
+| `lab.redis.*`                         | 设备事件监听和快照重放依赖 Redis       |
+| `lab.auth.permify.*`                  | 策略管理权限校验                  |
 
 ## 失败处理与一致性
 
@@ -570,7 +574,8 @@ flowchart LR
 
 ### 动作失败
 
-`DefaultRuntimeExecutor` 不让异常 future 打断 Runtime mailbox，而是统一转换成 `ActionExecutionResult.failed`，并通过 `ActionExecutionTracker` 记录失败详情。
+`DefaultRuntimeExecutor` 不让异常 future 打断 Runtime mailbox，而是统一转换成 `ActionExecutionResult.failed`，并通过
+`ActionExecutionTracker` 记录失败详情。
 
 ### 时间事件延迟
 
@@ -623,4 +628,5 @@ flowchart LR
 - 设备字段事件只在值变化时发布；如果上游重复推送相同值，不会唤醒 Runtime。
 - 时间点事件是瞬时脉冲，只在本次 signal 推演中成立。
 - 策略执行不会继承 Web 用户上下文，运行时控制动作依赖策略管理入口的授权正确性。
-- 单 Runtime 单飞可以避免重入，但一个 Runtime 内多个 Action 仍以 future 集合等待完成；动作执行耗时会影响该 Runtime 后续 signal 的处理延迟。
+- 单 Runtime 单飞可以避免重入，但一个 Runtime 内多个 Action 仍以 future 集合等待完成；动作执行耗时会影响该 Runtime 后续
+  signal 的处理延迟。

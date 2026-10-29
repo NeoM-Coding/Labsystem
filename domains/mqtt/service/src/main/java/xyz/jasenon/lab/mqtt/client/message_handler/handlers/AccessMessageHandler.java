@@ -29,7 +29,9 @@ public class AccessMessageHandler extends MessageHandler<AccessRecord> {
         int address = payload[0] & 0xff;
 
         boolean isOpen = payload[3] == (byte) 0xFF;
+        // 面板状态
         boolean isLock = payload[5] == (byte) 0xFF;
+        // 磁通阀状态
         int lockStatus = switch (payload[4]) {
             case (byte) 0xFF -> 1;
             case 0x11 -> 2;

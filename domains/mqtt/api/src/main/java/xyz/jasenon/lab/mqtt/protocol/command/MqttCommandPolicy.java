@@ -29,6 +29,7 @@ public final class MqttCommandPolicy {
             case Access -> EnumSet.of(
                     CommandLine.OPEN_ACCESS_ONCE,
                     CommandLine.CLOSE_ACCESS_ONCE,
+                    CommandLine.ENHANCE_CONTROL_ACCESS,
                     CommandLine.SET_ACCESS_DELAY,
                     CommandLine.REQUEST_ACCESS_DATA
             );
@@ -68,12 +69,23 @@ public final class MqttCommandPolicy {
                 throw new IllegalArgumentException("指令参数必须在 0 到 255 之间");
             }
         }
+        if (commandLine == CommandLine.ENHANCE_CONTROL_ACCESS) {
+            if (args[0] != 0 && args[0] != 0x11 && args[0] != 0xFF) {
+                throw new IllegalArgumentException("磁通阀参数必须为 0（关闭）、17（保持原状）或 255（开启）");
+            }
+            if (args[1] != 0 && args[1] != 0x11 && args[1] != 0xFF) {
+                throw new IllegalArgumentException("控制面板参数必须为 0（禁用）、17（保持原状）或 255（启用）");
+            }
+        }
         if (commandLine == CommandLine.ENHANCE_CONTROL_AIR_CONDITION) {
             validateAirConditionArgs(args);
         }
     }
 
     public static int expectedArgumentCount(CommandLine commandLine) {
+        if (commandLine == CommandLine.ENHANCE_CONTROL_ACCESS) {
+            return 2;
+        }
         if (commandLine == CommandLine.SET_ACCESS_DELAY) {
             return 1;
         }

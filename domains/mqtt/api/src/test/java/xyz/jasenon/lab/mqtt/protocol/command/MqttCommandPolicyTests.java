@@ -37,6 +37,22 @@ class MqttCommandPolicyTests {
     }
 
     @Test
+    void validatesEnhancedAccessAsTwoIndependentThreeStateEnums() {
+        for (int valve : new int[]{0, 0x11, 255}) {
+            for (int panel : new int[]{0, 0x11, 255}) {
+                assertDoesNotThrow(() -> MqttCommandPolicy.validate(
+                        DeviceType.Access, CommandLine.ENHANCE_CONTROL_ACCESS, new int[]{valve, panel}));
+            }
+        }
+        for (int[] invalid : new int[][]{ {}, {0}, {0, 255, 0}, {1, 0}, {0, 1}, {11, 255}, {255, 11}, {-1, 0}, {0, 256} }) {
+            assertThrows(IllegalArgumentException.class, () -> MqttCommandPolicy.validate(
+                    DeviceType.Access, CommandLine.ENHANCE_CONTROL_ACCESS, invalid));
+        }
+        assertThrows(IllegalArgumentException.class, () -> MqttCommandPolicy.validate(
+                DeviceType.Light, CommandLine.ENHANCE_CONTROL_ACCESS, new int[]{0, 255}));
+    }
+
+    @Test
     void validatesEnhancedAirConditionArguments() {
         assertDoesNotThrow(() -> MqttCommandPolicy.validate(
                 DeviceType.AirCondition,

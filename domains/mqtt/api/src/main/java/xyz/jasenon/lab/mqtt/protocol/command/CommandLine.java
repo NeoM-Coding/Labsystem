@@ -21,6 +21,7 @@ public enum CommandLine {
 //    CLOSE_ACCESS_PERSIST_KEEP(new Command("{0} 0A 01 00 11 00",CheckType.UNSIGN_SUM),SeqType.AccessReq,SeqType.AccessResp,"长关保持原状"),
 //    KEEP_ACCESS_STATUS_LOCK(new Command("{0} 0A 01 11 FF 00",CheckType.UNSIGN_SUM),SeqType.AccessReq,SeqType.AccessResp,"保持门禁锁定状态"),
 //    KEEP_ACCESS_STATUS_UNLOCK(new Command("{0} 0A 01 11 00 00",CheckType.UNSIGN_SUM),SeqType.AccessReq,SeqType.AccessResp,"保持门禁解锁状态"),
+    ENHANCE_CONTROL_ACCESS(new Command("{0} 0A 01 {1} {2} 00",CheckType.UNSIGN_SUM),SeqType.AccessReq,SeqType.AccessResp,"门禁状态控制"),
     SET_ACCESS_DELAY(new Command("{0} 0A 03 {1} 00 00",CheckType.UNSIGN_SUM),SeqType.AccessReq,SeqType.AccessResp,"延时设定门禁"),
 
     OPEN_CIRCUITBREAK(new Command("{0} 10 00 19 00 01 02 00 01",CheckType.CRC16),SeqType.CircuitBreakReq,SeqType.CircuitBreakResp,"断路器合闸"),

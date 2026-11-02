@@ -37,7 +37,7 @@ Web 接口：
 
 1. 配置 .env 中 MINIO_ROOT_PASSWORD、MINIO_SECRET_KEY，使用不同的管理员与业务凭据。配置 MINIO_PUBLIC_ENDPOINT 为浏览器、下位机可访问的地址；签名生成时使用此地址，不能生成后替换域名。内部服务使用 http://minio:9000。
 2. 执行已有库迁移 sql/migrations/20261102_bi_telemetry_archive.sql。表与索引创建均可重复执行；统一部署脚本已接入该迁移，新建数据库也可安全重跑。
-3. 统一入口 scripts/deploy.sh 已纳入 MinIO、Tempo 与 BI 迁移；先等待 MinIO 健康及 minio-init 以 0 退出，再部署 BI 和 Web。构建包含新增 shared/object-storage 模块。Compose 固定到实际测试的 MinIO 镜像摘要，初始化复用同一个镜像中自带的 mc。
+3. 统一入口 scripts/deploy.sh 已纳入 MinIO、Tempo 与 BI 迁移；先等待 MinIO 健康及 minio-init 以 0 退出，再部署 BI 和 Web。构建包含新增 shared/object-storage 模块。Compose 使用 dappros/minio:RELEASE.2025-09-07T16-13-09Z，初始化复用同一个镜像中自带的 mc。
 4. 启动新版前端，等待自动回填，或用下述管理员接口显式提交回填并检查状态。
 5. 执行归档演练；下载一组对象及清单，用恢复工具恢复到临时表并核对。
 6. 演练通过后将 BI_ARCHIVE_DELETE_ENABLED=true，重新创建 BI 服务。其他服务无需获得清理权限。
@@ -51,6 +51,8 @@ docker compose --profile app up -d bi-service web-service
 ~~~
 
 如果外部镜像仓库当前不可用，可通过 MINIO_IMAGE 指定可信的本地镜像或内部镜像仓库。此项同时用于服务端与初始化容器；替换镜像需保留 /bin/sh、mc、curl，以支持初始化和健康检查。
+
+2026-11-02 验证：原 minio/minio 与 quay.io/minio/minio 均无法匿名访问，改用第三方 Dappros 镜像。发布者声明为原版镜像副本：https://hub.docker.com/r/dappros/minio 。远程标签支持 linux/amd64 和 linux/arm64，清单摘要为 sha256:624bad2fe79a8613aa3c5c9b765ebcab365080b8445cf1b05c357cc7753725f0。清单访问和 Compose 配置解析通过；本机两次完整拉取均在镜像层传输时出现 short read / unexpected EOF，尚未完成启动及初始化验证。该变更不代表完整拉取验证、版本升级或漏洞扫描通过；已有 .env 如设置 MINIO_IMAGE，需同步更新，否则会覆盖 Compose 默认值。
 
 配置：
 

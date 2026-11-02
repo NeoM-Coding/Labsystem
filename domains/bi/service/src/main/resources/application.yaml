@@ -34,6 +34,15 @@ dubbo:
     group: ${NACOS_CONFIG_GROUP:LAB_SYSTEM}
 
 lab:
+  storage:
+    enabled: ${MINIO_ENABLED:false}
+    endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+    public-endpoint: ${MINIO_PUBLIC_ENDPOINT:http://localhost:9000}
+    access-key: ${MINIO_ACCESS_KEY:}
+    secret-key: ${MINIO_SECRET_KEY:}
+    region: ${MINIO_REGION:us-east-1}
+    archive-bucket: ${MINIO_ARCHIVE_BUCKET:lab-telemetry-archive}
+    device-bucket: ${MINIO_DEVICE_BUCKET:lab-device-files}
   redis:
     enabled: true
     host: ${REDIS_HOST:localhost}
@@ -56,3 +65,12 @@ lab:
       max-argument-length: ${TRACING_MAX_ARGUMENT_LENGTH:2048}
       max-collection-size: ${TRACING_MAX_COLLECTION_SIZE:20}
       max-depth: ${TRACING_MAX_DEPTH:3}
+  bi:
+    stale-minutes: ${BI_STALE_MINUTES:15}
+    jobs:
+      poll-ms: ${BI_JOB_POLL_MS:30000}
+      daily-cron: ${BI_DAILY_CRON:0 10 2 * * *}
+    archive:
+      delete-enabled: ${BI_ARCHIVE_DELETE_ENABLED:false}
+      retention-days: ${BI_ARCHIVE_RETENTION_DAYS:90}
+      batch-size: ${BI_ARCHIVE_BATCH_SIZE:500}

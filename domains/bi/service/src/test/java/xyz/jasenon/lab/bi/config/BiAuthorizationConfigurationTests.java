@@ -25,4 +25,17 @@ class BiAuthorizationConfigurationTests {
         assertThat(command.action()).isEqualTo(Action.App.edu_data_analysis);
         assertThat(command.subjectId()).isEqualTo("operator-1");
     }
+    @Test
+    void telemetryOptionsAndReportsRequireTheirOwnAnalysisPermission() {
+        var handler=new BiAuthorizationConfiguration().telemetryAuthorization();
+        var context=UserContext.builder().userId("analyst").build();
+        for(var kind:xyz.jasenon.lab.bi.api.query.TelemetryQuery.Kind.values()) {
+            var query=new xyz.jasenon.lab.bi.api.query.TelemetryQuery(kind,null,null,null,List.of());
+            var command=handler.handle(query,context);
+            assertThat(command.action()).isEqualTo(kind==xyz.jasenon.lab.bi.api.query.TelemetryQuery.Kind.AIR_CONDITION
+                ? Action.App.air_condition_data_analysis:Action.App.circuit_break_data_analysis);
+            assertThat(command.entityId()).isEqualTo("global");
+            assertThat(command.subjectId()).isEqualTo("analyst");
+        }
+    }
 }

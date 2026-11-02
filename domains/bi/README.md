@@ -21,3 +21,9 @@ Web 入口：
 ```text
 GET /api/bi/edu/dashboard?range=TODAY&laboratoryIds=...
 ```
+
+## 空调、用电与冷归档
+
+空调与用电看板、设备小时汇总、MinIO 公共存储和五类记录冷归档已接入。
+热记录默认保留 90 天并额外保护设备最新状态，物理清理默认关闭。
+部署、指标口径、维护 API、演练、恢复及验证见 [运维说明](TELEMETRY-OPERATIONS.md)。

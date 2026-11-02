@@ -11,7 +11,7 @@ public enum CommandLine {
     REQUEST_AIR_CONDITION_DATA_RS485(new Command("{0} {1} FF FF FF FF FF FF FF",CheckType.SIGN_SUM),SeqType.AirConditionReq,SeqType.AirConditionResp,"请求空调数据"),
 
     OPEN_ACCESS_ONCE(new Command("{0} 0A 02 FF 00 00",CheckType.UNSIGN_SUM),SeqType.AccessReq,SeqType.AccessResp,"单次开门"),
-    CLOSE_ACCESS_ONCE(new Command("{0} 0A 02 00 00 00",CheckType.UNSIGN_SUM),SeqType.AccessReq,SeqType.AccessResp,"单次关门"),
+//    CLOSE_ACCESS_ONCE(new Command("{0} 0A 02 00 00 00",CheckType.UNSIGN_SUM),SeqType.AccessReq,SeqType.AccessResp,"单次关门"),
     REQUEST_ACCESS_DATA(new Command("{0} 03 01 00 00 00",CheckType.UNSIGN_SUM),SeqType.AccessReq,SeqType.AccessResp,"请求门禁数据"),
 //    OPEN_ACCESS_PERSIST_LOCK(new Command("{0} 0A 01 FF FF 00",CheckType.UNSIGN_SUM),SeqType.AccessReq,SeqType.AccessResp,"长开锁定"),
 //    OPEN_ACCESS_PERSIST_UNLOCK(new Command("{0} 0A 01 FF 00 00",CheckType.UNSIGN_SUM),SeqType.AccessReq,SeqType.AccessResp,"长开解锁"),

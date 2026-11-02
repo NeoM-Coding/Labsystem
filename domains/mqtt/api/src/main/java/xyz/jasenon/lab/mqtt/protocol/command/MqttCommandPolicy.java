@@ -28,7 +28,6 @@ public final class MqttCommandPolicy {
         return switch (deviceType) {
             case Access -> EnumSet.of(
                     CommandLine.OPEN_ACCESS_ONCE,
-                    CommandLine.CLOSE_ACCESS_ONCE,
                     CommandLine.ENHANCE_CONTROL_ACCESS,
                     CommandLine.SET_ACCESS_DELAY,
                     CommandLine.REQUEST_ACCESS_DATA

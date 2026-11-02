@@ -56,6 +56,15 @@ fun:
     generator-mode: none
 
 lab:
+  storage:
+    enabled: ${MINIO_ENABLED:false}
+    endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+    public-endpoint: ${MINIO_PUBLIC_ENDPOINT:http://localhost:9000}
+    access-key: ${MINIO_ACCESS_KEY:}
+    secret-key: ${MINIO_SECRET_KEY:}
+    region: ${MINIO_REGION:us-east-1}
+    archive-bucket: ${MINIO_ARCHIVE_BUCKET:lab-telemetry-archive}
+    device-bucket: ${MINIO_DEVICE_BUCKET:lab-device-files}
   edu:
     import-max-bytes: ${EDU_IMPORT_MAX_BYTES_VALUE:5242880}
   session-cookie:

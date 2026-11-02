@@ -18,6 +18,7 @@
         <api-docs.port>18989</api-docs.port>
     </properties>
     <dependencies>
+        <dependency><groupId>xyz.jasenon.lab</groupId><artifactId>object-storage</artifactId><version>${project.version}</version></dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>

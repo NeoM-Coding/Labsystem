@@ -220,6 +220,8 @@ lab-system-cloud/
 
 `scripts/deploy.sh` 是统一的环境管理入口：
 
+基础设施包含 MinIO 和 Tempo。请先在 .env 中设置 MINIO_ROOT_PASSWORD、MINIO_SECRET_KEY，以及下位机可访问的 MINIO_PUBLIC_ENDPOINT。部署会等待 MinIO 健康，执行 minio-init 创建私有桶与业务账号，并在初始化成功后启动应用；status 会显示初始化容器正常退出的状态。BI 表与归档索引迁移会随 bootstrap 自动、幂等执行。
+
 | 命令 | 作用 |
 | --- | --- |
 | `./scripts/deploy.sh` | 完整部署；等同于 `deploy` |

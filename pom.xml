@@ -50,6 +50,7 @@
         <module>shared/persistence-core</module>
         <module>shared/observability</module>
         <module>shared/redis</module>
+        <module>shared/object-storage</module>
         <module>domains/device/domain</module>
         <module>domains/mqtt/api</module>
         <module>domains/rule/api</module>

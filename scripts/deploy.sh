@@ -6,7 +6,8 @@ ENV_FILE="${LAB_ENV_FILE:-$ROOT_DIR/.env}"
 ENV_EXAMPLE="$ROOT_DIR/.env.example"
 COMPOSE_FILE="$ROOT_DIR/compose.yml"
 COMMAND="${1:-deploy}"
-INFRA_SERVICES=(mysql redis emqx permify-postgres permify nacos loki alloy grafana)
+INFRA_SERVICES=(mysql redis emqx permify-postgres permify nacos minio loki tempo alloy grafana)
+INIT_SERVICES=(minio-init)
 APP_SERVICES=(base-service mqtt-service rule-engine-service edu-service bi-service web-service)
 APP_MODULES="domains/base/service,domains/mqtt/service,domains/rule/engine,domains/edu/service,domains/bi/service,web"
 DATABASE_MIGRATIONS=(
@@ -17,6 +18,7 @@ DATABASE_MIGRATIONS=(
     "$ROOT_DIR/sql/migrations/20260825_add_compensation_tasks.sql"
     "$ROOT_DIR/sql/migrations/20260825_add_laboratory_create_by.sql"
     "$ROOT_DIR/sql/migrations/20260827_add_edu_bi_view.sql"
+    "$ROOT_DIR/sql/migrations/20261102_bi_telemetry_archive.sql"
 )
 
 log() {
@@ -85,11 +87,54 @@ compose_apps() {
 }
 
 start_infrastructure() {
+    require_variable MINIO_ROOT_PASSWORD
+    require_variable MINIO_SECRET_KEY
     compose config --quiet
     log "starting infrastructure containers"
     # Explicit service names keep the app profile out of this phase. Repeated calls are idempotent.
     compose up -d --wait --wait-timeout "$DEPLOY_WAIT_TIMEOUT" "${INFRA_SERVICES[@]}"
     wait_for_loki
+    initialize_object_storage
+}
+
+initialize_object_storage() {
+    require_variable MINIO_ROOT_PASSWORD
+    require_variable MINIO_SECRET_KEY
+    log "initializing private MinIO buckets and application credentials"
+    # A successful initializer is expected to exit; keep it out of the long-running --wait group.
+    # Recreate it so changed credentials/policies are applied on subsequent deployments.
+    compose up -d --no-deps --force-recreate "${INIT_SERVICES[@]}"
+    wait_for_object_storage_initialization
+}
+
+wait_for_object_storage_initialization() {
+    local deadline=$((SECONDS + DEPLOY_WAIT_TIMEOUT))
+    local container_id container_state
+    while (( SECONDS < deadline )); do
+        container_id="$(compose ps --all -q minio-init)"
+        if [[ -n "$container_id" ]]; then
+            container_state="$(docker inspect --format '{{.State.Status}} {{.State.ExitCode}}' "$container_id")"
+            case "$container_state" in
+                "exited 0")
+                    log "MinIO initialization completed"
+                    return
+                    ;;
+                exited\ *|dead\ *|restarting\ *)
+                    die "MinIO initialization failed: $container_state (see ./scripts/deploy.sh logs)"
+                    ;;
+            esac
+        fi
+        sleep 2
+    done
+    die "MinIO initialization did not finish in ${DEPLOY_WAIT_TIMEOUT}s"
+}
+
+ensure_object_storage_initialized() {
+    local container_id
+    container_id="$(compose ps --all -q minio-init)"
+    [[ -n "$container_id" ]] || die "MinIO is not initialized (run ./scripts/deploy.sh infra first)"
+    [[ "$(docker inspect --format '{{.State.Status}} {{.State.ExitCode}}' "$container_id")" == "exited 0" ]] \
+        || die "MinIO initialization did not complete successfully (run ./scripts/deploy.sh infra first)"
 }
 
 build_applications() {
@@ -118,9 +163,11 @@ ensure_infrastructure_running() {
         [[ -n "$(compose ps --status running -q "$service")" ]] \
             || die "infrastructure service is not running: $service (run ./scripts/deploy.sh infra first)"
     done
+    ensure_object_storage_initialized
 }
 
 start_applications() {
+    ensure_infrastructure_running
     validate_application_jars
     compose_apps config --quiet
     log "starting application containers without recreating infrastructure"
@@ -452,7 +499,7 @@ case "$COMMAND" in
         bootstrap
         build_applications
         start_applications
-        compose_apps ps
+        compose_apps ps --all
         log "infrastructure, bootstrap and application deployment completed"
         ;;
     infra)
@@ -461,7 +508,7 @@ case "$COMMAND" in
         mkdir -p "$log_path"
         start_infrastructure
         bootstrap
-        compose ps "${INFRA_SERVICES[@]}"
+        compose ps --all "${INFRA_SERVICES[@]}" "${INIT_SERVICES[@]}"
         log "infrastructure deployment and bootstrap completed"
         ;;
     apps)
@@ -480,7 +527,7 @@ case "$COMMAND" in
         bootstrap
         ;;
     status)
-        compose_apps ps
+        compose_apps ps --all
         ;;
     logs)
         compose_apps logs -f

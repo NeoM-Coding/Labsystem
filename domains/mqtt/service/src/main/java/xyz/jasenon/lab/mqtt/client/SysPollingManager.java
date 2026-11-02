@@ -2,6 +2,8 @@ package xyz.jasenon.lab.mqtt.client;
 
 import jakarta.annotation.PreDestroy;
 import org.apache.dubbo.config.annotation.DubboService;
+import xyz.jasenon.lab.common.error.ErrorCode;
+import xyz.jasenon.lab.common.exception.BusinessException;
 import org.springframework.context.event.EventListener;
 import xyz.jasenon.lab.api.mqtt.MqttPollCo;
 import xyz.jasenon.lab.api.mqtt.dto.MqttTaskDto;
@@ -68,17 +70,17 @@ public class SysPollingManager implements MqttPollCo {
     public RpcResult<Pair<Boolean, String>> enable(String deviceId) {
         Device device = dhelper.getDeviceById(deviceId);
         if (device == null) {
-            return RpcResult.success(Pair.of(false, "device doesn't exist"));
+            throw new BusinessException(ErrorCode.MQTT_DEVICE_NOT_FOUND);
         }
 
         Poll<MqttTask> poll = pollOf(device);
         if (poll == null) {
-            return RpcResult.success(Pair.of(false, "poll task can't be created"));
+            throw new BusinessException(ErrorCode.MQTT_POLL_TASK_INVALID);
         }
 
         device.setPolling(true);
         if (!dhelper.updateDevice(device)) {
-            return RpcResult.success(Pair.of(false, "device polling status update failed"));
+            throw new BusinessException(ErrorCode.MQTT_POLL_UPDATE_FAILED);
         }
 
         if (!SysClientManager.clientIds().contains(device.getGatewayId())) {
@@ -101,13 +103,13 @@ public class SysPollingManager implements MqttPollCo {
     public RpcResult<Pair<Boolean, String>> disable(String deviceId) {
         Device device = dhelper.getDeviceById(deviceId);
         if (device == null) {
-            return RpcResult.success(Pair.of(false, "device doesn't exist"));
+            throw new BusinessException(ErrorCode.MQTT_DEVICE_NOT_FOUND);
         }
 
         Poll<MqttTask> poll = pollOf(device);
         device.setPolling(false);
         if (!dhelper.updateDevice(device)) {
-            return RpcResult.success(Pair.of(false, "device polling status update failed"));
+            throw new BusinessException(ErrorCode.MQTT_POLL_UPDATE_FAILED);
         }
 
         if (poll != null) {

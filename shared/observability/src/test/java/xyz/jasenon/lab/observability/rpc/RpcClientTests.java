@@ -20,7 +20,7 @@ class RpcClientTests {
     @Test
     void convertsRpcErrorIntoLocalBusinessException() {
         RpcError error = new RpcError(
-                "USER_NOT_FOUND", RpcErrorType.NOT_FOUND, 404, "用户不存在", "trace-1"
+                120101, RpcErrorType.NOT_FOUND, 404, "用户不存在", "trace-1"
         );
 
         BusinessException exception = assertThrows(
@@ -28,8 +28,28 @@ class RpcClientTests {
                 () -> RpcClient.call(() -> RpcResult.failure(error))
         );
 
-        assertEquals(404, exception.getCode());
+        assertEquals(120101, exception.getCode());
+        assertEquals(404, exception.getHttpStatus());
+        assertEquals("trace-1", exception.getTraceId());
         assertEquals("用户不存在", exception.getMessage());
+    }
+
+    @Test
+    void distinguishesTransportTimeoutFromDeviceTimeout() {
+        BusinessException failure = assertThrows(BusinessException.class,
+                () -> RpcClient.call(() -> { throw new RpcException(RpcException.TIMEOUT_EXCEPTION, "transport"); }));
+        assertEquals(100006, failure.getCode());
+        assertEquals(504, failure.getHttpStatus());
+    }
+
+    @Test
+    void preservesFailureAcrossAnotherProviderBoundary() {
+        var original = new BusinessException(130001, 504, RpcErrorType.DEPENDENCY, "设备超时", java.util.Map.of("deviceId", "1"), "trace-original");
+        var local = assertThrows(BusinessException.class, () -> RpcClient.require(RpcResult.failure(RpcErrors.from(original))));
+        var forwarded = RpcErrors.from(new java.util.concurrent.CompletionException(local));
+        assertEquals(original.getCode(), forwarded.code());
+        assertEquals(original.getData(), forwarded.data());
+        assertEquals("trace-original", forwarded.traceId());
     }
 
     @Test
@@ -41,6 +61,7 @@ class RpcClientTests {
                 })
         );
 
-        assertEquals(503, exception.getCode());
+        assertEquals(100005, exception.getCode());
+        assertEquals(503, exception.getHttpStatus());
     }
 }

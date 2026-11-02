@@ -1,5 +1,6 @@
 package xyz.jasenon.lab.base.service.impl;
 
+import xyz.jasenon.lab.common.error.ErrorCode;
 import cn.hutool.crypto.digest.BCrypt;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.apache.dubbo.config.annotation.DubboService;
@@ -40,10 +41,6 @@ import java.util.List;
 @Traced("user-service")
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
 
-    private static final int BAD_REQUEST = 400;
-    private static final int FORBIDDEN = 403;
-    private static final int NOT_FOUND = 404;
-    private static final int INTERNAL_SERVER_ERROR = 500;
 
     private final Auth auth;
     private final LaboratoryAuthorization laboratoryAuthorization;
@@ -70,15 +67,15 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     public RpcResult<User> authenticate(String username, String pwd) {
         User user = this.baseMapper.getUserByUsername(username);
         if (user == null){
-            throw new BusinessException(NOT_FOUND, "用户不存在!");
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND, "用户不存在!");
         }
 
         if (user.getPassword() == null || user.getPassword().isEmpty()){
-            throw new BusinessException(FORBIDDEN, "该用户不允许使用系统，请联系管理员!");
+            throw new BusinessException(ErrorCode.USER_DISABLED, "该用户不允许使用系统，请联系管理员!");
         }
 
         if (!BCrypt.checkpw(pwd,user.getPassword())){
-            throw new BusinessException(FORBIDDEN, "密码错误!");
+            throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, "密码错误!");
         }
         userContextStore.save(buildUserContext(user));
         return RpcResult.success(user.mask());
@@ -90,7 +87,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         UserContext context = requireUserContext();
         User user = getById(context.getUserId());
         if (user == null) {
-            throw new BusinessException(NOT_FOUND, "用户不存在");
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND, "用户不存在");
         }
         return RpcResult.success(user.mask());
     }
@@ -113,7 +110,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     @Traced("user-service.permissions")
     public RpcResult<List<String>> listPermissions(UserPermissionQuery query) {
         if (query == null || isBlank(query.userId())) {
-            throw new BusinessException(BAD_REQUEST, "用户 ID 不能为空");
+            throw new BusinessException(ErrorCode.USER_ID_REQUIRED);
         }
         return RpcResult.success(auth.list(query.userId().trim()).stream()
                 .map(Permission::str)
@@ -152,18 +149,18 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         ValidationErrors errors = normalUser.validateNormalUser();
         if (errors.hasErrors()) {
             String errorStr = String.join(",", errors.errors());
-            throw new BusinessException(BAD_REQUEST, errorStr);
+            throw new BusinessException(ErrorCode.VALIDATION_FAILED, errorStr);
         }
 
         synchronized (normalUser.getName().intern()){
             boolean exsist = nameExists(normalUser.getName());
             if (exsist) {
-                throw new BusinessException(FORBIDDEN, "该姓名已被使用");
+                throw new BusinessException(ErrorCode.USER_NAME_CONFLICT, "该姓名已被使用");
             }
             try {
                 save(normalUser);
             }catch (Exception e){
-                throw new BusinessException(INTERNAL_SERVER_ERROR, "插入失败");
+                throw new BusinessException(ErrorCode.INTERNAL_ERROR, "插入失败");
             }
         }
         synchronizeAuthorization(
@@ -186,18 +183,18 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         ValidationErrors errors = contactUser.validateContactUser();
         if (errors.hasErrors()) {
             String errorStr = String.join(",", errors.errors());
-            throw new BusinessException(BAD_REQUEST, errorStr);
+            throw new BusinessException(ErrorCode.VALIDATION_FAILED, errorStr);
         }
 
         synchronized (contactUser.getName().intern()){
             boolean exsist = nameExists(contactUser.getName());
             if (exsist){
-                throw new BusinessException(FORBIDDEN, "该姓名已被使用");
+                throw new BusinessException(ErrorCode.USER_NAME_CONFLICT, "该姓名已被使用");
             }
             try {
                 save(contactUser);
             }catch (Exception e){
-                throw new BusinessException(INTERNAL_SERVER_ERROR, "插入失败");
+                throw new BusinessException(ErrorCode.INTERNAL_ERROR, "插入失败");
             }
         }
         return RpcResult.success(contactUser);
@@ -210,17 +207,17 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     public RpcResult<User> updateUser(UserAuthorizationUpdate command) {
         User user = command.user();
         if (user == null || user.getId() == null || user.getId().isBlank()) {
-            throw new BusinessException(BAD_REQUEST, "用户 ID 不能为空");
+            throw new BusinessException(ErrorCode.USER_ID_REQUIRED);
         }
         User existing = getById(user.getId());
         if (existing == null) {
-            throw new BusinessException(NOT_FOUND, "用户不存在");
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND, "用户不存在");
         }
         if (isBlank(existing.getUsername()) && isBlank(existing.getPassword())) {
-            throw new BusinessException(BAD_REQUEST, "联系人不能通过用户更新接口分配登录信息或权限");
+            throw new BusinessException(ErrorCode.CONTACT_LOGIN_ASSIGNMENT_FORBIDDEN, "联系人不能通过用户更新接口分配登录信息或权限");
         }
         if (!updateById(user)) {
-            throw new BusinessException(NOT_FOUND, "用户不存在");
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND, "用户不存在");
         }
         synchronizeAuthorization(user.getId(), command.appRelations(), command.laboratoryIds());
         User updated = getById(user.getId());
@@ -234,18 +231,18 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     @Transactional
     public RpcResult<Void> deleteUser(UserDelete command) {
         if (command == null || isBlank(command.userId())) {
-            throw new BusinessException(BAD_REQUEST, "用户 ID 不能为空");
+            throw new BusinessException(ErrorCode.USER_ID_REQUIRED);
         }
         String userId = command.userId().trim();
         UserContext context = requireUserContext();
         if (userId.equals(context.getUserId())) {
-            throw new BusinessException(BAD_REQUEST, "不能删除当前登录用户");
+            throw new BusinessException(ErrorCode.SELF_DELETION_FORBIDDEN, "不能删除当前登录用户");
         }
         if (getById(userId) == null) {
-            throw new BusinessException(NOT_FOUND, "用户或联系人不存在");
+            throw new BusinessException(ErrorCode.CONTACT_NOT_FOUND, "用户或联系人不存在");
         }
         if (!removeById(userId)) {
-            throw new BusinessException(NOT_FOUND, "用户或联系人不存在");
+            throw new BusinessException(ErrorCode.CONTACT_NOT_FOUND, "用户或联系人不存在");
         }
         auth.removeUser(userId);
         afterCommit(() -> userContextStore.delete(userId));

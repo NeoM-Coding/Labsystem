@@ -1,6 +1,7 @@
 package xyz.jasenon.lab.observability.rpc;
 
 import org.apache.dubbo.rpc.RpcException;
+import xyz.jasenon.lab.common.error.ErrorCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import xyz.jasenon.lab.common.exception.BusinessException;
@@ -22,7 +23,8 @@ public final class RpcClient {
             result = invocation.get();
         } catch (RpcException exception) {
             log.error("RPC transport failed before a valid RpcResult was received", exception);
-            BusinessException local = new BusinessException(503, "下游服务暂不可用");
+            BusinessException local = new BusinessException(exception.isTimeout()
+                    ? ErrorCode.RPC_TIMEOUT : ErrorCode.DEPENDENCY_UNAVAILABLE);
             local.initCause(exception);
             throw local;
         }
@@ -31,7 +33,7 @@ public final class RpcClient {
 
     public static <T> T require(RpcResult<T> result) {
         if (result == null) {
-            throw new BusinessException(502, "下游服务返回了空响应");
+            throw new BusinessException(ErrorCode.INVALID_RPC_RESPONSE, "下游服务返回了空响应");
         }
         if (!result.successful()) {
             throw localException(result.error());
@@ -44,13 +46,11 @@ public final class RpcClient {
     }
 
     private static BusinessException localException(RpcError error) {
-        if (error == null) {
-            return new BusinessException(502, "下游服务返回了无效错误状态");
+        if (error == null || error.code() < 100000 || error.code() > 999999
+                || error.status() < 400 || error.status() > 599 || error.type() == null) {
+            return new BusinessException(ErrorCode.INVALID_RPC_RESPONSE, "下游服务返回了无效错误状态");
         }
-        String message = error.message();
-        if (error.traceId() != null && !error.traceId().isBlank() && error.status() >= 500) {
-            message = message + "（traceId: " + error.traceId() + "）";
-        }
-        return new BusinessException(error.status(), message);
+        return new BusinessException(error.code(), error.status(), error.type(),
+                error.message(), error.data(), error.traceId());
     }
 }

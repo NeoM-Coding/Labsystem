@@ -59,6 +59,22 @@ class RpcResultDubboFilterTests {
         assertEquals("设备不存在", rpcResult.error().message());
     }
 
+    @Test
+    void normalizesAsynchronousWrappedBusinessFailure() {
+        var future = new java.util.concurrent.CompletableFuture<AppResponse>();
+        var invocation = new RpcInvocation();
+        Result result;
+        try (var scope = xyz.jasenon.lab.observability.context.TraceContext.open("trace-async-1", "request-1")) {
+            result = filter.invoke(invoker(new AsyncRpcResult(future, invocation)), invocation);
+        }
+        future.complete(new AppResponse(new java.util.concurrent.CompletionException(
+                new BusinessException(xyz.jasenon.lab.common.error.ErrorCode.MQTT_DEVICE_TIMEOUT))));
+        RpcResult<?> failure = (RpcResult<?>) ((AsyncRpcResult) result).getAppResponse().getValue();
+        assertEquals(130001, failure.error().code());
+        assertEquals("trace-async-1", failure.error().traceId());
+        assertEquals(504, failure.error().status());
+    }
+
     private static Invoker<Object> invoker(Result response) {
         return new TestInvoker() {
             @Override

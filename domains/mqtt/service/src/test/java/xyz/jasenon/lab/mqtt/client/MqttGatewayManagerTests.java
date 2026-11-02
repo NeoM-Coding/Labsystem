@@ -56,7 +56,7 @@ class MqttGatewayManagerTests {
 
         BusinessException error = assertThrows(BusinessException.class, () -> manager.delete("gateway-1"));
 
-        assertEquals(409, error.getCode());
+        assertEquals(409, error.getHttpStatus());
         verify(gatewayHelper, never()).removeRS485Gateway("gateway-1");
         verify(clientManager, never()).unregisterGateway("gateway-1");
     }

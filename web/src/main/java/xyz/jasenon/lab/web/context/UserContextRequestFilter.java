@@ -57,7 +57,11 @@ public class UserContextRequestFilter extends OncePerRequestFilter {
 
             Optional<UserContext> context = contextStore.find(userId.get());
             if (context.isEmpty()) {
-                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "登录上下文不存在，请重新登录");
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.setContentType("application/json;charset=UTF-8");
+                new com.fasterxml.jackson.databind.ObjectMapper().writeValue(response.getWriter(),
+                        xyz.jasenon.lab.common.util.R.unauthorized("登录上下文不存在，请重新登录")
+                                .withTraceId(xyz.jasenon.lab.observability.context.TraceContext.traceId()));
                 return;
             }
 

@@ -3,6 +3,8 @@ package xyz.jasenon.lab.common.util;
 import xyz.jasenon.lab.common.exception.BusinessException;
 
 import java.io.Serializable;
+import java.beans.Transient;
+import xyz.jasenon.lab.common.error.ErrorCode;
 
 /**
  * 统一响应包装类 - 继承 借助DiyResponseEntity 以控制 HTTP 响应
@@ -11,6 +13,13 @@ import java.io.Serializable;
 public class R<T> implements Serializable {
 
     private final Integer code;
+    private final transient int httpStatus;
+    private String traceId;
+
+    @Transient
+    public int getHttpStatus() { return httpStatus; }
+    public String getTraceId() { return traceId; }
+    public R<T> withTraceId(String traceId) { this.traceId = traceId; return this; }
     private final boolean ok;
     private final T data;
     private final String msg;
@@ -35,7 +44,8 @@ public class R<T> implements Serializable {
      * 私有构造，强制使用工厂方法
      */
     private R(int httpStatus, Integer businessCode, boolean ok, T data, String msg) {
-        this.code = businessCode;
+        this.httpStatus = httpStatus;
+        this.code = ok || businessCode >= 100000 ? businessCode : ErrorCode.forHttpStatus(businessCode).code();
         this.ok = ok;
         this.data = data;
         this.msg = msg;
@@ -64,27 +74,27 @@ public class R<T> implements Serializable {
         return new R<>(200, 200, true, data, msg);
     }
 
-    // ========== 失败响应 (HTTP 200，业务失败) ==========
+    // ========== 失败响应：独立 HTTP 状态与业务码 ==========
 
     /**
      * 失败响应 - 仅消息
      */
     public static <T> R<T> fail(String msg) {
-        return new R<>(200, 500, false, null, msg);
+        return new R<>(500, 500, false, null, msg);
     }
 
     /**
      * 失败响应 - 带状态码和消息
      */
     public static <T> R<T> fail(Integer code, String msg) {
-        return new R<>(200, code, false, null, msg);
+        return new R<>(code >= 100000 ? ErrorCode.fromCode(code).httpStatus() : code, code, false, null, msg);
     }
 
     /**
      * 失败响应 - 带状态码、消息和数据
      */
     public static <T> R<T> fail(Integer code, String msg, T data) {
-        return new R<>(200, code, false, data, msg);
+        return new R<>(code >= 100000 ? ErrorCode.fromCode(code).httpStatus() : code, code, false, data, msg);
     }
 
     // ========== HTTP 状态码响应（可选） ==========

@@ -11,15 +11,17 @@ import org.apache.dubbo.rpc.RpcException;
 import xyz.jasenon.lab.common.rpc.RpcResult;
 import xyz.jasenon.lab.observability.rpc.RpcErrors;
 
-@Activate(group = CommonConstants.PROVIDER, order = -10000)
+@Activate(group = CommonConstants.PROVIDER, order = -195)
 public class RpcResultDubboFilter implements Filter {
 
     @Override
     public Result invoke(Invoker<?> invoker, Invocation invocation) throws RpcException {
+        var propagation = xyz.jasenon.lab.observability.context.Tracing.capture();
         try {
             Result result = invoker.invoke(invocation);
             if (result instanceof AsyncRpcResult) {
-                return result.whenCompleteWithContext((response, failure) -> normalize(response, failure));
+                return result.whenCompleteWithContext((response, failure) ->
+                        propagation.wrap(() -> normalize(response, failure)).run());
             }
             normalize(result, null);
             return AsyncRpcResult.newDefaultAsyncResult(

@@ -1,6 +1,15 @@
 package xyz.jasenon.lab.web.response;
 
 import org.apache.dubbo.rpc.RpcException;
+import xyz.jasenon.lab.common.error.ErrorCode;
+import xyz.jasenon.lab.observability.context.TraceContext;
+import xyz.jasenon.lab.observability.rpc.RpcErrors;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.ServletRequestBindingException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -18,10 +27,10 @@ public class BusinessExceptionHandler {
 
     @ExceptionHandler(BusinessException.class)
     public DiyResponseEntity<R<Object>> handle(BusinessException exception) {
-        R<Object> response = exception.getR() == null
-                ? R.fail(exception.getCode(), exception.getMessage(), exception.getData())
-                : R.fail(exception.getR().getCode(), exception.getR().getMsg(), exception.getR().getData());
-        return DiyResponseEntity.of(response);
+        if (exception.getType() == xyz.jasenon.lab.common.rpc.RpcErrorType.INTERNAL) log.error("业务执行失败", exception);
+        return DiyResponseEntity.of(R.fail(exception.getHttpStatus(), exception.getCode(),
+                exception.getMessage(), exception.getData()).withTraceId(
+                exception.getTraceId() == null ? TraceContext.traceId() : exception.getTraceId()));
     }
 
     @ExceptionHandler(AuthenticationRequiredException.class)
@@ -37,13 +46,29 @@ public class BusinessExceptionHandler {
     @ExceptionHandler(AuthorizationConfigurationException.class)
     public DiyResponseEntity<R<Object>> handleAuthorizationConfiguration(
             AuthorizationConfigurationException exception) {
-        return DiyResponseEntity.of(R.serverError(exception.getMessage()));
+        log.error("权限配置异常", exception);
+        return handle(new BusinessException(ErrorCode.AUTH_CONFIGURATION_ERROR));
     }
 
     @ExceptionHandler(RpcException.class)
     public DiyResponseEntity<R<Object>> handleRpcException(RpcException exception) {
-        log.error("下游 RPC 服务调用失败", exception);
-        return DiyResponseEntity.of(R.fail(503, 503, "下游服务暂不可用"));
+        var error = RpcErrors.from(exception);
+        return handle(new BusinessException(error.code(), error.status(), error.type(), error.message(), error.data(), error.traceId()));
+    }
+
+    @ExceptionHandler({MethodArgumentNotValidException.class, ServletRequestBindingException.class,
+            HttpMessageNotReadableException.class, HandlerMethodValidationException.class,
+            MethodArgumentTypeMismatchException.class, ConstraintViolationException.class, IllegalArgumentException.class})
+    public DiyResponseEntity<R<Object>> handleValidation(Exception exception) {
+        if (exception instanceof MethodArgumentNotValidException validation) {
+            var fields = validation.getBindingResult().getFieldErrors().stream()
+                    .map(field -> java.util.Map.of("field", field.getField(), "message",
+                            field.getDefaultMessage() == null ? "字段不合法" : field.getDefaultMessage()))
+                    .toList();
+            return handle(new BusinessException(ErrorCode.VALIDATION_FAILED,
+                    ErrorCode.VALIDATION_FAILED.message(), java.util.Map.of("fieldErrors", fields)));
+        }
+        return handle(new BusinessException(ErrorCode.VALIDATION_FAILED));
     }
 
     @ExceptionHandler(Exception.class)

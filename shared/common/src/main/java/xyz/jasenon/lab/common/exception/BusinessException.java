@@ -1,65 +1,40 @@
 package xyz.jasenon.lab.common.exception;
 
-
+import xyz.jasenon.lab.common.error.ErrorCode;
+import xyz.jasenon.lab.common.rpc.RpcErrorType;
 import xyz.jasenon.lab.common.util.R;
 
-/**
- * 业务异常 - 用于包装 R 响应为异常抛出
- * @author Jasenon_ce
- */
+/** Local business failure. RPC transports RpcError values rather than exceptions. */
 public class BusinessException extends RuntimeException {
-
-    private final Integer code;
-    private final boolean ok;
+    private static final long serialVersionUID = 1L;
+    private final int code;
+    private final int httpStatus;
     private final Object data;
-    private final R<?> r;
+    private final RpcErrorType type;
+    private final String traceId;
 
-    public Integer getCode() {
-        return code;
+    public BusinessException(ErrorCode error) { this(error, error.message()); }
+    public BusinessException(ErrorCode error, String message) { this(error, message, null); }
+    public BusinessException(ErrorCode error, String message, Object data) {
+        this(error.code(), error.httpStatus(), error.type(), message == null || message.isBlank() ? error.message() : message, data, null);
     }
-
-    public boolean isOk() {
-        return ok;
-    }
-
-    public Object getData() {
-        return data;
-    }
-
-    public R<?> getR() {
-        return r;
-    }
-
-    /**
-     * 从 R 构造业务异常
-     */
-    public <T> BusinessException(R<T> r) {
-        super(r.getMsg());
-        this.code = r.getCode();
-        this.ok = r.isOk();
-        this.data = r.getData();
-        this.r = r;
-    }
-
-    /**
-     * 构造业务异常
-     */
-    public BusinessException(Integer code, String message) {
-        super(message);
-        this.code = code;
-        this.ok = false;
-        this.data = null;
-        this.r = null;
-    }
-
-    /**
-     * 构造业务异常（带数据）
-     */
+    /** Compatibility for internal callers; HTTP codes are normalized to catalog codes. */
+    public BusinessException(Integer code, String message) { this(code, message, null); }
     public BusinessException(Integer code, String message, Object data) {
-        super(message);
-        this.code = code;
-        this.ok = false;
-        this.data = data;
-        this.r = null;
+        this(code != null && code >= 100000 ? ErrorCode.fromCode(code) : ErrorCode.forHttpStatus(code == null ? 500 : code), message, data);
     }
+    public BusinessException(R<?> response) {
+        this(response.getCode(), response.getHttpStatus(), ErrorCode.fromCode(response.getCode()).type(), response.getMsg(), response.getData(), response.getTraceId());
+    }
+    public BusinessException(int code, int httpStatus, RpcErrorType type, String message, Object data, String traceId) {
+        super(message);
+        this.code = code; this.httpStatus = httpStatus; this.type = type; this.data = data; this.traceId = traceId;
+    }
+    public Integer getCode() { return code; }
+    public int getHttpStatus() { return httpStatus; }
+    public RpcErrorType getType() { return type; }
+    public String getTraceId() { return traceId; }
+    public boolean isOk() { return false; }
+    public Object getData() { return data; }
+    public R<?> getR() { return R.fail(httpStatus, code, getMessage(), data).withTraceId(traceId); }
 }

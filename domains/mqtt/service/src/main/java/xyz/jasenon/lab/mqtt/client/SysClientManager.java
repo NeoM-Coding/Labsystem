@@ -1,5 +1,6 @@
 package xyz.jasenon.lab.mqtt.client;
 
+import xyz.jasenon.lab.common.error.ErrorCode;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import org.apache.dubbo.config.annotation.DubboService;
@@ -42,10 +43,6 @@ import java.util.stream.Collectors;
 public class SysClientManager implements MqttIo {
 
     private static final Logger log = LoggerFactory.getLogger(SysClientManager.class);
-    private static final int NOT_FOUND = 404;
-    private static final int BAD_REQUEST = 400;
-    private static final int FORBIDDEN = 403;
-    private static final int INTERNAL_SERVER_ERROR = 500;
     private static final int MAX_MULTI_TARGETS = 20;
 
     private final TaskHelper thelper;
@@ -84,19 +81,17 @@ public class SysClientManager implements MqttIo {
 
     public RpcResult<MqttResponseDto> syncSend(MqttTaskDto dto) {
         MqttTask userTask = thelper.help(dto);
-        if (userTask == null) throw new BusinessException(NOT_FOUND, "device doesn't exist!");
+        if (userTask == null) throw new BusinessException(ErrorCode.MQTT_DEVICE_NOT_FOUND);
         assertVisible(userTask);
         try {
             return RpcResult.success(syncSendPrepared(userTask));
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            throw new BusinessException(INTERNAL_SERVER_ERROR, "mqtt request was interrupted");
+            throw new BusinessException(ErrorCode.MQTT_REQUEST_INTERRUPTED);
         } catch (TimeoutException exception) {
-            throw new BusinessException(504, "mqtt request timed out");
+            throw new BusinessException(ErrorCode.MQTT_DEVICE_TIMEOUT, "设备响应超时，请检查设备连接");
         } catch (ExecutionException exception) {
-            Throwable cause = rootCause(exception);
-            throw new BusinessException(INTERNAL_SERVER_ERROR,
-                    cause.getMessage() == null ? "mqtt request failed" : cause.getMessage());
+            throw mqttFailure(exception);
         }
     }
 
@@ -108,7 +103,7 @@ public class SysClientManager implements MqttIo {
             client.offer(task);
             return toResponseDto(task.getFuture().get(task.getTimeout(), TimeUnit.MILLISECONDS));
         }
-        throw new BusinessException(NOT_FOUND, "gateway doesn't exist!");
+        throw new BusinessException(ErrorCode.MQTT_GATEWAY_NOT_FOUND);
     }
 
     public CompletableFuture<RpcResult<MqttResponseDto>> asyncSend(MqttTaskDto dto) {
@@ -124,7 +119,7 @@ public class SysClientManager implements MqttIo {
             boolean requireUserVisibility
     ) {
         MqttTask userTask = thelper.help(dto);
-        if (userTask == null) throw new BusinessException(NOT_FOUND, "device doesn't exist!");
+        if (userTask == null) throw new BusinessException(ErrorCode.MQTT_DEVICE_NOT_FOUND);
         if (requireUserVisibility) {
             assertVisible(userTask);
         }
@@ -132,15 +127,17 @@ public class SysClientManager implements MqttIo {
         if (client != null){
             PendingRequest<MqttTask> task = userTask.decorate();
             client.offer(task);
-            return task.getFuture().thenApply(response -> RpcResult.success(toResponseDto(response)));
+            return task.getFuture().handle((response, error) -> error == null
+                    ? RpcResult.success(toResponseDto(response))
+                    : RpcResult.failure(xyz.jasenon.lab.observability.rpc.RpcErrors.from(mqttFailure(error))));
         }
-        throw new BusinessException(NOT_FOUND, "gateway doesn't exist!");
+        throw new BusinessException(ErrorCode.MQTT_GATEWAY_NOT_FOUND);
     }
 
     @Override
     public RpcResult<List<MqttTaskResultDto>> multiSend(MqttMultiTaskDto task) {
         if (task == null || task.deviceIds() == null || task.deviceIds().isEmpty()) {
-            throw new BusinessException(BAD_REQUEST, "至少需要选择一台设备");
+            throw new BusinessException(ErrorCode.MQTT_TARGETS_REQUIRED, "至少需要选择一台设备");
         }
         List<String> deviceIds = task.deviceIds().stream()
                 .filter(Objects::nonNull)
@@ -149,10 +146,10 @@ public class SysClientManager implements MqttIo {
                 .distinct()
                 .toList();
         if (deviceIds.isEmpty()) {
-            throw new BusinessException(BAD_REQUEST, "至少需要选择一台设备");
+            throw new BusinessException(ErrorCode.MQTT_TARGETS_REQUIRED, "至少需要选择一台设备");
         }
         if (deviceIds.size() > MAX_MULTI_TARGETS) {
-            throw new BusinessException(BAD_REQUEST, "单次批量控制最多支持 20 台设备");
+            throw new BusinessException(ErrorCode.MQTT_TOO_MANY_TARGETS, "单次批量控制最多支持 20 台设备");
         }
         List<MqttTask> preparedTasks = deviceIds.stream().map(deviceId -> {
             MqttTaskDto single = MqttTaskDto.of(
@@ -163,7 +160,7 @@ public class SysClientManager implements MqttIo {
             );
             MqttTask prepared = thelper.help(single);
             if (prepared == null) {
-                throw new BusinessException(NOT_FOUND, "设备不存在: " + deviceId);
+                throw new BusinessException(ErrorCode.MQTT_DEVICE_NOT_FOUND, "设备不存在: " + deviceId);
             }
             assertVisible(prepared);
             return prepared;
@@ -173,6 +170,7 @@ public class SysClientManager implements MqttIo {
             try {
                 return MqttTaskResultDto.success(prepared.getDeviceId(), syncSendPrepared(prepared));
             } catch (Exception error) {
+                if (error instanceof InterruptedException) Thread.currentThread().interrupt();
                 return MqttTaskResultDto.failure(prepared.getDeviceId(), rootCause(error));
             }
         }).toList());
@@ -181,23 +179,34 @@ public class SysClientManager implements MqttIo {
     private void assertVisible(MqttTask task) {
         if (task.getLaboratoryId() == null
                 || visibleLaboratoryScope.resolve(List.of(task.getLaboratoryId())).isEmpty()) {
-            throw new BusinessException(FORBIDDEN, "无权控制该实验室设备");
+            throw new BusinessException(ErrorCode.MQTT_DEVICE_ACCESS_DENIED, "无权控制该实验室设备");
         }
     }
 
     private static Throwable rootCause(Throwable error) {
         Throwable current = error;
-        while (current.getCause() != null && current.getCause() != current) {
+        while ((current instanceof ExecutionException || current instanceof java.util.concurrent.CompletionException)
+                && current.getCause() != null && current.getCause() != current) {
             current = current.getCause();
         }
         return current;
+    }
+
+    private static BusinessException mqttFailure(Throwable error) {
+        Throwable cause = rootCause(error);
+        if (cause instanceof BusinessException business) return business;
+        ErrorCode code = cause instanceof TimeoutException ? ErrorCode.MQTT_DEVICE_TIMEOUT
+                : cause instanceof InterruptedException ? ErrorCode.MQTT_REQUEST_INTERRUPTED : ErrorCode.INTERNAL_ERROR;
+        BusinessException failure = new BusinessException(code);
+        failure.initCause(cause);
+        return failure;
     }
 
     private MqttResponseDto toResponseDto(Object resp) {
         if (resp instanceof Task task) {
             return MqttResponseDto.of(task.getGatewayId(), task.getPayload());
         }
-        throw new BusinessException(INTERNAL_SERVER_ERROR, "unsupported mqtt response type");
+        throw new BusinessException(ErrorCode.INTERNAL_ERROR);
     }
 
     public static void remove(AbstractSysClient<? extends Task> client) {

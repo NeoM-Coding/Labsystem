@@ -1,3 +1,4 @@
 traceContext=xyz.jasenon.lab.observability.dubbo.TraceDubboFilter
 userContext=xyz.jasenon.lab.observability.dubbo.UserContextDubboFilter
 rpcResult=xyz.jasenon.lab.observability.dubbo.RpcResultDubboFilter
+rpcResultValue=xyz.jasenon.lab.observability.dubbo.RpcResultValueDubboFilter

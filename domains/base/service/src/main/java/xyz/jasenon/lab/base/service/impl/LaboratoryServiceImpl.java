@@ -1,5 +1,6 @@
 package xyz.jasenon.lab.base.service.impl;
 
+import xyz.jasenon.lab.common.error.ErrorCode;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.apache.dubbo.config.annotation.DubboService;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,8 +42,6 @@ import java.util.stream.Collectors;
 @Traced("laboratory-service")
 public class LaboratoryServiceImpl extends ServiceImpl<LaboratoryMapper, Laboratory> implements LaboratoryService {
 
-    private static final int BAD_REQUEST = 400;
-    private static final int UNAUTHORIZED = 401;
 
     private final LaboratoryAuthorization laboratoryAuthorization;
     private final UserMapper userMapper;
@@ -70,7 +69,7 @@ public class LaboratoryServiceImpl extends ServiceImpl<LaboratoryMapper, Laborat
     public RpcResult<List<LaboratoryVO>> list(String[] buildingNames, String[] orgNames) {
         var context = UserContextHolder.get();
         if (context == null) {
-            throw new BusinessException(UNAUTHORIZED, "登陆已过期");
+            throw new BusinessException(ErrorCode.AUTHENTICATION_REQUIRED, "登陆已过期");
         }
         // 楼栋与组织过滤只能在当前用户的可见范围内继续收窄，不能扩大数据边界。
         List<String> laboratoryIds = context.filterLaboratoryIds(buildingNames, orgNames);
@@ -107,7 +106,7 @@ public class LaboratoryServiceImpl extends ServiceImpl<LaboratoryMapper, Laborat
         laboratory.setCreateBy(context.getUserId());
         ValidationErrors errors = laboratory.validate();
         if (errors.hasErrors()) {
-            throw new BusinessException(BAD_REQUEST, String.join(",", errors.errors()));
+            throw new BusinessException(ErrorCode.VALIDATION_FAILED, String.join(",", errors.errors()));
         }
         save(laboratory);
         // 初始化失败时异常向外传播，由本地事务回滚数据库写入。
@@ -128,12 +127,12 @@ public class LaboratoryServiceImpl extends ServiceImpl<LaboratoryMapper, Laborat
         Laboratory laboratory = from(command);
         ValidationErrors errors = laboratory.validate();
         if (errors.hasErrors()) {
-            throw new BusinessException(BAD_REQUEST, String.join(",", errors.errors()));
+            throw new BusinessException(ErrorCode.VALIDATION_FAILED, String.join(",", errors.errors()));
         }
         laboratory.setId(laboratoryId);
         Laboratory existing = getById(laboratoryId);
         if (existing == null) {
-            throw new BusinessException(404, "实验室不存在");
+            throw new BusinessException(ErrorCode.LABORATORY_NOT_FOUND, "实验室不存在");
         }
         laboratory.setCreateBy(existing.getCreateBy());
         updateById(laboratory);
@@ -161,7 +160,7 @@ public class LaboratoryServiceImpl extends ServiceImpl<LaboratoryMapper, Laborat
         requireLaboratory(laboratoryId);
         Set<String> userIds = command.userIds();
         if (!userIds.isEmpty() && userMapper.selectByIds(userIds).size() != userIds.size()) {
-            throw new BusinessException(BAD_REQUEST, "可见成员中包含不存在的用户");
+            throw new BusinessException(ErrorCode.LABORATORY_MEMBER_NOT_FOUND, "可见成员中包含不存在的用户");
         }
         Set<String> affectedBefore = laboratoryAuthorization.usersWhoCanView(laboratoryId);
         laboratoryAuthorization.replaceViewers(laboratoryId, userIds);
@@ -206,10 +205,10 @@ public class LaboratoryServiceImpl extends ServiceImpl<LaboratoryMapper, Laborat
 
     private void requireLaboratory(String laboratoryId) {
         if (laboratoryId == null || laboratoryId.isBlank()) {
-            throw new BusinessException(BAD_REQUEST, "实验室 ID 不能为空");
+            throw new BusinessException(ErrorCode.LABORATORY_ID_REQUIRED);
         }
         if (getById(laboratoryId) == null) {
-            throw new BusinessException(404, "实验室不存在");
+            throw new BusinessException(ErrorCode.LABORATORY_NOT_FOUND, "实验室不存在");
         }
     }
 
@@ -264,7 +263,7 @@ public class LaboratoryServiceImpl extends ServiceImpl<LaboratoryMapper, Laborat
     private static UserContext requireUserContext() {
         UserContext context = UserContextHolder.get();
         if (context == null || context.getUserId() == null || context.getUserId().isBlank()) {
-            throw new BusinessException(UNAUTHORIZED, "登陆已过期");
+            throw new BusinessException(ErrorCode.AUTHENTICATION_REQUIRED, "登陆已过期");
         }
         return context;
     }

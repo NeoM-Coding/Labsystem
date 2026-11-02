@@ -1,5 +1,6 @@
 package xyz.jasenon.lab.engine.infrastructure.service;
 
+import xyz.jasenon.lab.common.error.ErrorCode;
 import org.apache.dubbo.config.annotation.DubboService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import xyz.jasenon.lab.auth.annotation.ActionAuthorized;
@@ -22,8 +23,6 @@ import java.util.List;
 )
 public class SmartStrategyServiceImpl implements SmartStrategyService {
 
-    private static final int NOT_FOUND = 404;
-    private static final int CONFLICT = 409;
 
     private final RuntimePersist runtimePersist;
 
@@ -35,7 +34,7 @@ public class SmartStrategyServiceImpl implements SmartStrategyService {
     @ActionAuthorized
     public RpcResult<RuntimeRevision> create(SmartStrategyCreate command) {
         if (!runtimePersist.register(command.revision())) {
-            throw new BusinessException(CONFLICT, "smart strategy already exists");
+            throw new BusinessException(ErrorCode.STRATEGY_ALREADY_EXISTS);
         }
         return RpcResult.success(required(command.revision().runtimeId()));
     }
@@ -44,7 +43,7 @@ public class SmartStrategyServiceImpl implements SmartStrategyService {
     @ActionAuthorized
     public RpcResult<RuntimeRevision> update(SmartStrategyUpdate command) {
         if (!runtimePersist.update(command.runtimeId(), command.revision())) {
-            throw new BusinessException(NOT_FOUND, "smart strategy doesn't exist");
+            throw new BusinessException(ErrorCode.STRATEGY_NOT_FOUND);
         }
         return RpcResult.success(required(command.runtimeId()));
     }
@@ -53,7 +52,7 @@ public class SmartStrategyServiceImpl implements SmartStrategyService {
     @ActionAuthorized
     public RpcResult<Void> delete(SmartStrategyDelete command) {
         if (!runtimePersist.remove(command.runtimeId())) {
-            throw new BusinessException(NOT_FOUND, "smart strategy doesn't exist");
+            throw new BusinessException(ErrorCode.STRATEGY_NOT_FOUND);
         }
         return RpcResult.success();
     }
@@ -65,7 +64,7 @@ public class SmartStrategyServiceImpl implements SmartStrategyService {
                 ? runtimePersist.enable(command.runtimeId())
                 : runtimePersist.disable(command.runtimeId());
         if (!changed) {
-            throw new BusinessException(NOT_FOUND, "smart strategy doesn't exist");
+            throw new BusinessException(ErrorCode.STRATEGY_NOT_FOUND);
         }
         return RpcResult.success(required(command.runtimeId()));
     }
@@ -85,7 +84,7 @@ public class SmartStrategyServiceImpl implements SmartStrategyService {
     private RuntimeRevision required(String runtimeId) {
         RuntimeRevision revision = runtimePersist.get(runtimeId);
         if (revision == null) {
-            throw new BusinessException(NOT_FOUND, "smart strategy doesn't exist");
+            throw new BusinessException(ErrorCode.STRATEGY_NOT_FOUND);
         }
         return revision;
     }

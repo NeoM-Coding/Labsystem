@@ -1,5 +1,6 @@
 package xyz.jasenon.lab.bi.service;
 
+import xyz.jasenon.lab.common.error.ErrorCode;
 import org.apache.dubbo.config.annotation.DubboService;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcOperations;
@@ -40,9 +41,6 @@ import java.util.Set;
 @Traced("edu-dashboard-service")
 public class EduDashboardServiceImpl implements EduDashboardService {
 
-    private static final int BAD_REQUEST = 400;
-    private static final int UNAUTHORIZED = 401;
-    private static final int NOT_FOUND = 404;
 
     private static final String SEMESTER_AT_DATE_SQL = """
             SELECT id, name, start_date, end_date
@@ -66,7 +64,7 @@ public class EduDashboardServiceImpl implements EduDashboardService {
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public RpcResult<EduDashboardView> dashboard(EduDashboardQuery query) {
         if (query == null || query.range() == null) {
-            throw new BusinessException(BAD_REQUEST, "统计时间维度不能为空");
+            throw new BusinessException(ErrorCode.BI_TIME_DIMENSION_REQUIRED, "统计时间维度不能为空");
         }
         LocalDateTime now = LocalDateTime.now(clock);
         UserContext context = requireContext();
@@ -229,7 +227,7 @@ public class EduDashboardServiceImpl implements EduDashboardService {
             }
             case CURRENT_SEMESTER -> {
                 if (semester == null) {
-                    throw new BusinessException(NOT_FOUND, "当前日期不在任何有效学期内");
+                    throw new BusinessException(ErrorCode.BI_CURRENT_SEMESTER_NOT_FOUND, "当前日期不在任何有效学期内");
                 }
                 yield new Period(semester.startDate(), semester.endDate());
             }
@@ -272,7 +270,7 @@ public class EduDashboardServiceImpl implements EduDashboardService {
     private static UserContext requireContext() {
         UserContext context = UserContextHolder.get();
         if (context == null || context.getUserId() == null || context.getUserId().isBlank()) {
-            throw new BusinessException(UNAUTHORIZED, "登陆已过期");
+            throw new BusinessException(ErrorCode.AUTHENTICATION_REQUIRED, "登陆已过期");
         }
         return context;
     }

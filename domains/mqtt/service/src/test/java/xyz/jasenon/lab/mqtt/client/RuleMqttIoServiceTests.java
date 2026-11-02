@@ -42,8 +42,8 @@ class RuleMqttIoServiceTests {
                 () -> manager.asyncSendFromRuleEngine(request)
         );
 
-        assertEquals(404, exception.getCode());
-        assertEquals("gateway doesn't exist!", exception.getMessage());
+        assertEquals(404, exception.getHttpStatus());
+        assertEquals("网关不存在", exception.getMessage());
         verifyNoInteractions(visibleScope);
     }
 
@@ -64,7 +64,7 @@ class RuleMqttIoServiceTests {
                 () -> manager.asyncSend(request)
         );
 
-        assertEquals(401, exception.getCode());
+        assertEquals(401, exception.getHttpStatus());
         verify(visibleScope).resolve(List.of("lab-1"));
     }
 

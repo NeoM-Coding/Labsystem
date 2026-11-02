@@ -1,5 +1,6 @@
 package xyz.jasenon.lab.mqtt.client.itfc.impl;
 
+import xyz.jasenon.lab.common.error.ErrorCode;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import xyz.jasenon.lab.common.exception.BusinessException;
@@ -19,7 +20,6 @@ import java.util.List;
 @AllArgsConstructor
 public class MqttTaskHelper implements TaskHelper {
 
-    private static final int BAD_REQUEST = 400;
     private final DeviceMapper deviceMapper;
     
     @Override
@@ -33,13 +33,13 @@ public class MqttTaskHelper implements TaskHelper {
     public MqttTask help(Device device, MqttTaskDto dto) {
         if (device == null || dto == null) return null;
         if (dto.getType() != device.getDeviceType()) {
-            throw new BusinessException(BAD_REQUEST, "设备类型与实际设备不匹配");
+            throw new BusinessException(ErrorCode.MQTT_DEVICE_TYPE_MISMATCH, "设备类型与实际设备不匹配");
         }
         int[] suppliedArgs = dto.getArgs() == null ? new int[0] : dto.getArgs();
         try {
             MqttCommandPolicy.validate(device.getDeviceType(), dto.getCommandLine(), suppliedArgs);
         } catch (IllegalArgumentException error) {
-            throw new BusinessException(BAD_REQUEST, error.getMessage());
+            throw new BusinessException(ErrorCode.VALIDATION_FAILED, error.getMessage());
         }
         // 处理args参数
         List<Integer> stream = new ArrayList<>();

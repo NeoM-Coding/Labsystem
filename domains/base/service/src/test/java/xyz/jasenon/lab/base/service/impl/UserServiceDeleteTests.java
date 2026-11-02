@@ -71,7 +71,7 @@ class UserServiceDeleteTests {
         BusinessException error = assertThrows(BusinessException.class,
                 () -> service.deleteUser(new UserDelete("operator", null)));
 
-        assertEquals(400, error.getCode());
+        assertEquals(400, error.getHttpStatus());
         verify(auth, never()).removeUser("operator");
     }
 }

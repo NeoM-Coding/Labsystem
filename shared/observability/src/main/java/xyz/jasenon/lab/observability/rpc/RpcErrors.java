@@ -1,6 +1,8 @@
 package xyz.jasenon.lab.observability.rpc;
 
 import org.apache.dubbo.rpc.RpcException;
+import xyz.jasenon.lab.common.error.ErrorCode;
+import xyz.jasenon.lab.auth.exception.AuthorizationConfigurationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import xyz.jasenon.lab.auth.exception.AuthenticationRequiredException;
@@ -24,49 +26,45 @@ public final class RpcErrors {
         Throwable cause = unwrap(failure);
         String traceId = TraceContext.traceId();
         if (cause instanceof AuthenticationRequiredException exception) {
-            return error("AUTHENTICATION_REQUIRED", RpcErrorType.AUTHENTICATION, 401,
+            return error(ErrorCode.AUTHENTICATION_REQUIRED.code(), RpcErrorType.AUTHENTICATION, 401,
                     exception.getMessage(), traceId);
         }
         if (cause instanceof PermissionDeniedException exception) {
-            return error("PERMISSION_DENIED", RpcErrorType.AUTHORIZATION, 403,
+            return error(ErrorCode.PERMISSION_DENIED.code(), RpcErrorType.AUTHORIZATION, 403,
                     exception.getMessage(), traceId);
         }
         if (cause instanceof BusinessException exception) {
-            int status = exception.getCode() == null ? 500 : exception.getCode();
-            return error("BUSINESS_" + status, typeOf(status), status,
-                    safeMessage(exception.getMessage(), "业务处理失败"), traceId);
+            return new RpcError(exception.getCode(), exception.getType(), exception.getHttpStatus(),
+                    safeMessage(exception.getMessage(), "业务处理失败"),
+                    exception.getTraceId() == null ? traceId : exception.getTraceId(), exception.getData());
         }
         if (cause instanceof IllegalArgumentException exception) {
-            return error("VALIDATION_FAILED", RpcErrorType.VALIDATION, 400,
+            return error(ErrorCode.VALIDATION_FAILED.code(), RpcErrorType.VALIDATION, 400,
                     safeMessage(exception.getMessage(), "请求参数不合法"), traceId);
         }
 
+        if (cause instanceof AuthorizationConfigurationException) {
+            return error(ErrorCode.AUTH_CONFIGURATION_ERROR.code(), RpcErrorType.INTERNAL, 500, "权限配置异常", traceId);
+        }
+        if (cause instanceof RpcException rpc) {
+            ErrorCode code = rpc.isTimeout() ? ErrorCode.RPC_TIMEOUT : ErrorCode.DEPENDENCY_UNAVAILABLE;
+            return error(code.code(), code.type(), code.httpStatus(), code.message(), traceId);
+        }
         log.error("RPC provider execution failed, traceId={}", traceId, cause);
-        return error("INTERNAL_ERROR", RpcErrorType.INTERNAL, 500,
+        return error(ErrorCode.INTERNAL_ERROR.code(), RpcErrorType.INTERNAL, 500,
                 "下游服务处理失败", traceId);
     }
 
-    private static RpcError error(String code, RpcErrorType type, int status,
+    private static RpcError error(int code, RpcErrorType type, int status,
                                   String message, String traceId) {
         return new RpcError(code, type, status, message, traceId);
-    }
-
-    private static RpcErrorType typeOf(int status) {
-        return switch (status) {
-            case 400, 422 -> RpcErrorType.VALIDATION;
-            case 401 -> RpcErrorType.AUTHENTICATION;
-            case 403 -> RpcErrorType.AUTHORIZATION;
-            case 404 -> RpcErrorType.NOT_FOUND;
-            case 409 -> RpcErrorType.CONFLICT;
-            default -> status >= 500 ? RpcErrorType.INTERNAL : RpcErrorType.BUSINESS;
-        };
     }
 
     private static Throwable unwrap(Throwable failure) {
         Throwable current = failure;
         while ((current instanceof CompletionException
                 || current instanceof ExecutionException
-                || current instanceof RpcException)
+                || (current instanceof RpcException && !((RpcException) current).isTimeout()))
                 && current.getCause() != null) {
             current = current.getCause();
         }

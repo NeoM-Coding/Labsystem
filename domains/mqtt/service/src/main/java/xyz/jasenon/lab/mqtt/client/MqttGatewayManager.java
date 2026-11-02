@@ -1,5 +1,6 @@
 package xyz.jasenon.lab.mqtt.client;
 
+import xyz.jasenon.lab.common.error.ErrorCode;
 import org.apache.dubbo.config.annotation.DubboService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,10 +20,6 @@ import java.util.Set;
 @Traced("mqtt-gateway-service")
 public class MqttGatewayManager implements MqttGatewayCRUD {
 
-    private static final int BAD_REQUEST = 400;
-    private static final int NOT_FOUND = 404;
-    private static final int CONFLICT = 409;
-    private static final int INTERNAL_SERVER_ERROR = 500;
 
     private final GatewayHelper gatewayHelper;
     private final DeviceHelper deviceHelper;
@@ -52,7 +49,7 @@ public class MqttGatewayManager implements MqttGatewayCRUD {
         validate(gateway);
         gateway.setGatewayType(GatewayType.RS485);
         if (!gatewayHelper.addRS485Gateway(gateway)) {
-            throw new BusinessException(INTERNAL_SERVER_ERROR, "mqtt gateway create failed");
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
         RS485Gateway created = required(gateway.getId());
         TransactionCallbacks.afterCommit(() -> clientManager.registerGateway(created));
@@ -89,7 +86,7 @@ public class MqttGatewayManager implements MqttGatewayCRUD {
         gateway.setId(gatewayId);
         gateway.setGatewayType(GatewayType.RS485);
         if (!gatewayHelper.updateRS485Gateway(gateway)) {
-            throw new BusinessException(INTERNAL_SERVER_ERROR, "mqtt gateway update failed");
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
         RS485Gateway updated = required(gatewayId);
         // Topic 或连接身份可能变化，提交后立即替换旧 client。
@@ -102,10 +99,10 @@ public class MqttGatewayManager implements MqttGatewayCRUD {
     public RpcResult<Void> delete(String gatewayId) {
         required(gatewayId);
         if (!deviceHelper.list(gatewayId, null).isEmpty()) {
-            throw new BusinessException(CONFLICT, "mqtt gateway still has devices");
+            throw new BusinessException(ErrorCode.MQTT_GATEWAY_HAS_DEVICES);
         }
         if (!gatewayHelper.removeRS485Gateway(gatewayId)) {
-            throw new BusinessException(INTERNAL_SERVER_ERROR, "mqtt gateway delete failed");
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
         TransactionCallbacks.afterCommit(() -> clientManager.unregisterGateway(gatewayId));
         return RpcResult.success();
@@ -113,22 +110,22 @@ public class MqttGatewayManager implements MqttGatewayCRUD {
 
     private RS485Gateway required(String gatewayId) {
         if (gatewayId == null || gatewayId.isBlank()) {
-            throw new BusinessException(BAD_REQUEST, "gateway id is required");
+            throw new BusinessException(ErrorCode.MQTT_GATEWAY_ID_REQUIRED);
         }
         RS485Gateway gateway = gatewayHelper.getById(gatewayId);
         if (gateway == null) {
-            throw new BusinessException(NOT_FOUND, "mqtt gateway doesn't exist");
+            throw new BusinessException(ErrorCode.MQTT_GATEWAY_NOT_FOUND);
         }
         return gateway;
     }
 
     private void validate(RS485Gateway gateway) {
         if (gateway == null) {
-            throw new BusinessException(BAD_REQUEST, "mqtt gateway is required");
+            throw new BusinessException(ErrorCode.MQTT_GATEWAY_REQUIRED);
         }
         if (gateway.getSendTopic() == null || gateway.getSendTopic().isBlank()
                 || gateway.getAcceptTopic() == null || gateway.getAcceptTopic().isBlank()) {
-            throw new BusinessException(BAD_REQUEST, "mqtt gateway topics are required");
+            throw new BusinessException(ErrorCode.MQTT_GATEWAY_TOPICS_REQUIRED);
         }
     }
 }

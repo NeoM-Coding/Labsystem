@@ -1,5 +1,6 @@
 package xyz.jasenon.lab.mqtt.client;
 
+import xyz.jasenon.lab.common.error.ErrorCode;
 import org.apache.dubbo.config.annotation.DubboService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,9 +26,6 @@ import java.util.List;
 @Traced("mqtt-device-service")
 public class MqttDeviceManager implements MqttDeviceCRUD {
 
-    private static final int BAD_REQUEST = 400;
-    private static final int NOT_FOUND = 404;
-    private static final int INTERNAL_SERVER_ERROR = 500;
 
     private final DeviceHelper deviceHelper;
     private final GatewayHelper gatewayHelper;
@@ -56,7 +54,7 @@ public class MqttDeviceManager implements MqttDeviceCRUD {
     public RpcResult<Device> create(Device device) {
         validate(device);
         if (!deviceHelper.addDevice(device)) {
-            throw new BusinessException(INTERNAL_SERVER_ERROR, "device create failed");
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
         Device created = required(device.getId());
         TransactionCallbacks.afterCommit(() -> pollingManager.synchronizeRuntime(null, created));
@@ -87,13 +85,13 @@ public class MqttDeviceManager implements MqttDeviceCRUD {
         Device previous = required(deviceId);
         validate(device);
         if (previous.getDeviceType() != device.getDeviceType()) {
-            throw new BusinessException(BAD_REQUEST, "device type can't be changed");
+            throw new BusinessException(ErrorCode.MQTT_DEVICE_TYPE_IMMUTABLE);
         }
 
         // URL/RPC 方法参数中的 ID 是资源身份，禁止请求体把更新导向其他设备。
         device.setId(deviceId);
         if (!deviceHelper.updateDevice(device)) {
-            throw new BusinessException(INTERNAL_SERVER_ERROR, "device update failed");
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
         Device updated = required(deviceId);
         TransactionCallbacks.afterCommit(() -> pollingManager.synchronizeRuntime(previous, updated));
@@ -105,7 +103,7 @@ public class MqttDeviceManager implements MqttDeviceCRUD {
     public RpcResult<Void> delete(String deviceId) {
         Device previous = required(deviceId);
         if (!deviceHelper.removeDevice(deviceId)) {
-            throw new BusinessException(INTERNAL_SERVER_ERROR, "device delete failed");
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
         TransactionCallbacks.afterCommit(() -> pollingManager.synchronizeRuntime(previous, null));
         return RpcResult.success();
@@ -113,30 +111,30 @@ public class MqttDeviceManager implements MqttDeviceCRUD {
 
     private Device required(String deviceId) {
         if (deviceId == null || deviceId.isBlank()) {
-            throw new BusinessException(BAD_REQUEST, "device id is required");
+            throw new BusinessException(ErrorCode.MQTT_DEVICE_ID_REQUIRED);
         }
         Device device = deviceHelper.getDeviceById(deviceId);
         if (device == null) {
-            throw new BusinessException(NOT_FOUND, "device doesn't exist");
+            throw new BusinessException(ErrorCode.MQTT_DEVICE_NOT_FOUND);
         }
         return device;
     }
 
     private void validate(Device device) {
         if (device == null || device.getDeviceType() == null) {
-            throw new BusinessException(BAD_REQUEST, "device type is required");
+            throw new BusinessException(ErrorCode.MQTT_DEVICE_TYPE_REQUIRED);
         }
         if (device.getGatewayId() == null || device.getGatewayId().isBlank()) {
-            throw new BusinessException(BAD_REQUEST, "gateway id is required");
+            throw new BusinessException(ErrorCode.MQTT_GATEWAY_ID_REQUIRED);
         }
         if (gatewayHelper.getById(device.getGatewayId()) == null) {
-            throw new BusinessException(BAD_REQUEST, "mqtt gateway doesn't exist");
+            throw new BusinessException(ErrorCode.MQTT_GATEWAY_NOT_FOUND);
         }
         if (device.getDeviceName() == null || device.getDeviceName().isBlank()) {
-            throw new BusinessException(BAD_REQUEST, "device name is required");
+            throw new BusinessException(ErrorCode.MQTT_DEVICE_NAME_REQUIRED);
         }
         if (!matchesConcreteType(device)) {
-            throw new BusinessException(BAD_REQUEST, "device type doesn't match its model");
+            throw new BusinessException(ErrorCode.MQTT_DEVICE_MODEL_MISMATCH);
         }
         validateAddress(device);
     }
@@ -162,10 +160,10 @@ public class MqttDeviceManager implements MqttDeviceCRUD {
             case Sensor -> address >= 61 && address <= 80;
         };
         if (!valid) {
-            throw new BusinessException(BAD_REQUEST, "device address is outside the allowed range");
+            throw new BusinessException(ErrorCode.MQTT_DEVICE_ADDRESS_INVALID);
         }
         if (device instanceof SelfId selfId && selfId.selfId() < 0) {
-            throw new BusinessException(BAD_REQUEST, "device self id must not be negative");
+            throw new BusinessException(ErrorCode.MQTT_DEVICE_SELF_ID_INVALID);
         }
     }
 }

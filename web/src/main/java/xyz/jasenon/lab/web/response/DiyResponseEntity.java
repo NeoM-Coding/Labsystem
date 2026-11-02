@@ -9,11 +9,12 @@ public class DiyResponseEntity<T extends R<?>> extends ResponseEntity<T> {
     private DiyResponseEntity(T data){
         super(
                 data,
-                HttpStatusCode.valueOf(data.getCode())
+                HttpStatusCode.valueOf(data.getHttpStatus())
         );
     }
 
     public static <T extends R<?>> DiyResponseEntity<T> of(T data){
+        if (data.getTraceId() == null) data.withTraceId(xyz.jasenon.lab.observability.context.TraceContext.traceId());
         return new DiyResponseEntity<>(data);
     }
 }

@@ -26,6 +26,10 @@ class EduHandlerConfigurationTests {
                 "manage_semester");
         assertAction(configuration.timetableClearAuthorization(),
                 new TimetableClear("semester-1", "lab-1"), "manage_timetable");
+        assertAction(configuration.timetableImportTemplateAuthorization(),
+                new xyz.jasenon.lab.edu.api.command.TimetableImportTemplateQuery(), "manage_timetable");
+        assertAction(configuration.timetableExportAuthorization(),
+                new xyz.jasenon.lab.edu.api.command.TimetableExportQuery("s1", java.util.List.of("lab-1")), "view_timetable");
     }
 
     @Test

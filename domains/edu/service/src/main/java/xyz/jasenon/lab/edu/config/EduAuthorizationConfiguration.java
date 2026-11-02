@@ -16,6 +16,8 @@ import xyz.jasenon.lab.edu.api.command.TimetableClear;
 import xyz.jasenon.lab.edu.api.command.TimetableCreate;
 import xyz.jasenon.lab.edu.api.command.TimetableDelete;
 import xyz.jasenon.lab.edu.api.command.TimetableImport;
+import xyz.jasenon.lab.edu.api.command.TimetableImportTemplateQuery;
+import xyz.jasenon.lab.edu.api.command.TimetableExportQuery;
 import xyz.jasenon.lab.edu.api.command.TimetableListQuery;
 import xyz.jasenon.lab.edu.api.command.TimetableUpdate;
 
@@ -51,6 +53,14 @@ public class EduAuthorizationConfiguration {
     }
     @Bean ActionCommandHandler<TimetableImport> timetableImportAuthorization() {
         return app(TimetableImport.class, Action.App.manage_timetable);
+    }
+
+    @Bean ActionCommandHandler<TimetableImportTemplateQuery> timetableImportTemplateAuthorization() {
+        return app(TimetableImportTemplateQuery.class, Action.App.manage_timetable);
+    }
+
+    @Bean ActionCommandHandler<TimetableExportQuery> timetableExportAuthorization() {
+        return app(TimetableExportQuery.class, Action.App.view_timetable);
     }
 
     private static <T> ActionCommandHandler<T> app(Class<T> type, Action.App action) {

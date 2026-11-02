@@ -1,5 +1,6 @@
 package xyz.jasenon.lab.web.edu;
 
+import xyz.jasenon.lab.common.error.ErrorCode;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,6 +24,11 @@ import xyz.jasenon.lab.edu.api.command.TimetableClear;
 import xyz.jasenon.lab.edu.api.command.TimetableCreate;
 import xyz.jasenon.lab.edu.api.command.TimetableDelete;
 import xyz.jasenon.lab.edu.api.command.TimetableImport;
+import xyz.jasenon.lab.edu.api.command.TimetableImportTemplateQuery;
+import xyz.jasenon.lab.edu.api.command.TimetableExportQuery;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import xyz.jasenon.lab.edu.api.command.TimetableListQuery;
 import xyz.jasenon.lab.edu.api.command.TimetableUpdate;
 import xyz.jasenon.lab.edu.api.view.TimetableImportResult;
@@ -116,12 +122,37 @@ public class TimetableController {
         return DiyResponseEntity.of(R.success());
     }
 
+    @GetMapping("/import-template")
+    @Operation(summary = "下载课表 Excel 模板", description = "第一张表为无表头的课表数据，A-G 对应周一至周日；第二张表为填写说明。需要课表管理权限。")
+    public ResponseEntity<byte[]> importTemplate() {
+        byte[] content = RpcClient.call(() -> timetableService.importTemplate(
+                new TimetableImportTemplateQuery()));
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"timetable-import-template.xlsx\"")
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(content);
+    }
+
+    @GetMapping("/export")
+    @Operation(summary = "导出可打印的 Excel 课表", description = "学期和实验室必填，每个实验室一张工作表，A3 横向单页打印。包含全部课程，不受前端搜索词影响；需要课表查看权限和实验室可见权限。")
+    public ResponseEntity<byte[]> exportExcel(@RequestParam String semesterId,
+                                              @RequestParam List<String> laboratoryIds) {
+        byte[] content = RpcClient.call(() -> timetableService.exportExcel(
+                new TimetableExportQuery(semesterId, laboratoryIds)));
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"timetable-print.xlsx\"")
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(content);
+    }
+
     @PostMapping(value = "/import", consumes = "multipart/form-data")
     @Operation(
             summary = "从 Excel 导入课表",
             description = """
                     使用 semesterId 和 laboratoryId 确定归属。单元格格式为
-                    课程名称<>时间信息<>教师名称；Excel 第 0 列代表星期一。
+                    课程名称<>时间信息<>教师名称；只读取第一张工作表，无表头，A-G 列代表周一至周日。
                     每条课表独立提交，响应包含成功数、失败数和错误位置。
                     """
     )
@@ -132,16 +163,16 @@ public class TimetableController {
             @RequestParam String laboratoryId
     ) {
         if (excel.isEmpty()) {
-            throw new BusinessException(400, "Excel 文件不能为空");
+            throw new BusinessException(ErrorCode.TIMETABLE_IMPORT_EMPTY);
         }
         if (excel.getSize() > importMaxBytes) {
-            throw new BusinessException(400, "Excel 文件不能超过 " + importMaxBytes + " 字节");
+            throw new BusinessException(ErrorCode.TIMETABLE_IMPORT_TOO_LARGE, "Excel 文件不能超过 " + importMaxBytes + " 字节");
         }
         byte[] content;
         try {
             content = excel.getBytes();
         } catch (IOException exception) {
-            throw new BusinessException(400, "Excel 文件读取失败");
+            throw new BusinessException(ErrorCode.TIMETABLE_IMPORT_PARSE_FAILED, "Excel 文件读取失败");
         }
         TimetableImport command = new TimetableImport(
                 semesterId, laboratoryId, excel.getOriginalFilename(), content

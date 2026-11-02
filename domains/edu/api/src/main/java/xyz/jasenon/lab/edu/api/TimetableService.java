@@ -5,6 +5,8 @@ import xyz.jasenon.lab.edu.api.command.TimetableClear;
 import xyz.jasenon.lab.edu.api.command.TimetableCreate;
 import xyz.jasenon.lab.edu.api.command.TimetableDelete;
 import xyz.jasenon.lab.edu.api.command.TimetableImport;
+import xyz.jasenon.lab.edu.api.command.TimetableImportTemplateQuery;
+import xyz.jasenon.lab.edu.api.command.TimetableExportQuery;
 import xyz.jasenon.lab.edu.api.command.TimetableListQuery;
 import xyz.jasenon.lab.edu.api.command.TimetableUpdate;
 import xyz.jasenon.lab.edu.api.view.TimetableImportResult;
@@ -13,6 +15,10 @@ import xyz.jasenon.lab.edu.api.view.TimetableView;
 import java.util.List;
 
 public interface TimetableService {
+
+    RpcResult<byte[]> importTemplate(TimetableImportTemplateQuery query);
+
+    RpcResult<byte[]> exportExcel(TimetableExportQuery query);
 
     RpcResult<List<TimetableView>> list(TimetableListQuery query);
 

@@ -1,5 +1,6 @@
 package xyz.jasenon.lab.edu.service;
 
+import xyz.jasenon.lab.common.error.ErrorCode;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.apache.dubbo.config.annotation.DubboService;
 import org.apache.fesod.sheet.FesodSheet;
@@ -21,6 +22,9 @@ import xyz.jasenon.lab.edu.api.command.TimetableClear;
 import xyz.jasenon.lab.edu.api.command.TimetableCreate;
 import xyz.jasenon.lab.edu.api.command.TimetableDelete;
 import xyz.jasenon.lab.edu.api.command.TimetableImport;
+import xyz.jasenon.lab.edu.api.command.TimetableImportTemplateQuery;
+import xyz.jasenon.lab.edu.api.command.TimetableExportQuery;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import xyz.jasenon.lab.edu.api.command.TimetableListQuery;
 import xyz.jasenon.lab.edu.api.command.TimetableUpdate;
 import xyz.jasenon.lab.edu.api.model.WeekType;
@@ -34,6 +38,8 @@ import xyz.jasenon.lab.edu.model.Timetable;
 import xyz.jasenon.lab.observability.annotation.Traced;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.time.LocalTime;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -91,7 +97,7 @@ public class TimetableServiceImpl extends ServiceImpl<TimetableMapper, Timetable
     public RpcResult<List<TimetableView>> list(TimetableListQuery query) {
         requireText(query.semesterId(), "学期ID不能为空");
         if (semesterMapper.selectById(query.semesterId().trim()) == null) {
-            throw new BusinessException(404, "学期不存在");
+            throw new BusinessException(ErrorCode.SEMESTER_NOT_FOUND, "学期不存在");
         }
         UserContext context = requireContext();
         Set<String> visible = Set.copyOf(context.filterLaboratoryIds());
@@ -135,7 +141,7 @@ public class TimetableServiceImpl extends ServiceImpl<TimetableMapper, Timetable
         requireText(command.timetableId(), "课表ID不能为空");
         Timetable existing = getById(command.timetableId().trim());
         if (existing == null) {
-            throw new BusinessException(404, "课表不存在");
+            throw new BusinessException(ErrorCode.TIMETABLE_NOT_FOUND, "课表不存在");
         }
         requireVisibleLaboratory(existing.getLaboratoryId());
         requireVisibleLaboratory(command.laboratoryId());
@@ -163,7 +169,7 @@ public class TimetableServiceImpl extends ServiceImpl<TimetableMapper, Timetable
         requireText(command.timetableId(), "课表ID不能为空");
         Timetable timetable = getById(command.timetableId().trim());
         if (timetable == null) {
-            throw new BusinessException(404, "课表不存在");
+            throw new BusinessException(ErrorCode.TIMETABLE_NOT_FOUND, "课表不存在");
         }
         requireVisibleLaboratory(timetable.getLaboratoryId());
         lockSemester(timetable.getSemesterId());
@@ -188,13 +194,96 @@ public class TimetableServiceImpl extends ServiceImpl<TimetableMapper, Timetable
 
     @Override
     @ActionAuthorized
+    public RpcResult<byte[]> importTemplate(TimetableImportTemplateQuery query) {
+        try (var workbook = new XSSFWorkbook(); var output = new ByteArrayOutputStream()) {
+            var sheet = workbook.createSheet("课表数据");
+            var helper = workbook.getCreationHelper();
+            var drawing = sheet.createDrawingPatriarch();
+            var row = sheet.createRow(0);
+            String[] weekdays = {"周一", "周二", "周三", "周四", "周五", "周六", "周日"};
+            for (int column = 0; column < weekdays.length; column++) {
+                sheet.setColumnWidth(column, 42 * 256);
+                var cell = row.createCell(column);
+                var anchor = helper.createClientAnchor();
+                anchor.setCol1(column);
+                anchor.setCol2(column + 3);
+                anchor.setRow1(0);
+                anchor.setRow2(5);
+                var comment = drawing.createCellComment(anchor);
+                comment.setAuthor("课表管理");
+                comment.setString(helper.createRichTextString(weekdays[column]
+                        + "：课程名称<>时间信息<>教师名称。无表头，从第一行填写；多条课程用英文逗号分隔。"));
+                cell.setCellComment(comment);
+            }
+            var instructions = workbook.createSheet("填写说明");
+            instructions.setColumnWidth(0, 28 * 256);
+            instructions.setColumnWidth(1, 100 * 256);
+            var noteStyle = workbook.createCellStyle();
+            noteStyle.setWrapText(true);
+            noteStyle.setVerticalAlignment(org.apache.poi.ss.usermodel.VerticalAlignment.CENTER);
+            String[][] notes = {
+                    {"导入范围", "只读取第一张工作表；学期和实验室在导入页面选择。请勿添加表头或左侧节次列。"},
+                    {"星期对应", "A=周一，B=周二，C=周三，D=周四，E=周五，F=周六，G=周日。"},
+                    {"填写规则", "一项为：课程名称<>时间信息<>教师名称；同一单元格多项用英文逗号分隔。空白单元格跳过。"},
+                    {"每周示例", "软件工程<>1-16周[1-2节]<>张三"},
+                    {"单周示例", "大学英语<>1-8周(单)[10:00-10:45]<>李四"},
+                    {"双周示例", "计算机网络<>2-16周(双)[18:40-20:15]<>王五"},
+                    {"多项示例", "软件工程<>1-8周[1-2节]<>张三,软件工程<>9-16周[1-2节]<>李四"},
+                    {"注意事项", "括号、分隔符使用英文字符；课程和教师名称不要包含英文逗号或<>；不合并单元格，不使用公式。"},
+                    {"导入结果", "合法记录逐条入库，错误不影响后续记录；重试请仅保留失败课程，已成功课程再次上传会发生冲突。"},
+                    {"文件限制", "上传支持 .xlsx / .xls，最大 5 MiB。以下为系统节次时间表。"}
+            };
+            int index = 0;
+            for (String[] note : notes) {
+                var line = instructions.createRow(index++);
+                line.createCell(0).setCellValue(note[0]);
+                line.createCell(1).setCellValue(note[1]);
+                line.getCell(1).setCellStyle(noteStyle);
+                line.setHeightInPoints(48);
+            }
+            for (SectionInfo section : SECTIONS) {
+                var line = instructions.createRow(index++);
+                line.createCell(0).setCellValue("第 " + section.section() + " 节");
+                line.createCell(1).setCellValue(section.start() + " - " + section.end());
+            }
+            workbook.write(output);
+            return RpcResult.success(output.toByteArray());
+        } catch (IOException exception) {
+            throw new BusinessException(ErrorCode.TIMETABLE_IMPORT_PARSE_FAILED, "课表模板生成失败");
+        }
+    }
+
+    @Override
+    @ActionAuthorized
+    public RpcResult<byte[]> exportExcel(TimetableExportQuery query) {
+        requireText(query.semesterId(), "学期ID不能为空");
+        List<String> laboratoryIds = normalizeIds(query.laboratoryIds());
+        if (laboratoryIds.isEmpty()) {
+            throw new BusinessException(ErrorCode.VALIDATION_FAILED, "请选择要导出的实验室");
+        }
+        laboratoryIds.forEach(TimetableServiceImpl::requireVisibleLaboratory);
+        Semester semester = semesterMapper.selectById(query.semesterId().trim());
+        if (semester == null) throw new BusinessException(ErrorCode.SEMESTER_NOT_FOUND, "学期不存在");
+        List<TimetableView> courses = list(new TimetableListQuery(query.semesterId(), laboratoryIds)).data();
+        return RpcResult.success(TimetableWorkbookExporter.write(
+                SemesterServiceImpl.view(semester), laboratoryIds, laboratoryNames(requireContext()), courses));
+    }
+
+    @Override
+    @ActionAuthorized
     @Audited("timetable.import")
     public RpcResult<TimetableImportResult> importExcel(TimetableImport command) {
         requireText(command.semesterId(), "学期ID不能为空");
         requireVisibleLaboratory(command.laboratoryId());
         validateFile(command.filename(), command.content());
 
+        if (semesterMapper.selectById(command.semesterId().trim()) == null) {
+            throw new BusinessException(ErrorCode.SEMESTER_NOT_FOUND, "学期不存在");
+        }
         ParsedWorkbook workbook = parseWorkbook(command.content());
+        if (workbook.entries().isEmpty() && workbook.errors().isEmpty()) {
+            throw new BusinessException(ErrorCode.TIMETABLE_IMPORT_EMPTY, "第一张工作表没有可导入的课程，请按模板填写后上传");
+        }
         List<TimetableImportError> errors = new ArrayList<>(workbook.errors());
         int success = 0;
         for (ParsedEntry entry : workbook.entries()) {
@@ -265,19 +354,19 @@ public class TimetableServiceImpl extends ServiceImpl<TimetableMapper, Timetable
         requireText(laboratoryId, "实验室ID不能为空");
         requireText(courseName, "课程名称不能为空");
         requireText(teacherName, "教师名称不能为空");
-        if (weekType == null) throw new BusinessException(400, "周次类型不能为空");
+        if (weekType == null) throw new BusinessException(ErrorCode.TIMETABLE_WEEK_TYPE_REQUIRED, "周次类型不能为空");
         if (startWeek == null || endWeek == null || startWeek < 1 || endWeek < startWeek) {
-            throw new BusinessException(400, "周次范围不合法");
+            throw new BusinessException(ErrorCode.TIMETABLE_WEEK_RANGE_INVALID, "周次范围不合法");
         }
         if (startSection == null || endSection == null
                 || startSection < 1 || endSection < startSection || endSection > SECTIONS.size()) {
-            throw new BusinessException(400, "节次范围必须在 1 到 " + SECTIONS.size() + " 之间");
+            throw new BusinessException(ErrorCode.TIMETABLE_PERIOD_RANGE_INVALID, "节次范围必须在 1 到 " + SECTIONS.size() + " 之间");
         }
         if (startTime == null || endTime == null || !startTime.isBefore(endTime)) {
-            throw new BusinessException(400, "上课开始时间必须早于结束时间");
+            throw new BusinessException(ErrorCode.TIMETABLE_TIME_RANGE_INVALID, "上课开始时间必须早于结束时间");
         }
         if (weekday == null || weekday < 1 || weekday > 7) {
-            throw new BusinessException(400, "weekday 必须在 1 到 7 之间");
+            throw new BusinessException(ErrorCode.TIMETABLE_WEEKDAY_INVALID);
         }
         Timetable timetable = new Timetable();
         timetable.setSemesterId(semesterId.trim());
@@ -298,7 +387,7 @@ public class TimetableServiceImpl extends ServiceImpl<TimetableMapper, Timetable
     private Semester lockSemester(String semesterId) {
         Semester semester = semesterMapper.selectByIdForUpdate(semesterId);
         if (semester == null) {
-            throw new BusinessException(404, "学期不存在");
+            throw new BusinessException(ErrorCode.SEMESTER_NOT_FOUND, "学期不存在");
         }
         return semester;
     }
@@ -311,7 +400,7 @@ public class TimetableServiceImpl extends ServiceImpl<TimetableMapper, Timetable
         for (Timetable existing : possible) {
             if (Objects.equals(existing.getId(), excludedId)) continue;
             if (hasConflict(candidate, existing)) {
-                throw new BusinessException(409, "课程安排冲突，冲突课表ID：" + existing.getId());
+                throw new BusinessException(ErrorCode.TIMETABLE_CONFLICT, "课程安排冲突，冲突课表ID：" + existing.getId());
             }
         }
     }
@@ -356,9 +445,9 @@ public class TimetableServiceImpl extends ServiceImpl<TimetableMapper, Timetable
                 @Override
                 public void doAfterAllAnalysed(AnalysisContext context) {
                 }
-            }).sheet().headRowNumber(0).doRead();
+            }).sheet(0).headRowNumber(0).doRead();
         } catch (RuntimeException exception) {
-            throw new BusinessException(400, "Excel 文件无法解析");
+            throw new BusinessException(ErrorCode.TIMETABLE_IMPORT_PARSE_FAILED);
         }
         entries.sort(Comparator.comparing(ParsedEntry::rowIndex).thenComparing(ParsedEntry::columnIndex));
         errors.sort(Comparator.comparing(TimetableImportError::rowIndex)
@@ -389,17 +478,17 @@ public class TimetableServiceImpl extends ServiceImpl<TimetableMapper, Timetable
     private static ParsedEntry parseItem(int rowIndex, int columnIndex, String raw) {
         Matcher item = ITEM_PATTERN.matcher(raw);
         if (!item.matches()) {
-            throw new BusinessException(400, "格式应为：课程名称<>时间信息<>教师名称");
+            throw new BusinessException(ErrorCode.TIMETABLE_IMPORT_CELL_INVALID, "格式应为：课程名称<>时间信息<>教师名称");
         }
         String course = item.group(1).trim();
         String time = item.group(2).trim();
         String teacher = item.group(3).trim();
         if (course.isEmpty() || teacher.isEmpty()) {
-            throw new BusinessException(400, "课程名称和教师名称不能为空");
+            throw new BusinessException(ErrorCode.TIMETABLE_COURSE_TEACHER_REQUIRED, "课程名称和教师名称不能为空");
         }
         Matcher week = WEEK_PATTERN.matcher(time);
         if (!week.matches()) {
-            throw new BusinessException(400, "时间格式应为 X-Y周[节次或时间]");
+            throw new BusinessException(ErrorCode.TIMETABLE_IMPORT_TIME_INVALID);
         }
         int startWeek;
         int endWeek;
@@ -407,10 +496,10 @@ public class TimetableServiceImpl extends ServiceImpl<TimetableMapper, Timetable
             startWeek = Integer.parseInt(week.group(1));
             endWeek = Integer.parseInt(week.group(2));
         } catch (NumberFormatException exception) {
-            throw new BusinessException(400, "周次数字不合法");
+            throw new BusinessException(ErrorCode.TIMETABLE_IMPORT_WEEK_INVALID, "周次数字不合法");
         }
         if (startWeek < 1 || endWeek < startWeek) {
-            throw new BusinessException(400, "周次范围不合法");
+            throw new BusinessException(ErrorCode.TIMETABLE_WEEK_RANGE_INVALID, "周次范围不合法");
         }
         WeekType weekType = switch (week.group(3) == null ? "" : week.group(3)) {
             case "单" -> WeekType.Single;
@@ -431,7 +520,7 @@ public class TimetableServiceImpl extends ServiceImpl<TimetableMapper, Timetable
             int start = Integer.parseInt(section.group(1));
             int end = Integer.parseInt(section.group(2));
             if (start < 1 || end < start || end > SECTIONS.size()) {
-                throw new BusinessException(400, "节次范围必须在 1 到 " + SECTIONS.size() + " 之间");
+                throw new BusinessException(ErrorCode.TIMETABLE_PERIOD_RANGE_INVALID, "节次范围必须在 1 到 " + SECTIONS.size() + " 之间");
             }
             return new TimeRange(
                     SECTIONS.get(start - 1).start(),
@@ -445,14 +534,14 @@ public class TimetableServiceImpl extends ServiceImpl<TimetableMapper, Timetable
             try {
                 LocalTime start = LocalTime.of(Integer.parseInt(time.group(1)), Integer.parseInt(time.group(2)));
                 LocalTime end = LocalTime.of(Integer.parseInt(time.group(3)), Integer.parseInt(time.group(4)));
-                if (!start.isBefore(end)) throw new BusinessException(400, "开始时间必须早于结束时间");
+                if (!start.isBefore(end)) throw new BusinessException(ErrorCode.TIMETABLE_IMPORT_TIME_RANGE_INVALID, "开始时间必须早于结束时间");
                 SectionRange sections = sectionsForTime(start, end);
                 return new TimeRange(start, end, sections.start(), sections.end());
             } catch (java.time.DateTimeException exception) {
-                throw new BusinessException(400, "时间值不合法");
+                throw new BusinessException(ErrorCode.TIMETABLE_IMPORT_TIME_VALUE_INVALID, "时间值不合法");
             }
         }
-        throw new BusinessException(400, "时间详情应为 X-Y节 或 HH:mm-HH:mm");
+        throw new BusinessException(ErrorCode.TIMETABLE_IMPORT_TIME_DETAIL_INVALID);
     }
 
     private static SectionRange sectionsForTime(LocalTime startTime, LocalTime endTime) {
@@ -476,20 +565,20 @@ public class TimetableServiceImpl extends ServiceImpl<TimetableMapper, Timetable
         requireText(filename, "Excel 文件名不能为空");
         String lower = filename.trim().toLowerCase(Locale.ROOT);
         if (!lower.endsWith(".xlsx") && !lower.endsWith(".xls")) {
-            throw new BusinessException(400, "仅支持 .xlsx 或 .xls 文件");
+            throw new BusinessException(ErrorCode.TIMETABLE_IMPORT_EXTENSION_INVALID);
         }
         if (content == null || content.length == 0) {
-            throw new BusinessException(400, "Excel 文件不能为空");
+            throw new BusinessException(ErrorCode.TIMETABLE_IMPORT_EMPTY);
         }
         if (content.length > importMaxBytes) {
-            throw new BusinessException(400, "Excel 文件不能超过 " + importMaxBytes + " 字节");
+            throw new BusinessException(ErrorCode.TIMETABLE_IMPORT_TOO_LARGE, "Excel 文件不能超过 " + importMaxBytes + " 字节");
         }
         boolean xlsx = content.length >= 2 && content[0] == 'P' && content[1] == 'K';
         boolean xls = content.length >= 4
                 && (content[0] & 0xff) == 0xD0 && (content[1] & 0xff) == 0xCF
                 && (content[2] & 0xff) == 0x11 && (content[3] & 0xff) == 0xE0;
         if (!xlsx && !xls) {
-            throw new BusinessException(400, "文件内容不是有效的 Excel 格式");
+            throw new BusinessException(ErrorCode.TIMETABLE_IMPORT_FORMAT_INVALID);
         }
     }
 
@@ -516,7 +605,7 @@ public class TimetableServiceImpl extends ServiceImpl<TimetableMapper, Timetable
     private static UserContext requireContext() {
         UserContext context = UserContextHolder.get();
         if (context == null || context.getUserId() == null || context.getUserId().isBlank()) {
-            throw new BusinessException(401, "登陆已过期");
+            throw new BusinessException(ErrorCode.AUTHENTICATION_REQUIRED, "登陆已过期");
         }
         return context;
     }
@@ -524,7 +613,7 @@ public class TimetableServiceImpl extends ServiceImpl<TimetableMapper, Timetable
     private static void requireVisibleLaboratory(String laboratoryId) {
         requireText(laboratoryId, "实验室ID不能为空");
         if (!requireContext().canViewLaboratory(laboratoryId.trim())) {
-            throw new BusinessException(403, "无权访问该实验室");
+            throw new BusinessException(ErrorCode.LABORATORY_ACCESS_DENIED, "无权访问该实验室");
         }
     }
 
@@ -558,7 +647,7 @@ public class TimetableServiceImpl extends ServiceImpl<TimetableMapper, Timetable
     }
 
     private static void requireText(String value, String message) {
-        if (value == null || value.isBlank()) throw new BusinessException(400, message);
+        if (value == null || value.isBlank()) throw new BusinessException(ErrorCode.VALIDATION_FAILED, message);
     }
 
     private record SectionInfo(int section, LocalTime start, LocalTime end) {

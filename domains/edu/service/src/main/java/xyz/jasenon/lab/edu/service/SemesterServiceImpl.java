@@ -1,5 +1,6 @@
 package xyz.jasenon.lab.edu.service;
 
+import xyz.jasenon.lab.common.error.ErrorCode;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.apache.dubbo.config.annotation.DubboService;
 import org.springframework.dao.DuplicateKeyException;
@@ -68,7 +69,7 @@ public class SemesterServiceImpl extends ServiceImpl<SemesterMapper, Semester> i
         try {
             save(semester);
         } catch (DuplicateKeyException exception) {
-            throw new BusinessException(409, "学期名称已存在");
+            throw new BusinessException(ErrorCode.SEMESTER_NAME_CONFLICT, "学期名称已存在");
         }
         return RpcResult.success(view(semester));
     }
@@ -82,7 +83,7 @@ public class SemesterServiceImpl extends ServiceImpl<SemesterMapper, Semester> i
         validate(command.name(), command.startDate(), command.endDate());
         Semester semester = baseMapper.selectByIdForUpdate(command.semesterId().trim());
         if (semester == null) {
-            throw new BusinessException(404, "学期不存在");
+            throw new BusinessException(ErrorCode.SEMESTER_NOT_FOUND, "学期不存在");
         }
         String name = command.name().trim();
         requireNameAvailable(name, semester.getId());
@@ -93,7 +94,7 @@ public class SemesterServiceImpl extends ServiceImpl<SemesterMapper, Semester> i
         try {
             updateById(semester);
         } catch (DuplicateKeyException exception) {
-            throw new BusinessException(409, "学期名称已存在");
+            throw new BusinessException(ErrorCode.SEMESTER_NAME_CONFLICT, "学期名称已存在");
         }
 
         // 冗余快照必须与学期主记录在同一事务内同步。
@@ -121,13 +122,13 @@ public class SemesterServiceImpl extends ServiceImpl<SemesterMapper, Semester> i
         requireId(command.semesterId(), "学期ID不能为空");
         Semester semester = baseMapper.selectByIdForUpdate(command.semesterId().trim());
         if (semester == null) {
-            throw new BusinessException(404, "学期不存在");
+            throw new BusinessException(ErrorCode.SEMESTER_NOT_FOUND, "学期不存在");
         }
         Long count = new com.baomidou.mybatisplus.extension.conditions.query.LambdaQueryChainWrapper<>(
                 timetableMapper
         ).eq(Timetable::getSemesterId, semester.getId()).count();
         if (count > 0) {
-            throw new BusinessException(409, "该学期仍有课表记录，请先清理课表");
+            throw new BusinessException(ErrorCode.SEMESTER_HAS_TIMETABLES, "该学期仍有课表记录，请先清理课表");
         }
         removeById(semester.getId());
         return RpcResult.success();
@@ -139,7 +140,7 @@ public class SemesterServiceImpl extends ServiceImpl<SemesterMapper, Semester> i
                 .ne(excludedId != null, Semester::getId, excludedId)
                 .count();
         if (count > 0) {
-            throw new BusinessException(409, "学期名称已存在");
+            throw new BusinessException(ErrorCode.SEMESTER_NAME_CONFLICT, "学期名称已存在");
         }
     }
 
@@ -156,19 +157,19 @@ public class SemesterServiceImpl extends ServiceImpl<SemesterMapper, Semester> i
 
     private static void validate(String name, LocalDate startDate, LocalDate endDate) {
         if (name == null || !NAME_PATTERN.matcher(name.trim()).matches()) {
-            throw new BusinessException(400, "学期名称格式应为 YYYY-YYYY 第N学期");
+            throw new BusinessException(ErrorCode.SEMESTER_NAME_INVALID);
         }
         if (startDate == null || endDate == null) {
-            throw new BusinessException(400, "学期开始日期和结束日期不能为空");
+            throw new BusinessException(ErrorCode.SEMESTER_DATES_REQUIRED, "学期开始日期和结束日期不能为空");
         }
         if (!startDate.isBefore(endDate)) {
-            throw new BusinessException(400, "学期开始日期必须早于结束日期");
+            throw new BusinessException(ErrorCode.SEMESTER_DATE_RANGE_INVALID, "学期开始日期必须早于结束日期");
         }
     }
 
     private static void requireId(String value, String message) {
         if (value == null || value.isBlank()) {
-            throw new BusinessException(400, message);
+            throw new BusinessException(ErrorCode.VALIDATION_FAILED, message);
         }
     }
 

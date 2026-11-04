@@ -2,15 +2,16 @@ package xyz.jasenon.lab.api.mqtt.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
+import xyz.jasenon.lab.audit.api.Loggable;
 import xyz.jasenon.lab.device.model.DeviceType;
 import xyz.jasenon.lab.mqtt.protocol.command.CommandLine;
 
 import java.io.Serial;
-import java.io.Serializable;
+import java.util.Arrays;
 
 @AllArgsConstructor
 @NoArgsConstructor
-public class MqttTaskDto implements Serializable {
+public class MqttTaskDto implements Loggable {
 
     @Serial
     private static final long serialVersionUID = 1L;
@@ -54,5 +55,11 @@ public class MqttTaskDto implements Serializable {
 
     public static MqttTaskDto of(CommandLine commandLine, int[] args, DeviceType deviceType, String deviceId){
         return new MqttTaskDto(commandLine,args,deviceType,deviceId);
+    }
+    @Override
+    public String log() {
+        return "发送MQTT任务：设备「" + deviceId + "」，类型「" + type
+                + "」，指令「" + (commandLine == null ? "未指定" : commandLine.getDescription())
+                + "」，参数" + Arrays.toString(args);
     }
 }

@@ -56,6 +56,8 @@ fun:
     generator-mode: none
 
 lab:
+  audit:
+    store: rpc
   storage:
     enabled: ${MINIO_ENABLED:false}
     endpoint: ${MINIO_ENDPOINT:http://localhost:9000}

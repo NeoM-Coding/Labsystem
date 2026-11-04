@@ -57,6 +57,16 @@ lab:
 
 审计 Store 当前使用业务 MySQL，表为 `audit_operation_log`，不声明物理外键。审计写入失败会记录 error，但不会回滚已经成功的核心业务。
 
+`lab.audit.store` 缺省为 `local`，注册 MyBatis Mapper 并直接写业务数据库。
+Web 网关配置为 `rpc`，使用 `RpcAuditLogStore` 调用 Base 提供的内部
+`AuditLogWriterService`，不注册审计 Mapper，也不需要网关数据源。
+操作人、时间和链路标识由网关生成并随 `AuditEvent` 原样传递；RPC 写入关闭重试，
+失败仍由网关切面记录 `audit_persist_failure`，不会改变业务返回值。
+
+发布该变更时先升级 Base，再升级 Web，使新的审计写入接口先可用。
+`AuditEvent` 和 `AuditFragment` 已移至 `audit-api` 的 `api.model` 包并支持序列化，
+所有依赖审计模块的服务应使用同一版本重新构建。
+
 ## 5. 当前覆盖
 
 已接入：

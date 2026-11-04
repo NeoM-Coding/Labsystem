@@ -1,5 +1,7 @@
 package xyz.jasenon.lab.audit.handler;
 
+import xyz.jasenon.lab.audit.api.model.AuditFragment;
+
 import org.junit.jupiter.api.Test;
 import xyz.jasenon.lab.audit.api.AuditAction;
 import xyz.jasenon.lab.audit.api.Loggable;

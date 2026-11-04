@@ -8,7 +8,7 @@ import xyz.jasenon.lab.audit.api.Loggable;
 import xyz.jasenon.lab.audit.api.annotation.Audited;
 import xyz.jasenon.lab.audit.handler.AuditHandlerRegistry;
 import xyz.jasenon.lab.audit.handler.AuditLogHandler;
-import xyz.jasenon.lab.audit.model.AuditEvent;
+import xyz.jasenon.lab.audit.api.model.AuditEvent;
 import xyz.jasenon.lab.audit.persistence.AuditLogStore;
 import xyz.jasenon.lab.auth.context.UserContext;
 import xyz.jasenon.lab.auth.context.UserContextHolder;

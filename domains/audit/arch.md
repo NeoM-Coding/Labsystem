@@ -31,18 +31,21 @@ domains/audit
 │   ├── @Audited               方法级审计入口
 │   ├── Loggable               可被审计的命令/事件
 │   ├── AuditAction            CREATE / EDIT / DELETE
-│   ├── model                  查询、分页和展示 DTO
+│   ├── model                  查询、分页、展示 DTO 及可序列化 AuditEvent/AuditFragment
 │   └── service                AuditLogService RPC 契约
 └── service                     审计运行时实现
     ├── aspect                 成功调用拦截与聚合
     ├── handler                类型分派与片段转换
-    ├── model                  内部 AuditEvent
     ├── persistence            Store、Entity、Mapper
     ├── service                查询实现
     └── config                 自动装配与查询授权映射
 ```
 
 `api` 只依赖公共 RPC 基础，使业务 API 可以声明 `Loggable` 而不引入切面、MyBatis 或授权实现。`service` 承担 Spring AOP、Dubbo、鉴权接入和 MySQL 持久化。
+
+Web 网关使用 `lab.audit.store=rpc`，通过内部 `AuditLogWriterService` 将事件交给现有
+Base 服务落库。Base 使用默认 `local` Store 写入业务 MySQL；不新增独立数据库服务。
+RPC 模式不扫描审计 Mapper，因此网关仍可禁用数据源自动配置。
 
 ## 3. 写入调用链
 

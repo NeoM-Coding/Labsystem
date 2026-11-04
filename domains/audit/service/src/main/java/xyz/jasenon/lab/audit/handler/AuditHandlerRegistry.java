@@ -1,5 +1,7 @@
 package xyz.jasenon.lab.audit.handler;
 
+import xyz.jasenon.lab.audit.api.model.AuditFragment;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;

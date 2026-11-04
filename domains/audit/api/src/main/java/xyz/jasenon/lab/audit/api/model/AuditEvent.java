@@ -1,6 +1,4 @@
-package xyz.jasenon.lab.audit.model;
-
-import xyz.jasenon.lab.audit.handler.AuditFragment;
+package xyz.jasenon.lab.audit.api.model;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -14,5 +12,7 @@ public record AuditEvent(
         String traceId,
         String requestId,
         LocalDateTime occurredAt
-) {
+) implements java.io.Serializable {
+    @java.io.Serial
+    private static final long serialVersionUID = 1L;
 }

@@ -1,7 +1,7 @@
 package xyz.jasenon.lab.audit.persistence;
 
-import xyz.jasenon.lab.audit.handler.AuditFragment;
-import xyz.jasenon.lab.audit.model.AuditEvent;
+import xyz.jasenon.lab.audit.api.model.AuditFragment;
+import xyz.jasenon.lab.audit.api.model.AuditEvent;
 import xyz.jasenon.lab.audit.persistence.mapper.AuditLogMapper;
 
 import java.util.UUID;

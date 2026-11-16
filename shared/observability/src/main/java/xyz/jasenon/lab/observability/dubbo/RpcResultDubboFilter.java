@@ -2,6 +2,7 @@ package xyz.jasenon.lab.observability.dubbo;
 
 import org.apache.dubbo.common.constants.CommonConstants;
 import org.apache.dubbo.common.extension.Activate;
+import org.apache.dubbo.rpc.AppResponse;
 import org.apache.dubbo.rpc.AsyncRpcResult;
 import org.apache.dubbo.rpc.Filter;
 import org.apache.dubbo.rpc.Invocation;
@@ -19,11 +20,18 @@ public class RpcResultDubboFilter implements Filter {
         var propagation = xyz.jasenon.lab.observability.context.Tracing.capture();
         try {
             Result result = invoker.invoke(invocation);
-            if (result instanceof AsyncRpcResult) {
-                return result.whenCompleteWithContext((response, failure) ->
-                        propagation.wrap(() -> normalize(response, failure)).run());
+            if (result instanceof AsyncRpcResult async) {
+                async.setResponseFuture(async.getResponseFuture().handle((response, failure) ->
+                        propagation.get(() -> {
+                            if (failure != null) {
+                                return new AppResponse(RpcResult.failure(RpcErrors.from(failure)));
+                            }
+                            normalize(response);
+                            return response;
+                        })));
+                return async;
             }
-            normalize(result, null);
+            normalize(result);
             return AsyncRpcResult.newDefaultAsyncResult(
                     result.getValue(), result.getException(), invocation
             );
@@ -34,11 +42,11 @@ public class RpcResultDubboFilter implements Filter {
         }
     }
 
-    private static void normalize(Result result, Throwable failure) {
+    private static void normalize(Result result) {
         if (result == null) {
             return;
         }
-        Throwable exception = failure != null ? failure : result.getException();
+        Throwable exception = result.getException();
         if (exception == null) {
             return;
         }

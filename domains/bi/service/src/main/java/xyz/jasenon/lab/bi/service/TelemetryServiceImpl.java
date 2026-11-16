@@ -1,5 +1,7 @@
 package xyz.jasenon.lab.bi.service;
 
+import xyz.jasenon.lab.common.error.ErrorCode;
+
 import org.apache.dubbo.config.annotation.DubboService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import xyz.jasenon.lab.auth.annotation.ActionAuthorized;
@@ -28,14 +30,14 @@ public class TelemetryServiceImpl implements TelemetryService {
     @Override @ActionAuthorized
     @org.springframework.transaction.annotation.Transactional(readOnly=true,isolation=org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public RpcResult<TelemetryDashboard> dashboard(TelemetryQuery q) {
-        if (q==null || q.kind()==null || q.range()==null) throw new BusinessException(400,"请选择统计范围");
+        if (q==null || q.kind()==null || q.range()==null) throw new BusinessException(ErrorCode.VALIDATION_FAILED,"请选择统计范围");
         var context=UserContextHolder.get();
-        if (context==null || context.getUserId()==null) throw new BusinessException(401,"请先登录");
+        if (context==null || context.getUserId()==null) throw new BusinessException(ErrorCode.AUTHENTICATION_REQUIRED,"请先登录");
         var now=LocalDateTime.now(clock); var today=now.toLocalDate();
         LocalDate start=switch(q.range()) { case TODAY -> today;case CURRENT_MONTH -> today.withDayOfMonth(1);case CUSTOM -> q.startDate();};
         LocalDate end=q.range()==TelemetryQuery.Range.CUSTOM ? q.endDate() : today;
         if (start==null || end==null || start.isAfter(end) || end.isAfter(today) || start.plusYears(1).isBefore(end))
-            throw new BusinessException(400,"日期范围不得超过一年或包含未来日期");
+            throw new BusinessException(ErrorCode.VALIDATION_FAILED,"日期范围不得超过一年或包含未来日期");
         Map<String,Laboratory> laboratoryMetadata=visibleLaboratories();
         Set<String> labs=effectiveLaboratories(q,laboratoryMetadata);
         Set<String> selectedDevices=normalized(q.deviceIds());
@@ -154,7 +156,7 @@ public class TelemetryServiceImpl implements TelemetryService {
     @Override @ActionAuthorized
     @org.springframework.transaction.annotation.Transactional(readOnly=true)
     public RpcResult<xyz.jasenon.lab.bi.api.view.TelemetryFilterOptions> filterOptions(TelemetryQuery q) {
-        if(q==null || q.kind()==null) throw new BusinessException(400,"请选择分析类型");
+        if(q==null || q.kind()==null) throw new BusinessException(ErrorCode.VALIDATION_FAILED,"请选择分析类型");
         var visible=visibleLaboratories();
         Set<String> buildings=normalized(q.buildingNames()),organizations=normalized(q.orgNames());
         var laboratories=visible.values().stream()
@@ -176,7 +178,7 @@ public class TelemetryServiceImpl implements TelemetryService {
 
     private Map<String,Laboratory> visibleLaboratories() {
         var context=UserContextHolder.get();
-        if(context==null || context.getUserId()==null) throw new BusinessException(401,"请先登录");
+        if(context==null || context.getUserId()==null) throw new BusinessException(ErrorCode.AUTHENTICATION_REQUIRED,"请先登录");
         Set<String> ids=new HashSet<>(context.filterLaboratoryIds());
         Map<String,Laboratory> result=new HashMap<>(repository.laboratories(ids));
         if(context.getLaboratoryScopes()!=null) for(var lab:context.getLaboratoryScopes()) {

@@ -29,6 +29,8 @@ import xyz.jasenon.lab.mqtt.client.mqtt.MqttTask;
 import xyz.jasenon.lab.mqtt.config.MqttOptions;
 import xyz.jasenon.lab.observability.annotation.Traced;
 
+import xyz.jasenon.lab.observability.rpc.RpcErrors;
+
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -127,9 +129,10 @@ public class SysClientManager implements MqttIo {
         if (client != null){
             PendingRequest<MqttTask> task = userTask.decorate();
             client.offer(task);
-            return task.getFuture().handle((response, error) -> error == null
+            var propagation = xyz.jasenon.lab.observability.context.Tracing.capture();
+            return task.getFuture().handle((response, error) -> propagation.get(() -> error == null
                     ? RpcResult.success(toResponseDto(response))
-                    : RpcResult.failure(xyz.jasenon.lab.observability.rpc.RpcErrors.from(mqttFailure(error))));
+                    : RpcResult.failure(RpcErrors.from(mqttFailure(error)))));
         }
         throw new BusinessException(ErrorCode.MQTT_GATEWAY_NOT_FOUND);
     }
@@ -171,7 +174,8 @@ public class SysClientManager implements MqttIo {
                 return MqttTaskResultDto.success(prepared.getDeviceId(), syncSendPrepared(prepared));
             } catch (Exception error) {
                 if (error instanceof InterruptedException) Thread.currentThread().interrupt();
-                return MqttTaskResultDto.failure(prepared.getDeviceId(), rootCause(error));
+                var failure = RpcErrors.from(mqttFailure(error));
+                return new MqttTaskResultDto(prepared.getDeviceId(), false, null, failure.message(), failure.code());
             }
         }).toList());
     }
@@ -197,9 +201,7 @@ public class SysClientManager implements MqttIo {
         if (cause instanceof BusinessException business) return business;
         ErrorCode code = cause instanceof TimeoutException ? ErrorCode.MQTT_DEVICE_TIMEOUT
                 : cause instanceof InterruptedException ? ErrorCode.MQTT_REQUEST_INTERRUPTED : ErrorCode.INTERNAL_ERROR;
-        BusinessException failure = new BusinessException(code);
-        failure.initCause(cause);
-        return failure;
+        return BusinessException.causedBy(code, cause);
     }
 
     private MqttResponseDto toResponseDto(Object resp) {

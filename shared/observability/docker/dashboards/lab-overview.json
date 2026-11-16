@@ -1,0 +1,415 @@
+{
+  "uid": "lab-observability",
+  "title": "Lab System 可观测性",
+  "schemaVersion": 39,
+  "version": 2,
+  "timezone": "browser",
+  "editable": false,
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "refresh": "1m",
+  "links": [
+    {
+      "title": "打开 Tempo 链路追踪",
+      "type": "link",
+      "url": "/explore?orgId=1&schemaVersion=1&panes=%7B%22tempo%22%3A%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22datasource%22%3A%7B%22type%22%3A%22tempo%22%2C%22uid%22%3A%22tempo%22%7D%2C%22queryType%22%3A%22traceql%22%2C%22query%22%3A%22%7B%7D%22%2C%22limit%22%3A20%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22now-1h%22%2C%22to%22%3A%22now%22%7D%7D%7D"
+    }
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "title": "HTTP 请求数",
+      "type": "stat",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 8,
+        "h": 5
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(count_over_time({job=\"lab-system-cloud\"} |= \" message=http_request_completed status=\"[$__range])) or vector(0)",
+          "queryType": "instant",
+          "editorMode": "code"
+        }
+      ],
+      "description": "选定时间内进入应用 HTTP 过滤器的请求数。每个请求记录一次。",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "—"
+        },
+        "overrides": []
+      },
+      "options": {
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "服务端错误请求数",
+      "type": "stat",
+      "gridPos": {
+        "x": 8,
+        "y": 0,
+        "w": 8,
+        "h": 5
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(count_over_time({job=\"lab-system-cloud\"} |= \" message=http_request_completed status=\" |= \" server_error=true\"[$__range])) or vector(0)",
+          "queryType": "instant",
+          "editorMode": "code"
+        }
+      ],
+      "description": "HTTP 5xx 或向外抛出异常的请求数。每个请求最多计一次。",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "—"
+        },
+        "overrides": []
+      },
+      "options": {
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "异常错误率",
+      "type": "stat",
+      "gridPos": {
+        "x": 16,
+        "y": 0,
+        "w": 8,
+        "h": 5
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * (sum(count_over_time({job=\"lab-system-cloud\"} |= \" message=http_request_completed status=\" |= \" server_error=true\"[$__range])) or vector(0)) / (sum(count_over_time({job=\"lab-system-cloud\"} |= \" message=http_request_completed status=\"[$__range])) > 0)",
+          "queryType": "instant",
+          "editorMode": "code"
+        }
+      ],
+      "description": "服务端错误请求数 ÷ HTTP 请求数。没有请求时显示 —。",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 2,
+          "noValue": "—"
+        },
+        "overrides": []
+      },
+      "options": {
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "请求与服务端错误趋势",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 24,
+        "h": 8
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(count_over_time({job=\"lab-system-cloud\"} |= \" message=http_request_completed status=\"[$__interval])) or vector(0)",
+          "queryType": "range",
+          "editorMode": "code",
+          "legendFormat": "HTTP 请求"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(count_over_time({job=\"lab-system-cloud\"} |= \" message=http_request_completed status=\" |= \" server_error=true\"[$__interval])) or vector(0)",
+          "queryType": "range",
+          "editorMode": "code",
+          "legendFormat": "服务端错误"
+        }
+      ],
+      "interval": "1m",
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "decimals": 0
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "title": "服务端错误与异常日志",
+      "type": "logs",
+      "gridPos": {
+        "x": 0,
+        "y": 13,
+        "w": 24,
+        "h": 9
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{job=\"lab-system-cloud\"} |~ \" level=ERROR service=|Exception|Error:|异常|http_request_completed status=[0-9]+ server_error=true$\" | regexp `^ts=\\S+ level=(?P<app_level>[A-Z]+) service=` | label_format level=`{{ if or (eq .app_level \"ERROR\") (contains \"Exception\" (__line__)) (contains \"Error:\" (__line__)) (contains \"异常\" (__line__)) (contains \" server_error=true\" (__line__)) }}error{{ else }}{{ lower .app_level }}{{ end }}` | line_format `{{ if or (eq .app_level \"ERROR\") (contains \"Exception\" (__line__)) (contains \"Error:\" (__line__)) (contains \"异常\" (__line__)) (contains \" server_error=true\" (__line__)) }}⚠ {{ end }}{{ __line__ }}`",
+          "queryType": "range",
+          "editorMode": "code"
+        }
+      ],
+      "description": "展开日志后可通过 TraceID 跳转到 Tempo。Tempo 只保存采样到的链路。",
+      "options": {
+        "showTime": true,
+        "enableLogDetails": true,
+        "sortOrder": "Descending"
+      }
+    },
+    {
+      "id": 6,
+      "title": "Tempo 错误链路",
+      "type": "table",
+      "gridPos": {
+        "x": 0,
+        "y": 22,
+        "w": 24,
+        "h": 9
+      },
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "queryType": "traceql",
+          "query": "{ status = error }",
+          "limit": 20
+        }
+      ],
+      "description": "最近匹配的已采样错误链路。可点击 Trace ID 查看完整链路，或通过顶部链接进入 Tempo 搜索。"
+    },
+    {
+      "id": 7,
+      "title": "Web 服务日志",
+      "type": "logs",
+      "gridPos": {
+        "x": 0,
+        "y": 31,
+        "w": 12,
+        "h": 9
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "editorMode": "code",
+          "queryType": "range",
+          "expr": "{job=\"lab-system-cloud\",service=\"lab-system-web\"} | regexp `^ts=\\S+ level=(?P<app_level>[A-Z]+) service=` | label_format level=`{{ if or (eq .app_level \"ERROR\") (contains \"Exception\" (__line__)) (contains \"Error:\" (__line__)) (contains \"异常\" (__line__)) (contains \" server_error=true\" (__line__)) }}error{{ else }}{{ lower .app_level }}{{ end }}` | line_format `{{ if or (eq .app_level \"ERROR\") (contains \"Exception\" (__line__)) (contains \"Error:\" (__line__)) (contains \"异常\" (__line__)) (contains \" server_error=true\" (__line__)) }}⚠ {{ end }}{{ __line__ }}`"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      }
+    },
+    {
+      "id": 8,
+      "title": "Base 服务日志",
+      "type": "logs",
+      "gridPos": {
+        "x": 12,
+        "y": 31,
+        "w": 12,
+        "h": 9
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "editorMode": "code",
+          "queryType": "range",
+          "expr": "{job=\"lab-system-cloud\",service=\"lab-system-base\"} | regexp `^ts=\\S+ level=(?P<app_level>[A-Z]+) service=` | label_format level=`{{ if or (eq .app_level \"ERROR\") (contains \"Exception\" (__line__)) (contains \"Error:\" (__line__)) (contains \"异常\" (__line__)) (contains \" server_error=true\" (__line__)) }}error{{ else }}{{ lower .app_level }}{{ end }}` | line_format `{{ if or (eq .app_level \"ERROR\") (contains \"Exception\" (__line__)) (contains \"Error:\" (__line__)) (contains \"异常\" (__line__)) (contains \" server_error=true\" (__line__)) }}⚠ {{ end }}{{ __line__ }}`"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      }
+    },
+    {
+      "id": 9,
+      "title": "MQTT 服务日志",
+      "type": "logs",
+      "gridPos": {
+        "x": 0,
+        "y": 40,
+        "w": 12,
+        "h": 9
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "editorMode": "code",
+          "queryType": "range",
+          "expr": "{job=\"lab-system-cloud\",service=\"lab-system-mqtt\"} | regexp `^ts=\\S+ level=(?P<app_level>[A-Z]+) service=` | label_format level=`{{ if or (eq .app_level \"ERROR\") (contains \"Exception\" (__line__)) (contains \"Error:\" (__line__)) (contains \"异常\" (__line__)) (contains \" server_error=true\" (__line__)) }}error{{ else }}{{ lower .app_level }}{{ end }}` | line_format `{{ if or (eq .app_level \"ERROR\") (contains \"Exception\" (__line__)) (contains \"Error:\" (__line__)) (contains \"异常\" (__line__)) (contains \" server_error=true\" (__line__)) }}⚠ {{ end }}{{ __line__ }}`"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      }
+    },
+    {
+      "id": 10,
+      "title": "规则引擎 服务日志",
+      "type": "logs",
+      "gridPos": {
+        "x": 12,
+        "y": 40,
+        "w": 12,
+        "h": 9
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "editorMode": "code",
+          "queryType": "range",
+          "expr": "{job=\"lab-system-cloud\",service=\"lab-system-rule-engine\"} | regexp `^ts=\\S+ level=(?P<app_level>[A-Z]+) service=` | label_format level=`{{ if or (eq .app_level \"ERROR\") (contains \"Exception\" (__line__)) (contains \"Error:\" (__line__)) (contains \"异常\" (__line__)) (contains \" server_error=true\" (__line__)) }}error{{ else }}{{ lower .app_level }}{{ end }}` | line_format `{{ if or (eq .app_level \"ERROR\") (contains \"Exception\" (__line__)) (contains \"Error:\" (__line__)) (contains \"异常\" (__line__)) (contains \" server_error=true\" (__line__)) }}⚠ {{ end }}{{ __line__ }}`"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      }
+    },
+    {
+      "id": 11,
+      "title": "教务 服务日志",
+      "type": "logs",
+      "gridPos": {
+        "x": 0,
+        "y": 49,
+        "w": 12,
+        "h": 9
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "editorMode": "code",
+          "queryType": "range",
+          "expr": "{job=\"lab-system-cloud\",service=\"lab-system-edu\"} | regexp `^ts=\\S+ level=(?P<app_level>[A-Z]+) service=` | label_format level=`{{ if or (eq .app_level \"ERROR\") (contains \"Exception\" (__line__)) (contains \"Error:\" (__line__)) (contains \"异常\" (__line__)) (contains \" server_error=true\" (__line__)) }}error{{ else }}{{ lower .app_level }}{{ end }}` | line_format `{{ if or (eq .app_level \"ERROR\") (contains \"Exception\" (__line__)) (contains \"Error:\" (__line__)) (contains \"异常\" (__line__)) (contains \" server_error=true\" (__line__)) }}⚠ {{ end }}{{ __line__ }}`"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      }
+    },
+    {
+      "id": 12,
+      "title": "BI 服务日志",
+      "type": "logs",
+      "gridPos": {
+        "x": 12,
+        "y": 49,
+        "w": 12,
+        "h": 9
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "editorMode": "code",
+          "queryType": "range",
+          "expr": "{job=\"lab-system-cloud\",service=\"lab-system-bi\"} | regexp `^ts=\\S+ level=(?P<app_level>[A-Z]+) service=` | label_format level=`{{ if or (eq .app_level \"ERROR\") (contains \"Exception\" (__line__)) (contains \"Error:\" (__line__)) (contains \"异常\" (__line__)) (contains \" server_error=true\" (__line__)) }}error{{ else }}{{ lower .app_level }}{{ end }}` | line_format `{{ if or (eq .app_level \"ERROR\") (contains \"Exception\" (__line__)) (contains \"Error:\" (__line__)) (contains \"异常\" (__line__)) (contains \" server_error=true\" (__line__)) }}⚠ {{ end }}{{ __line__ }}`"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      }
+    }
+  ]
+}

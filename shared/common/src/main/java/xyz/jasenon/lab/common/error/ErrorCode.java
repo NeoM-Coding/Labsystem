@@ -79,7 +79,22 @@ public enum ErrorCode {
     STRATEGY_ALREADY_EXISTS(140101, 409, "策略已存在", RpcErrorType.CONFLICT),
     STRATEGY_NOT_FOUND(140102, 404, "策略不存在", RpcErrorType.NOT_FOUND),
     MQTT_POLL_TASK_INVALID(130121, 400, "无法为该设备创建轮询任务", RpcErrorType.VALIDATION),
-    MQTT_POLL_UPDATE_FAILED(130122, 500, "设备轮询状态更新失败", RpcErrorType.INTERNAL);
+    MQTT_POLL_UPDATE_FAILED(130122, 500, "设备轮询状态更新失败", RpcErrorType.INTERNAL),
+    DUPLICATE_KEY(100012, 409, "数据已存在，唯一键冲突", RpcErrorType.CONFLICT),
+    MQTT_GATEWAY_SEND_TOPIC_CONFLICT(130123, 409, "网关发送主题已被占用", RpcErrorType.CONFLICT),
+    MQTT_GATEWAY_ACCEPT_TOPIC_CONFLICT(130124, 409, "网关接收主题已被占用", RpcErrorType.CONFLICT),
+    DATA_CONSTRAINT_VIOLATION(100013, 409, "数据违反完整性约束", RpcErrorType.CONFLICT),
+    DATA_STORE_UNAVAILABLE(100014, 503, "数据服务暂不可用，请稍后重试", RpcErrorType.DEPENDENCY),
+    DATA_ACCESS_FAILED(100015, 500, "数据读写失败", RpcErrorType.INTERNAL),
+    DATA_CONCURRENT_UPDATE(100016, 409, "数据正在被其他操作修改，请重试", RpcErrorType.CONFLICT),
+    OBJECT_STORAGE_FAILED(100017, 503, "文件存储服务暂不可用，请稍后重试", RpcErrorType.DEPENDENCY),
+    AUTH_DEPENDENCY_FAILED(110004, 503, "权限服务暂不可用，请稍后重试", RpcErrorType.DEPENDENCY),
+    BI_MAINTENANCE_FAILED(160103, 500, "BI 维护任务执行失败", RpcErrorType.INTERNAL),
+    COMPENSATION_TASK_FAILED(120112, 500, "补偿任务执行失败", RpcErrorType.INTERNAL),
+    RULE_ALERT_RECORD_INVALID(140103, 500, "规则告警记录无法读取", RpcErrorType.INTERNAL),
+    BI_LEASE_LOST(160104, 409, "BI 任务执行权已失效，将由调度器重新领取", RpcErrorType.CONFLICT),
+    BI_ARCHIVE_INCONSISTENT(160105, 409, "归档数据与源记录不一致", RpcErrorType.CONFLICT),
+    BI_ARCHIVE_INVALID(160106, 500, "归档文件校验失败", RpcErrorType.INTERNAL);
 
     private final int code;
     private final int httpStatus;

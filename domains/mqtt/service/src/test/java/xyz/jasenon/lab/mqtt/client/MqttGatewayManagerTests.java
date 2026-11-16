@@ -2,12 +2,18 @@ package xyz.jasenon.lab.mqtt.client;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DuplicateKeyException;
+import xyz.jasenon.lab.common.error.ErrorCode;
 import xyz.jasenon.lab.common.exception.BusinessException;
 import xyz.jasenon.lab.device.model.devices.Light;
 import xyz.jasenon.lab.device.model.gateway.gateways.RS485Gateway;
 import xyz.jasenon.lab.mqtt.client.itfc.DeviceHelper;
 import xyz.jasenon.lab.mqtt.client.itfc.GatewayHelper;
+import xyz.jasenon.lab.mqtt.client.itfc.impl.MqttGatewayHelper;
+import xyz.jasenon.lab.mqtt.client.itfc.mapper.GatewayMapper;
+import xyz.jasenon.lab.observability.rpc.RpcErrors;
 
+import java.sql.SQLIntegrityConstraintViolationException;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -45,6 +51,31 @@ class MqttGatewayManagerTests {
 
         assertEquals("2001", created.getId());
         verify(clientManager).registerGateway(gateway);
+    }
+
+    @Test
+    void reportsWhichTopicConflictedOnCreateAndUpdate() {
+        RS485Gateway gateway = gateway();
+        gateway.setId("gateway-1");
+        GatewayMapper mapper = mock(GatewayMapper.class);
+        var mqttManager = new MqttGatewayManager(new MqttGatewayHelper(mapper), deviceHelper, clientManager);
+        when(mapper.getById(gateway.getId())).thenReturn(gateway);
+        when(mapper.addRS485Gateway(gateway)).thenThrow(duplicateIndex("gateway.uk_gateway_rs485_active_send_topic"));
+        when(mapper.updateRS485Gateway(gateway)).thenThrow(duplicateIndex("gateway.uk_gateway_rs485_accept_topic"));
+
+        var createError = RpcErrors.from(assertThrows(BusinessException.class, () -> mqttManager.create(gateway)));
+        var updateError = RpcErrors.from(assertThrows(BusinessException.class, () -> mqttManager.update(gateway.getId(), gateway)));
+
+        assertEquals(ErrorCode.MQTT_GATEWAY_SEND_TOPIC_CONFLICT.code(), createError.code());
+        assertEquals(ErrorCode.MQTT_GATEWAY_ACCEPT_TOPIC_CONFLICT.code(), updateError.code());
+        assertEquals(409, createError.status());
+        assertEquals(409, updateError.status());
+        verify(clientManager, never()).registerGateway(gateway);
+    }
+
+    private DuplicateKeyException duplicateIndex(String index) {
+        return new DuplicateKeyException("mapper details",
+                new SQLIntegrityConstraintViolationException("Duplicate entry 'topic' for key '" + index + "'", "23000", 1062));
     }
 
     @Test

@@ -1,4 +1,6 @@
 package xyz.jasenon.lab.web.storage;
+
+import xyz.jasenon.lab.common.error.ErrorCode;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -24,25 +26,31 @@ public class DeviceFileController {
     }
     private void requireAdmin() {
         var user=UserContextHolder.get();
-        if(user==null || user.getUserId()==null) throw new BusinessException(401,"请先登录");
+        if(user==null || user.getUserId()==null) throw new BusinessException(ErrorCode.AUTHENTICATION_REQUIRED,"请先登录");
         if(!authorization.relationsOf(SourceType.app,"global",SourceType.user,user.getUserId()).contains("super_admin"))
-            throw new BusinessException(403,"仅系统管理员可管理下位机文件");
+            throw new BusinessException(ErrorCode.PERMISSION_DENIED,"仅系统管理员可管理下位机文件");
     }
     @PostMapping(consumes="multipart/form-data")
-    public DiyResponseEntity<R<Map<String,Object>>> upload(@RequestParam MultipartFile file) throws Exception {
+    public DiyResponseEntity<R<Map<String,Object>>> upload(@RequestParam MultipartFile file) {
         requireAdmin();
-        if(file.isEmpty() || file.getSize()>20*1024*1024) throw new BusinessException(400,"文件大小需为 1 字节至 20 MB");
+        if(file.isEmpty() || file.getSize()>20*1024*1024) throw new BusinessException(ErrorCode.VALIDATION_FAILED,"文件大小需为 1 字节至 20 MB");
         String key="device-files/"+UUID.randomUUID();
         try(InputStream input=file.getInputStream()) {
             storage.put(properties.deviceBucket(),key,input,file.getSize(),"application/octet-stream");
+        } catch (Exception exception) {
+            throw BusinessException.causedBy(ErrorCode.OBJECT_STORAGE_FAILED, exception);
         }
         return DiyResponseEntity.of(R.success(Map.of("key",key,"size",file.getSize())));
     }
     @GetMapping("/download-url")
-    public DiyResponseEntity<R<Map<String,Object>>> url(@RequestParam String key,@RequestParam(defaultValue="300") int expiresSeconds) throws Exception {
+    public DiyResponseEntity<R<Map<String,Object>>> url(@RequestParam String key,@RequestParam(defaultValue="300") int expiresSeconds) {
         requireAdmin();
         if(!key.matches("device-files/[a-f0-9-]{36}") || expiresSeconds<1 || expiresSeconds>3600)
-            throw new BusinessException(400,"文件标识或有效期无效");
-        return DiyResponseEntity.of(R.success(Map.of("url",storage.downloadUrl(properties.deviceBucket(),key,expiresSeconds),"expiresSeconds",expiresSeconds)));
+            throw new BusinessException(ErrorCode.VALIDATION_FAILED,"文件标识或有效期无效");
+        try {
+            return DiyResponseEntity.of(R.success(Map.of("url",storage.downloadUrl(properties.deviceBucket(),key,expiresSeconds),"expiresSeconds",expiresSeconds)));
+        } catch (Exception exception) {
+            throw BusinessException.causedBy(ErrorCode.OBJECT_STORAGE_FAILED, exception);
+        }
     }
 }

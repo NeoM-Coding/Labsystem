@@ -287,8 +287,11 @@ services:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
       GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/lab-dashboards/lab-overview.json
     volumes:
       - ./shared/observability/docker/grafana-datasources.yml:/etc/grafana/provisioning/datasources/loki.yml:ro
+      - ./shared/observability/docker/grafana-dashboards.yml:/etc/grafana/provisioning/dashboards/lab.yml:ro
+      - ./shared/observability/docker/dashboards:/etc/grafana/lab-dashboards:ro
       - grafana-data:/var/lib/grafana
     depends_on:
       loki:

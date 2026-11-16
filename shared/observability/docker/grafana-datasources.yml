@@ -14,6 +14,13 @@ datasources:
     url: http://loki:3100
     isDefault: true
     editable: false
+    jsonData:
+      derivedFields:
+        - name: TraceID
+          matcherRegex: ' trace_id=([0-9a-f]{32}) '
+          datasourceUid: tempo
+          url: '$${__value.raw}'
+          urlDisplayLabel: 在 Tempo 查看链路
   - name: Tempo
     uid: tempo
     type: tempo
@@ -24,3 +31,9 @@ datasources:
       httpMethod: GET
       nodeGraph:
         enabled: true
+      tracesToLogsV2:
+        datasourceUid: loki
+        spanStartTimeShift: '-5m'
+        spanEndTimeShift: '5m'
+        customQuery: true
+        query: '{job="lab-system-cloud"} |= " trace_id=$${__span.traceId} "'

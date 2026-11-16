@@ -1,5 +1,8 @@
 package xyz.jasenon.lab.bi.telemetry;
 
+import xyz.jasenon.lab.common.error.ErrorCode;
+import xyz.jasenon.lab.common.exception.BusinessException;
+import xyz.jasenon.lab.observability.rpc.RpcErrors;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -40,9 +43,9 @@ public class RecordArchive {
         return false;
     }
     public String run(boolean dryRun,String token) throws Exception {
-        if(!dryRun && !deleteEnabled) throw new IllegalStateException("Archive deletion is disabled; run a dry run first");
+        if(!dryRun && !deleteEnabled) throw new BusinessException(ErrorCode.BUSINESS_CONFLICT, "删除开关未开启，请先执行归档演练");
         ObjectStorage objects=storage.getIfAvailable();
-        if(objects==null) throw new IllegalStateException("Object storage is disabled");
+        if(objects==null) throw new BusinessException(ErrorCode.OBJECT_STORAGE_FAILED, "归档对象存储未启用");
         if(!dryRun) {
             for(var batch:jdbc.queryForList("SELECT * FROM bi_archive_batch WHERE status IN ('VERIFIED','DELETING','FAILED') AND sha256 IS NOT NULL ORDER BY created_at LIMIT 20")) {
                 lease.renew(token); resume(batch,objects,token);
@@ -62,7 +65,7 @@ public class RecordArchive {
                 rows=rows.stream().filter(row->time(row.get("create_at")).toLocalDate().equals(date)).toList();
                 LocalDateTime watermark=prepareDay(date,dryRun,token);
                 for(var row:rows) if(time(row.get("update_at")).isAfter(watermark))
-                    throw new IllegalStateException("Late or modified raw records in sealed date "+date+"; restore and reconcile before retry");
+                    throw new BusinessException(ErrorCode.BI_ARCHIVE_INCONSISTENT, "已封存日期 " + date + " 存在新增或修改的记录，请核对后重试");
                 String id=UUID.randomUUID().toString();
                 String key=table+"/"+date+"/"+id+".ndjson.gz";
                 List<Map<String,Object>> snapshot=rows.stream().map(RecordArchive::canonical).toList();
@@ -85,8 +88,10 @@ public class RecordArchive {
                     total+=snapshot.size();batches++;
                     if(dryRun) break;
                 } catch(Exception error) {
+                    var fallback = ErrorCode.BI_MAINTENANCE_FAILED;
+                    var failure = RpcErrors.from(error, fallback, fallback.message());
                     lease.guarded(token,()->jdbc.update("UPDATE bi_archive_batch SET status='FAILED',error_message=? WHERE id=?",
-                        abbreviate(error.toString()),id));
+                        abbreviate("[" + failure.code() + "] " + failure.message()),id));
                     throw error;
                 } finally { Files.deleteIfExists(file);Files.deleteIfExists(manifest); }
             }
@@ -103,7 +108,7 @@ public class RecordArchive {
             for(String table:TABLES) {
                 Long changed=jdbc.queryForObject("SELECT COUNT(*) FROM "+table+" WHERE create_at>=? AND create_at<? AND update_at>?",
                     Long.class,date.atStartOfDay(),date.plusDays(1).atStartOfDay(),began);
-                if(changed!=null && changed>0) throw new IllegalStateException("Source changed during rollup; retry "+date);
+                if(changed!=null && changed>0) throw new BusinessException(ErrorCode.BI_ARCHIVE_INCONSISTENT, "汇总期间源记录发生变更，请重新汇总 " + date);
             }
             if(!dryRun) jdbc.update("UPDATE bi_summary_day SET sealed=1,calculated_at=? WHERE summary_date=?",began,date);
         });
@@ -112,29 +117,29 @@ public class RecordArchive {
     @SuppressWarnings("unchecked")
     private void resume(Map<String,Object> batch,ObjectStorage objects,String token) throws Exception {
         String table=(String)batch.get("table_name"),key=(String)batch.get("object_key"),id=(String)batch.get("id");
-        if(!TABLES.contains(table)) throw new IllegalStateException("Invalid archive table");
+        if(!TABLES.contains(table)) throw new BusinessException(ErrorCode.BI_ARCHIVE_INVALID, "归档记录的表名无效");
         if(!objects.sha256(properties.archiveBucket(),key).equals(batch.get("sha256")) ||
            !objects.sha256(properties.archiveBucket(),key+".manifest.json").equals(batch.get("manifest_sha256")))
-            throw new IllegalStateException("Archive checksum mismatch: "+id);
+            throw new BusinessException(ErrorCode.BI_ARCHIVE_INVALID, "归档文件校验和不匹配");
         List<Map<String,Object>> rows=new ArrayList<>();
         try(var input=new BufferedReader(new InputStreamReader(new GZIPInputStream(objects.get(properties.archiveBucket(),key)),StandardCharsets.UTF_8))) {
             for(String line;(line=input.readLine())!=null;) {
                 var envelope=readMap(line);
-                if(!table.equals(envelope.get("table")) || number(envelope.get("schemaVersion"))!=1) throw new IllegalStateException("Invalid archive schema");
+                if(!table.equals(envelope.get("table")) || number(envelope.get("schemaVersion"))!=1) throw new BusinessException(ErrorCode.BI_ARCHIVE_INVALID, "归档文件格式不匹配");
                 rows.add((Map<String,Object>)envelope.get("row"));
-                if(rows.size()>2000) throw new IllegalStateException("Archive exceeds batch limit");
+                if(rows.size()>2000) throw new BusinessException(ErrorCode.BI_ARCHIVE_INVALID, "归档文件超过批次行数上限");
             }
         }
-        if(rows.size()!=((Number)batch.get("row_count")).intValue()) throw new IllegalStateException("Archive row count mismatch");
+        if(rows.size()!=((Number)batch.get("row_count")).intValue()) throw new BusinessException(ErrorCode.BI_ARCHIVE_INVALID, "归档文件行数与批次记录不匹配");
         lease.guarded(token,()->jdbc.update("UPDATE bi_archive_batch SET status='DELETING' WHERE id=?",id));
         // One short transaction per source row. Resume tolerates already-deleted rows.
         for(var archived:rows) {
             lease.guarded(token,()->{
                 var current=jdbc.queryForList("SELECT * FROM "+table+" WHERE id=? FOR UPDATE",archived.get("id"));
                 if(current.isEmpty()) return;
-                if(!canonical(current.get(0)).equals(archived)) throw new IllegalStateException("Source version changed: "+archived.get("id"));
+                if(!canonical(current.get(0)).equals(archived)) throw new BusinessException(ErrorCode.BI_ARCHIVE_INCONSISTENT, "归档期间源记录版本发生变更");
                 var newest=jdbc.queryForList("SELECT id FROM "+table+" WHERE device_id=? AND delete_at IS NULL ORDER BY create_at DESC,id DESC LIMIT 1",archived.get("device_id"));
-                if(!newest.isEmpty() && archived.get("id").equals(newest.get(0).get("id"))) throw new IllegalStateException("Latest state must remain hot");
+                if(!newest.isEmpty() && archived.get("id").equals(newest.get(0).get("id"))) throw new BusinessException(ErrorCode.BI_ARCHIVE_INCONSISTENT, "设备最新状态必须保留在在线库");
                 if(archived.get("delete_at")==null) {
                     var existing=jdbc.queryForList("SELECT observed_at,record_id FROM bi_archive_anchor WHERE table_name=? AND device_id=? FOR UPDATE",table,archived.get("device_id"));
                     boolean newer=existing.isEmpty() || time(existing.get(0).get("observed_at")).isBefore(time(archived.get("create_at")))

@@ -606,5 +606,125 @@
     "message": "设备轮询状态更新失败",
     "type": "INTERNAL",
     "domain": "mqtt"
+  },
+  {
+    "name": "DUPLICATE_KEY",
+    "code": 100012,
+    "httpStatus": 409,
+    "message": "数据已存在，唯一键冲突",
+    "type": "CONFLICT",
+    "domain": "common"
+  },
+  {
+    "name": "MQTT_GATEWAY_SEND_TOPIC_CONFLICT",
+    "code": 130123,
+    "httpStatus": 409,
+    "message": "网关发送主题已被占用",
+    "type": "CONFLICT",
+    "domain": "mqtt"
+  },
+  {
+    "name": "MQTT_GATEWAY_ACCEPT_TOPIC_CONFLICT",
+    "code": 130124,
+    "httpStatus": 409,
+    "message": "网关接收主题已被占用",
+    "type": "CONFLICT",
+    "domain": "mqtt"
+  },
+  {
+    "name": "DATA_CONSTRAINT_VIOLATION",
+    "code": 100013,
+    "httpStatus": 409,
+    "message": "数据违反完整性约束",
+    "type": "CONFLICT",
+    "domain": "common"
+  },
+  {
+    "name": "DATA_STORE_UNAVAILABLE",
+    "code": 100014,
+    "httpStatus": 503,
+    "message": "数据服务暂不可用，请稍后重试",
+    "type": "DEPENDENCY",
+    "domain": "common"
+  },
+  {
+    "name": "DATA_ACCESS_FAILED",
+    "code": 100015,
+    "httpStatus": 500,
+    "message": "数据读写失败",
+    "type": "INTERNAL",
+    "domain": "common"
+  },
+  {
+    "name": "DATA_CONCURRENT_UPDATE",
+    "code": 100016,
+    "httpStatus": 409,
+    "message": "数据正在被其他操作修改，请重试",
+    "type": "CONFLICT",
+    "domain": "common"
+  },
+  {
+    "name": "OBJECT_STORAGE_FAILED",
+    "code": 100017,
+    "httpStatus": 503,
+    "message": "文件存储服务暂不可用，请稍后重试",
+    "type": "DEPENDENCY",
+    "domain": "common"
+  },
+  {
+    "name": "AUTH_DEPENDENCY_FAILED",
+    "code": 110004,
+    "httpStatus": 503,
+    "message": "权限服务暂不可用，请稍后重试",
+    "type": "DEPENDENCY",
+    "domain": "auth"
+  },
+  {
+    "name": "BI_MAINTENANCE_FAILED",
+    "code": 160103,
+    "httpStatus": 500,
+    "message": "BI 维护任务执行失败",
+    "type": "INTERNAL",
+    "domain": "bi"
+  },
+  {
+    "name": "COMPENSATION_TASK_FAILED",
+    "code": 120112,
+    "httpStatus": 500,
+    "message": "补偿任务执行失败",
+    "type": "INTERNAL",
+    "domain": "base"
+  },
+  {
+    "name": "RULE_ALERT_RECORD_INVALID",
+    "code": 140103,
+    "httpStatus": 500,
+    "message": "规则告警记录无法读取",
+    "type": "INTERNAL",
+    "domain": "rule"
+  },
+  {
+    "name": "BI_LEASE_LOST",
+    "code": 160104,
+    "httpStatus": 409,
+    "message": "BI 任务执行权已失效，将由调度器重新领取",
+    "type": "CONFLICT",
+    "domain": "bi"
+  },
+  {
+    "name": "BI_ARCHIVE_INCONSISTENT",
+    "code": 160105,
+    "httpStatus": 409,
+    "message": "归档数据与源记录不一致",
+    "type": "CONFLICT",
+    "domain": "bi"
+  },
+  {
+    "name": "BI_ARCHIVE_INVALID",
+    "code": 160106,
+    "httpStatus": 500,
+    "message": "归档文件校验失败",
+    "type": "INTERNAL",
+    "domain": "bi"
   }
 ]

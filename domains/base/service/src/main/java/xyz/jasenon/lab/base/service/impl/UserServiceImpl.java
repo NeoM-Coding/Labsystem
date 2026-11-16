@@ -157,9 +157,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             if (exsist) {
                 throw new BusinessException(ErrorCode.USER_NAME_CONFLICT, "该姓名已被使用");
             }
-            try {
-                save(normalUser);
-            }catch (Exception e){
+            if (!save(normalUser)) {
                 throw new BusinessException(ErrorCode.INTERNAL_ERROR, "插入失败");
             }
         }
@@ -191,9 +189,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             if (exsist){
                 throw new BusinessException(ErrorCode.USER_NAME_CONFLICT, "该姓名已被使用");
             }
-            try {
-                save(contactUser);
-            }catch (Exception e){
+            if (!save(contactUser)) {
                 throw new BusinessException(ErrorCode.INTERNAL_ERROR, "插入失败");
             }
         }

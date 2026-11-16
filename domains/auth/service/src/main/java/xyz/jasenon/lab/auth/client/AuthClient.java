@@ -12,12 +12,22 @@ import xyz.jasenon.lab.auth.config.PermifyAuthProperties;
 import xyz.jasenon.lab.auth.permission.Permission;
 import xyz.jasenon.lab.auth.permission.RelationShip;
 
+import xyz.jasenon.lab.common.error.ErrorCode;
+import xyz.jasenon.lab.common.exception.BusinessException;
+
 import java.util.List;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
 @Slf4j
 public class AuthClient implements AuthorizationOperations {
+
+    private static BusinessException dependencyFailure(String operation, ApiException cause) {
+        ErrorCode code = ErrorCode.AUTH_DEPENDENCY_FAILED;
+        BusinessException error = new BusinessException(code, operation + "，请稍后重试");
+        error.initCause(cause);
+        return error;
+    }
 
     private final ApiClient client;
     private final String tenantId;
@@ -67,7 +77,7 @@ public class AuthClient implements AuthorizationOperations {
             log.error("grant relationship error args:{} {} {} {} {}",
                     source, sourceId, relationShip, target, targetId
             );
-            throw new RuntimeException("授权失败");
+            throw dependencyFailure("授权失败", e);
         }
     }
 
@@ -84,7 +94,7 @@ public class AuthClient implements AuthorizationOperations {
             log.error("revoke relationship error args:{} {} {} {} {}",
                     source, sourceId, relationShip, target, targetId
             );
-            throw new RuntimeException("回收权限失败");
+            throw dependencyFailure("回收权限失败", e);
         }
     }
 
@@ -97,7 +107,7 @@ public class AuthClient implements AuthorizationOperations {
             return true;
         } catch (ApiException e) {
             log.error("delete entity data error args:{} {}", source, sourceId, e);
-            throw new IllegalStateException("清理资源授权数据失败", e);
+            throw dependencyFailure("清理资源授权数据失败", e);
         }
     }
 
@@ -130,7 +140,7 @@ public class AuthClient implements AuthorizationOperations {
             log.error("check permission error args:{} {} {} {} {}",
                     source, sourceId, permission, target, targetId
             );
-            throw new RuntimeException("验证权限失败");
+            throw dependencyFailure("验证权限失败", e);
         }
     }
 
@@ -157,7 +167,7 @@ public class AuthClient implements AuthorizationOperations {
             return Set.copyOf(relations);
         } catch (ApiException e) {
             log.error("read relationships error args:{} {} {} {}", source, sourceId, target, targetId, e);
-            throw new IllegalStateException("查询用户关系失败", e);
+            throw dependencyFailure("查询用户关系失败", e);
         }
     }
 
@@ -189,7 +199,7 @@ public class AuthClient implements AuthorizationOperations {
         } catch (ApiException e) {
             log.error("read relationship entities error args:{} {} {} {}",
                     source, relationShip, target, targetId, e);
-            throw new IllegalStateException("查询用户资源关系失败", e);
+            throw dependencyFailure("查询用户资源关系失败", e);
         }
     }
 
@@ -221,7 +231,7 @@ public class AuthClient implements AuthorizationOperations {
         } catch (ApiException e) {
             log.error("read relationship subjects error args:{} {} {} {}",
                     source, sourceId, relationShip, target, e);
-            throw new IllegalStateException("查询资源用户关系失败", e);
+            throw dependencyFailure("查询资源用户关系失败", e);
         }
     }
 
@@ -264,7 +274,7 @@ public class AuthClient implements AuthorizationOperations {
         } catch (ApiException e) {
             log.error("lookup permission entities error args:{} {} {} {}",
                     entityType, permission, subjectType, subjectId, e);
-            throw new IllegalStateException("反向查询用户可访问资源失败", e);
+            throw dependencyFailure("反向查询用户可访问资源失败", e);
         }
     }
 
@@ -298,7 +308,7 @@ public class AuthClient implements AuthorizationOperations {
         } catch (ApiException e) {
             log.error("lookup permission subjects error args:{} {} {} {}",
                     entityType, entityId, permission, subjectType, e);
-            throw new IllegalStateException("反向查询资源可访问用户失败", e);
+            throw dependencyFailure("反向查询资源可访问用户失败", e);
         }
     }
 

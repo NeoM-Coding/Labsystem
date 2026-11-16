@@ -4,6 +4,7 @@ import org.apache.dubbo.common.URL;
 import org.apache.dubbo.common.extension.ExtensionLoader;
 import org.apache.dubbo.common.serialize.Serialization;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -81,6 +82,16 @@ class ApiErrorContractTests {
     }
 
     @Test
+    void duplicateKeyReturnsConflictWithoutLeakingSql() throws Exception {
+        var mvc = MockMvcBuilders.standaloneSetup(new UnexpectedController())
+                .setControllerAdvice(new BusinessExceptionHandler()).build();
+        mvc.perform(get("/duplicate"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value(ErrorCode.DUPLICATE_KEY.code()))
+                .andExpect(jsonPath("$.msg").value(ErrorCode.DUPLICATE_KEY.message()));
+    }
+
+    @Test
     void requestBindingFailuresReturnTheSharedValidationCode() throws Exception {
         var mvc = MockMvcBuilders.standaloneSetup(new ValidationController())
                 .setControllerAdvice(new BusinessExceptionHandler()).build();
@@ -107,5 +118,8 @@ class ApiErrorContractTests {
     static class UnexpectedController {
         @GetMapping("/unexpected")
         public Object getFailure() { throw new IllegalStateException("database secret"); }
+
+        @GetMapping("/duplicate")
+        public Object getDuplicate() { throw new DuplicateKeyException("database secret"); }
     }
 }

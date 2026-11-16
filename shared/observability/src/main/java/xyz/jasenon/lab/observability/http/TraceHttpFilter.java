@@ -4,6 +4,8 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.filter.OncePerRequestFilter;
 import xyz.jasenon.lab.auth.context.UserContext;
 import xyz.jasenon.lab.auth.context.UserContextHolder;
@@ -15,6 +17,8 @@ import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.api.trace.StatusCode;
 
 public class TraceHttpFilter extends OncePerRequestFilter {
+
+    private static final Logger log = LoggerFactory.getLogger(TraceHttpFilter.class);
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
@@ -33,10 +37,17 @@ public class TraceHttpFilter extends OncePerRequestFilter {
             if (user != null) TraceContext.putUser(user.getUserId(), user.getUsername());
             response.setHeader(TraceContext.TRACE_HEADER, TraceContext.traceId());
             response.setHeader(TraceContext.REQUEST_HEADER, TraceContext.requestId());
-            chain.doFilter(request, response);
-        } catch (IOException | ServletException | RuntimeException error) {
-            Spans.error(span, error);
-            throw error;
+            boolean failed = false;
+            try {
+                chain.doFilter(request, response);
+            } catch (IOException | ServletException | RuntimeException | Error error) {
+                failed = true;
+                Spans.error(span, error);
+                throw error;
+            } finally {
+                int status = response.getStatus();
+                log.info("http_request_completed status={} server_error={}", status, failed || status >= 500);
+            }
         } finally {
             span.setAttribute("http.response.status_code", response.getStatus());
             if (response.getStatus() >= 500) span.setStatus(StatusCode.ERROR);

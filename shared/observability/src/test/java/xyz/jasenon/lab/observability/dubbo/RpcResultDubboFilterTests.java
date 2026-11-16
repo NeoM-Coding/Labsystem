@@ -9,6 +9,8 @@ import org.apache.dubbo.rpc.Result;
 import org.apache.dubbo.rpc.RpcException;
 import org.apache.dubbo.rpc.RpcInvocation;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DuplicateKeyException;
+import xyz.jasenon.lab.common.error.ErrorCode;
 import xyz.jasenon.lab.common.exception.BusinessException;
 import xyz.jasenon.lab.common.rpc.RpcResult;
 
@@ -57,6 +59,20 @@ class RpcResultDubboFilterTests {
         assertFalse(rpcResult.successful());
         assertEquals(404, rpcResult.error().status());
         assertEquals("设备不存在", rpcResult.error().message());
+    }
+
+    @Test
+    void normalizesAnExceptionallyCompletedResponseFuture() {
+        var future = new java.util.concurrent.CompletableFuture<AppResponse>();
+        var invocation = new RpcInvocation();
+        Result result = filter.invoke(invoker(new AsyncRpcResult(future, invocation)), invocation);
+
+        future.completeExceptionally(new DuplicateKeyException("SQL details"));
+
+        var error = ((RpcResult<?>) ((AsyncRpcResult) result).getAppResponse().getValue()).error();
+        assertEquals(ErrorCode.DUPLICATE_KEY.code(), error.code());
+        assertEquals(ErrorCode.DUPLICATE_KEY.message(), error.message());
+        assertEquals(409, error.status());
     }
 
     @Test

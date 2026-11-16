@@ -10,6 +10,8 @@ import org.apache.dubbo.rpc.RpcException;
 import xyz.jasenon.lab.observability.context.TraceContext;
 import xyz.jasenon.lab.observability.context.Spans;
 import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.api.trace.StatusCode;
+import xyz.jasenon.lab.common.rpc.RpcResult;
 
 @Activate(group = {CommonConstants.CONSUMER, CommonConstants.PROVIDER}, order = -200)
 public class TraceDubboFilter implements Filter {
@@ -39,6 +41,11 @@ public class TraceDubboFilter implements Filter {
             java.util.function.BiConsumer<Result, Throwable> complete = (completed, error) -> {
                 if (error != null) Spans.error(span, error);
                 else if (completed != null && completed.hasException()) Spans.error(span, completed.getException());
+                else if (completed != null && completed.getValue() instanceof RpcResult<?> rpc && !rpc.successful()) {
+                    span.setAttribute("rpc.business.code", rpc.error().code());
+                    span.setAttribute("rpc.business.type", rpc.error().type().name());
+                    span.setStatus(StatusCode.ERROR);
+                }
                 span.end();
             };
             if (result instanceof org.apache.dubbo.rpc.AsyncRpcResult) result.whenCompleteWithContext(complete);

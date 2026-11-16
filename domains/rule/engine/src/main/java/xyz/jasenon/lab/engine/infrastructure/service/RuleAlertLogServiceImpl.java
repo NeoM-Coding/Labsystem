@@ -1,5 +1,7 @@
 package xyz.jasenon.lab.engine.infrastructure.service;
 
+import xyz.jasenon.lab.common.error.ErrorCode;
+import xyz.jasenon.lab.common.exception.BusinessException;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -75,7 +77,7 @@ public class RuleAlertLogServiceImpl implements RuleAlertLogService {
                     entity.getCreateAt()
             );
         } catch (JsonProcessingException exception) {
-            throw new IllegalStateException("failed to deserialize alert log " + entity.getId(), exception);
+            throw BusinessException.causedBy(ErrorCode.RULE_ALERT_RECORD_INVALID, exception);
         }
     }
 }

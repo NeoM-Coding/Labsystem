@@ -7,6 +7,11 @@ import xyz.jasenon.lab.base.api.model.CompensationTask;
 import xyz.jasenon.lab.base.api.model.CompensationTaskLog;
 import xyz.jasenon.lab.base.mapper.CompensationTaskLogMapper;
 import xyz.jasenon.lab.base.mapper.CompensationTaskMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import xyz.jasenon.lab.common.error.ErrorCode;
+import xyz.jasenon.lab.observability.rpc.RpcErrors;
+
 import java.net.InetAddress;
 import java.time.*;
 import java.util.List;
@@ -17,6 +22,8 @@ import java.util.stream.Collectors;
 
 @Component
 public class CompensationTaskScheduler {
+    private static final Logger logger = LoggerFactory.getLogger(CompensationTaskScheduler.class);
+
     private final CompensationTaskMapper taskMapper;
     private final CompensationTaskLogMapper logMapper;
     private final Map<String, CompensationTaskHandler> handlers;
@@ -60,7 +67,10 @@ public class CompensationTaskScheduler {
             finishTask(task, scheduledAt, next, now, "SUCCESS", null);
             writeLog(task.getCode(), scheduledAt, now, "SUCCESS", result.affectedCount(), result.message());
         } catch (Exception e) {
-            String error = abbreviate(e.getMessage());
+            var fallback = ErrorCode.COMPENSATION_TASK_FAILED;
+            var failure = RpcErrors.from(e, fallback, fallback.message());
+            logger.error("Compensation task {} failed, code={}", task.getCode(), failure.code());
+            String error = abbreviate("[" + failure.code() + "] " + failure.message());
             finishTask(task, scheduledAt, next, now, "FAILED", error);
             writeLog(task.getCode(), scheduledAt, now, "FAILED", 0, error);
         }

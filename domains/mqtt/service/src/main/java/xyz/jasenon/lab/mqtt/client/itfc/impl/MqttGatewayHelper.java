@@ -1,17 +1,24 @@
 package xyz.jasenon.lab.mqtt.client.itfc.impl;
 
 import lombok.AllArgsConstructor;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
+import xyz.jasenon.lab.common.error.ErrorCode;
+import xyz.jasenon.lab.common.exception.BusinessException;
 import xyz.jasenon.lab.device.model.gateway.Gateway;
 import xyz.jasenon.lab.device.model.gateway.gateways.RS485Gateway;
 import xyz.jasenon.lab.mqtt.client.itfc.GatewayHelper;
 import xyz.jasenon.lab.mqtt.client.itfc.mapper.GatewayMapper;
 
+import java.sql.SQLException;
 import java.util.List;
+import java.util.regex.Pattern;
 
 @AllArgsConstructor
 @Service
 public class MqttGatewayHelper implements GatewayHelper {
+
+    private static final Pattern MYSQL_DUPLICATE_INDEX = Pattern.compile(" for key '([^']+)'$");
 
     private final GatewayMapper gatewayMapper;
 
@@ -27,12 +34,42 @@ public class MqttGatewayHelper implements GatewayHelper {
 
     @Override
     public boolean addRS485Gateway(RS485Gateway gateway) {
-        return gatewayMapper.addRS485Gateway(gateway);
+        try {
+            return gatewayMapper.addRS485Gateway(gateway);
+        } catch (DuplicateKeyException exception) {
+            throw translateDuplicateKey(exception);
+        }
     }
 
     @Override
     public boolean updateRS485Gateway(RS485Gateway gateway) {
-        return gatewayMapper.updateRS485Gateway(gateway);
+        try {
+            return gatewayMapper.updateRS485Gateway(gateway);
+        } catch (DuplicateKeyException exception) {
+            throw translateDuplicateKey(exception);
+        }
+    }
+
+    private static RuntimeException translateDuplicateKey(DuplicateKeyException exception) {
+        if (!(exception.getMostSpecificCause() instanceof SQLException sql) || sql.getMessage() == null) {
+            return exception;
+        }
+        var match = MYSQL_DUPLICATE_INDEX.matcher(sql.getMessage());
+        if (!match.find()) {
+            return exception;
+        }
+        String key = match.group(1);
+        ErrorCode code = switch (key.substring(key.lastIndexOf('.') + 1)) {
+            case "uk_gateway_rs485_send_topic", "uk_gateway_rs485_active_send_topic" ->
+                    ErrorCode.MQTT_GATEWAY_SEND_TOPIC_CONFLICT;
+            case "uk_gateway_rs485_accept_topic", "uk_gateway_rs485_active_accept_topic" ->
+                    ErrorCode.MQTT_GATEWAY_ACCEPT_TOPIC_CONFLICT;
+            default -> null;
+        };
+        if (code == null) {
+            return exception;
+        }
+        return BusinessException.causedBy(code, exception);
     }
 
     @Override

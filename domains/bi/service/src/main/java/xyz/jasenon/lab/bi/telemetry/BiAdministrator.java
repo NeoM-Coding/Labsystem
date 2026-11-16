@@ -1,4 +1,6 @@
 package xyz.jasenon.lab.bi.telemetry;
+
+import xyz.jasenon.lab.common.error.ErrorCode;
 import org.springframework.stereotype.Component;
 import xyz.jasenon.lab.auth.SourceType;
 import xyz.jasenon.lab.auth.client.AuthorizationOperations;
@@ -10,8 +12,8 @@ public class BiAdministrator {
     public BiAdministrator(AuthorizationOperations authorization) { this.authorization=authorization; }
     public void require() {
         var user=UserContextHolder.get();
-        if(user==null || user.getUserId()==null) throw new BusinessException(401,"请先登录");
+        if(user==null || user.getUserId()==null) throw new BusinessException(ErrorCode.AUTHENTICATION_REQUIRED,"请先登录");
         if(!authorization.relationsOf(SourceType.app,"global",SourceType.user,user.getUserId()).contains("super_admin"))
-            throw new BusinessException(403,"仅系统管理员可维护 BI 数据");
+            throw new BusinessException(ErrorCode.PERMISSION_DENIED,"仅系统管理员可维护 BI 数据");
     }
 }

@@ -74,7 +74,14 @@ lab.observability.tracing.otlp-enabled=true
 docker compose up -d loki tempo alloy grafana
 ```
 
-应用日志默认写入项目根目录的 `logs/`，也可通过 `LOG_PATH` 修改。打开 `http://localhost:3000`，使用 `admin/admin` 登录 Grafana，在 Explore 中查询：
+应用日志默认写入项目根目录的 `logs/`，也可通过 `LOG_PATH` 修改。打开 `http://localhost:3000`，使用 `admin/admin` 登录 Grafana，默认首页为 **Lab System 可观测性**。看板由 Compose 自动导入，也可以从 Dashboards → Lab System 打开。
+
+- **HTTP 请求数**统计经过应用 HTTP 过滤器的请求。服务端错误指 HTTP 5xx 或抛出到请求处理链之外的异常。每个请求计一次，异常错误率为服务端错误请求数除以总请求数。HTTP 4xx 仍计入请求总数。
+- **服务端错误与异常日志**汇总各服务的异常。Web、Base、MQTT、规则引擎、教务、BI 各有一个日志面板。红色级别标记和 `⚠` 前缀用于定位异常行。展开日志可通过 TraceID 打开 Tempo。看板中的 **Tempo 错误链路**列出已采样的错误 trace，顶部链接可以打开 Explore 搜索其他链路。
+
+可预见的业务失败通过 `BusinessException` 上报。Dubbo 将失败转换成 `RpcResult`，Web 返回对应的 HTTP 状态、业务码、提示及 Trace ID。数据库唯一键冲突、完整性约束、并发修改、数据服务不可用和其他读写失败有独立业务码。网关主题占用会进一步说明是发送还是接收主题。BI 和补偿任务在任务结果中记录业务码与原因。未分类的异常在服务端记录堆栈，调用端收到通用错误。已采样的失败 RPC span 带有 `rpc.business.code` 和 `rpc.business.type`。
+
+已有部署需要重新构建并重启 Java 服务，应用才会写入 `http_request_completed` 日志。请求指标从新版服务开始产生数据。也可以在 Explore 中按 Trace ID 查询日志：
 
 ```logql
 {job="lab-system-cloud"} |= "trace_id=目标ID"

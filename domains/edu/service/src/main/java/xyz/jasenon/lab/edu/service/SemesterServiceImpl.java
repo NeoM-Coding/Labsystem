@@ -69,7 +69,7 @@ public class SemesterServiceImpl extends ServiceImpl<SemesterMapper, Semester> i
         try {
             save(semester);
         } catch (DuplicateKeyException exception) {
-            throw new BusinessException(ErrorCode.SEMESTER_NAME_CONFLICT, "学期名称已存在");
+            throw BusinessException.causedBy(ErrorCode.SEMESTER_NAME_CONFLICT, exception);
         }
         return RpcResult.success(view(semester));
     }
@@ -94,7 +94,7 @@ public class SemesterServiceImpl extends ServiceImpl<SemesterMapper, Semester> i
         try {
             updateById(semester);
         } catch (DuplicateKeyException exception) {
-            throw new BusinessException(ErrorCode.SEMESTER_NAME_CONFLICT, "学期名称已存在");
+            throw BusinessException.causedBy(ErrorCode.SEMESTER_NAME_CONFLICT, exception);
         }
 
         // 冗余快照必须与学期主记录在同一事务内同步。

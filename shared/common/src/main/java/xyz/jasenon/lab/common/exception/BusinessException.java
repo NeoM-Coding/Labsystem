@@ -14,6 +14,11 @@ public class BusinessException extends RuntimeException {
     private final String traceId;
 
     public BusinessException(ErrorCode error) { this(error, error.message()); }
+    public static BusinessException causedBy(ErrorCode error, Throwable cause) {
+        BusinessException exception = new BusinessException(error);
+        exception.initCause(cause);
+        return exception;
+    }
     public BusinessException(ErrorCode error, String message) { this(error, message, null); }
     public BusinessException(ErrorCode error, String message, Object data) {
         this(error.code(), error.httpStatus(), error.type(), message == null || message.isBlank() ? error.message() : message, data, null);

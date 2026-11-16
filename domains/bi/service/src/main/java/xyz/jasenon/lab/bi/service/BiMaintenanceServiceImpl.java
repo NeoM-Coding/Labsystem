@@ -1,4 +1,6 @@
 package xyz.jasenon.lab.bi.service;
+
+import xyz.jasenon.lab.common.error.ErrorCode;
 import org.apache.dubbo.config.annotation.DubboService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import xyz.jasenon.lab.bi.api.BiMaintenanceService;
@@ -31,18 +33,18 @@ public class BiMaintenanceServiceImpl implements BiMaintenanceService {
     public RpcResult<String> backfill(LocalDate start,LocalDate end) {
         admin.require();
         if(start==null || end==null || start.isAfter(end) || !end.isBefore(LocalDate.now(ZoneId.of("Asia/Shanghai"))) || start.plusYears(1).isBefore(end))
-            throw new BusinessException(400,"回填范围为已结束日期，最多一年");
+            throw new BusinessException(ErrorCode.VALIDATION_FAILED,"回填范围为已结束日期，最多一年");
         return RpcResult.success(enqueue("BACKFILL",start,end,false));
     }
     public RpcResult<String> archive(boolean dryRun) {
         admin.require();
-        if(!dryRun && !archive.deletionEnabled()) throw new BusinessException(400,"删除开关未开启，请先执行归档演练");
+        if(!dryRun && !archive.deletionEnabled()) throw new BusinessException(ErrorCode.VALIDATION_FAILED,"删除开关未开启，请先执行归档演练");
         return RpcResult.success(enqueue("ARCHIVE",null,null,dryRun));
     }
     public RpcResult<String> retry(String jobId) {
         admin.require();
         int updated=jdbc.update("UPDATE bi_work_request SET status='QUEUED',error_message=NULL,finished_at=NULL WHERE id=? AND status='FAILED'",jobId);
-        if(updated!=1) throw new BusinessException(400,"仅失败任务可以重试");
+        if(updated!=1) throw new BusinessException(ErrorCode.VALIDATION_FAILED,"仅失败任务可以重试");
         return RpcResult.success(jobId);
     }
     private String enqueue(String kind,LocalDate start,LocalDate end,boolean dry) {

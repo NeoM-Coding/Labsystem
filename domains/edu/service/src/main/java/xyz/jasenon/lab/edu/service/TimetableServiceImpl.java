@@ -37,6 +37,8 @@ import xyz.jasenon.lab.edu.model.Semester;
 import xyz.jasenon.lab.edu.model.Timetable;
 import xyz.jasenon.lab.observability.annotation.Traced;
 
+import xyz.jasenon.lab.observability.rpc.RpcErrors;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -302,9 +304,9 @@ public class TimetableServiceImpl extends ServiceImpl<TimetableMapper, Timetable
                     return exception.getMessage();
                 } catch (RuntimeException exception) {
                     status.setRollbackOnly();
-                    log.error("Excel timetable item import failed row={} column={}",
-                            entry.rowIndex(), entry.columnIndex(), exception);
-                    return "课表写入失败";
+                    log.warn("Excel timetable item import failed row={} column={}",
+                            entry.rowIndex(), entry.columnIndex());
+                    return RpcErrors.from(exception, ErrorCode.INTERNAL_ERROR, "课表写入失败").message();
                 }
             });
             if (failure == null) {
@@ -447,7 +449,7 @@ public class TimetableServiceImpl extends ServiceImpl<TimetableMapper, Timetable
                 }
             }).sheet(0).headRowNumber(0).doRead();
         } catch (RuntimeException exception) {
-            throw new BusinessException(ErrorCode.TIMETABLE_IMPORT_PARSE_FAILED);
+            throw BusinessException.causedBy(ErrorCode.TIMETABLE_IMPORT_PARSE_FAILED, exception);
         }
         entries.sort(Comparator.comparing(ParsedEntry::rowIndex).thenComparing(ParsedEntry::columnIndex));
         errors.sort(Comparator.comparing(TimetableImportError::rowIndex)

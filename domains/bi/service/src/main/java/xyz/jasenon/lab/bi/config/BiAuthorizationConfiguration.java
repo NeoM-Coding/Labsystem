@@ -1,5 +1,7 @@
 package xyz.jasenon.lab.bi.config;
 
+import xyz.jasenon.lab.common.error.ErrorCode;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import xyz.jasenon.lab.auth.SourceType;
@@ -32,7 +34,7 @@ public class BiAuthorizationConfiguration {
     ActionCommandHandler<xyz.jasenon.lab.bi.api.query.TelemetryQuery> telemetryAuthorization() {
         return new ActionCommandHandler<>(xyz.jasenon.lab.bi.api.query.TelemetryQuery.class) {
             @Override protected ActionCommand toAction(xyz.jasenon.lab.bi.api.query.TelemetryQuery source, UserContext context) {
-                if (source.kind()==null) throw new xyz.jasenon.lab.common.exception.BusinessException(400,"请选择分析类型");
+                if (source.kind()==null) throw new xyz.jasenon.lab.common.exception.BusinessException(ErrorCode.VALIDATION_FAILED,"请选择分析类型");
                 return new ActionCommand(SourceType.app,AuthService.GLOBAL_APP_ID,
                     source.kind()==xyz.jasenon.lab.bi.api.query.TelemetryQuery.Kind.AIR_CONDITION
                         ? Action.App.air_condition_data_analysis : Action.App.circuit_break_data_analysis,

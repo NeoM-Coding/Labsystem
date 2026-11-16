@@ -4,6 +4,8 @@ import org.springframework.scheduling.annotation.*;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import xyz.jasenon.lab.common.error.ErrorCode;
+import xyz.jasenon.lab.observability.rpc.RpcErrors;
 import java.time.*;
 import static xyz.jasenon.lab.bi.telemetry.TelemetryRepository.time;
 
@@ -51,8 +53,11 @@ public class BiJobs {
                 lease.guarded(token,()->jdbc.update("UPDATE bi_work_request SET status='COMPLETE',result_message=?,finished_at=NOW(3) WHERE id=?",result,id));
                 log.info("BI job {} complete in {} ms: {}",id,(System.nanoTime()-began)/1_000_000,result);
             } catch(Exception e) {
-                log.error("BI job {} failed",id,e);
-                lease.guarded(token,()->jdbc.update("UPDATE bi_work_request SET status='FAILED',error_message=?,finished_at=NOW(3) WHERE id=?",e.toString().substring(0,Math.min(e.toString().length(),2000)),id));
+                var fallback = ErrorCode.BI_MAINTENANCE_FAILED;
+                var failure = RpcErrors.from(e, fallback, fallback.message());
+                log.error("BI job {} failed, code={}", id, failure.code());
+                lease.guarded(token,()->jdbc.update("UPDATE bi_work_request SET status='FAILED',error_message=?,finished_at=NOW(3) WHERE id=?",
+                        "[" + failure.code() + "] " + failure.message(), id));
             }
         } catch(Exception e) { log.error("BI scheduler failed",e); }
         finally { if(token!=null) lease.release(token); }

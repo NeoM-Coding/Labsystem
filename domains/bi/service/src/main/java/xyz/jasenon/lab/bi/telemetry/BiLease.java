@@ -1,5 +1,7 @@
 package xyz.jasenon.lab.bi.telemetry;
 
+import xyz.jasenon.lab.common.error.ErrorCode;
+import xyz.jasenon.lab.common.exception.BusinessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -19,12 +21,12 @@ public class BiLease {
     }
     public void renew(String token) {
         if (jdbc.update("UPDATE bi_job_lease SET expires_at=DATE_ADD(NOW(3),INTERVAL 5 MINUTE) WHERE job_name='telemetry' AND owner=? AND expires_at>NOW(3)",token)!=1)
-            throw new IllegalStateException("BI lease lost");
+            throw new BusinessException(ErrorCode.BI_LEASE_LOST);
     }
     public void guarded(String token, Runnable action) {
         tx.executeWithoutResult(status -> {
             var owners=jdbc.queryForList("SELECT owner FROM bi_job_lease WHERE job_name='telemetry' AND owner=? AND expires_at>NOW(3) FOR UPDATE",String.class,token);
-            if (owners.isEmpty()) throw new IllegalStateException("BI lease lost");
+            if (owners.isEmpty()) throw new BusinessException(ErrorCode.BI_LEASE_LOST);
             action.run();
         });
         renew(token);

@@ -19,6 +19,7 @@ DATABASE_MIGRATIONS=(
     "$ROOT_DIR/sql/migrations/20260825_add_laboratory_create_by.sql"
     "$ROOT_DIR/sql/migrations/20260827_add_edu_bi_view.sql"
     "$ROOT_DIR/sql/migrations/20261102_bi_telemetry_archive.sql"
+    "$ROOT_DIR/sql/migrations/20261116_gateway_active_topic_indexes.sql"
 )
 
 log() {

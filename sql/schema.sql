@@ -17,8 +17,8 @@ CREATE TABLE IF NOT EXISTS `gateway` (
     PRIMARY KEY (`id`),
     KEY `idx_gateway_type_delete` (`gateway_type`, `delete_at`),
     KEY `idx_gateway_delete` (`delete_at`),
-    UNIQUE KEY `uk_gateway_rs485_send_topic` (`send_topic`),
-    UNIQUE KEY `uk_gateway_rs485_accept_topic` (`accept_topic`),
+    UNIQUE KEY `uk_gateway_rs485_active_send_topic` (`send_topic`, (IF(`delete_at` IS NULL, 1, NULL))),
+    UNIQUE KEY `uk_gateway_rs485_active_accept_topic` (`accept_topic`, (IF(`delete_at` IS NULL, 1, NULL))),
     CONSTRAINT `chk_gateway_type`
         CHECK (`gateway_type` IN ('RS485', 'Socket')),
     CONSTRAINT `chk_gateway_rs485_topics`

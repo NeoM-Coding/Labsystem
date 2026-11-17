@@ -78,8 +78,7 @@ public class SysPollingManager implements MqttPollCo {
             throw new BusinessException(ErrorCode.MQTT_POLL_TASK_INVALID);
         }
 
-        device.setPolling(true);
-        if (!dhelper.updateDevice(device)) {
+        if (!dhelper.updatePolling(deviceId, true)) {
             throw new BusinessException(ErrorCode.MQTT_POLL_UPDATE_FAILED);
         }
 
@@ -107,8 +106,7 @@ public class SysPollingManager implements MqttPollCo {
         }
 
         Poll<MqttTask> poll = pollOf(device);
-        device.setPolling(false);
-        if (!dhelper.updateDevice(device)) {
+        if (!dhelper.updatePolling(deviceId, false)) {
             throw new BusinessException(ErrorCode.MQTT_POLL_UPDATE_FAILED);
         }
 

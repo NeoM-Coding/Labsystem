@@ -34,6 +34,7 @@ public class MqttGatewayHelper implements GatewayHelper {
 
     @Override
     public boolean addRS485Gateway(RS485Gateway gateway) {
+        lockLaboratories(gateway);
         try {
             return gatewayMapper.addRS485Gateway(gateway);
         } catch (DuplicateKeyException exception) {
@@ -43,10 +44,26 @@ public class MqttGatewayHelper implements GatewayHelper {
 
     @Override
     public boolean updateRS485Gateway(RS485Gateway gateway) {
+        lockLaboratories(gateway);
         try {
             return gatewayMapper.updateRS485Gateway(gateway);
         } catch (DuplicateKeyException exception) {
             throw translateDuplicateKey(exception);
+        }
+    }
+
+    private void lockLaboratories(RS485Gateway gateway) {
+        List<String> laboratoryIds = gateway.getUsingIn();
+        if (laboratoryIds == null) {
+            return;
+        }
+        if (laboratoryIds.stream().anyMatch(id -> id == null || id.isBlank())) {
+            throw new BusinessException(ErrorCode.LABORATORY_ID_REQUIRED);
+        }
+        for (String id : laboratoryIds.stream().distinct().sorted().toList()) {
+            if (!id.equals(gatewayMapper.lockActiveLaboratory(id))) {
+                throw new BusinessException(ErrorCode.LABORATORY_NOT_FOUND);
+            }
         }
     }
 

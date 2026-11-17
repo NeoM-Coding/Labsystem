@@ -18,6 +18,8 @@ public interface DeviceHelper {
 
     boolean updateDevice(Device device);
 
+    boolean updatePolling(String deviceId, boolean polling);
+
     boolean removeDevice(String deviceId);
 
 }

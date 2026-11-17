@@ -216,6 +216,22 @@
     "domain": "base"
   },
   {
+    "name": "LABORATORY_HAS_DEVICES",
+    "code": 120113,
+    "httpStatus": 409,
+    "message": "实验室仍有关联设备，请先移除或迁移设备",
+    "type": "CONFLICT",
+    "domain": "base"
+  },
+  {
+    "name": "LABORATORY_HAS_GATEWAYS",
+    "code": 120114,
+    "httpStatus": 409,
+    "message": "实验室仍有关联网关，请先解除网关绑定或删除网关",
+    "type": "CONFLICT",
+    "domain": "base"
+  },
+  {
     "name": "BI_TIME_DIMENSION_REQUIRED",
     "code": 160101,
     "httpStatus": 400,

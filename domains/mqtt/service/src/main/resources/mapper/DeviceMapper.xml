@@ -148,6 +148,11 @@
         WHERE `delete_at` IS NULL AND `id` = #{device.id};
     </update>
 
+    <update id="updatePolling">
+        UPDATE device SET polling = #{polling}, update_at = CURRENT_TIMESTAMP(3)
+        WHERE id = #{deviceId} AND delete_at IS NULL
+    </update>
+
     <update id="removeDevice">
         UPDATE `device`
         SET `delete_at` = CURRENT_TIMESTAMP(3), `polling` = FALSE

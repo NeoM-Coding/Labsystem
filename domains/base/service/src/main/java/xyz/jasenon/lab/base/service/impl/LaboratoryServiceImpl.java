@@ -3,6 +3,7 @@ package xyz.jasenon.lab.base.service.impl;
 import xyz.jasenon.lab.common.error.ErrorCode;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.apache.dubbo.config.annotation.DubboService;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -174,11 +175,22 @@ public class LaboratoryServiceImpl extends ServiceImpl<LaboratoryMapper, Laborat
     @Override
     @Audited("laboratory.delete")
     @ActionAuthorized
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public RpcResult<Void> delete(LaboratoryDelete command) {
         String laboratoryId = command.laboratoryId();
         // 写权限由 app:global#manage_laboratory 决定，view scope 仅用于查询范围。
         requireUserContext();
+
+        // 写入网关或设备绑定时也锁定该实验室，避免检查通过后出现新关联。
+        String activeLaboratoryId = baseMapper.lockActiveLaboratory(laboratoryId);
+        if (activeLaboratoryId != null) {
+            if (baseMapper.hasActiveDevices(activeLaboratoryId)) {
+                throw new BusinessException(ErrorCode.LABORATORY_HAS_DEVICES);
+            }
+            if (baseMapper.hasActiveGateways(activeLaboratoryId)) {
+                throw new BusinessException(ErrorCode.LABORATORY_HAS_GATEWAYS);
+            }
+        }
 
         // 必须在清理 Permify 关系前反查，否则无法再得到完整的受影响用户集合。
         Set<String> affectedUserIds = laboratoryAuthorization.usersWhoCanView(laboratoryId);

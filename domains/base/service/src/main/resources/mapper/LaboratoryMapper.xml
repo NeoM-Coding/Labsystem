@@ -13,6 +13,23 @@
     </resultMap>
 
 
+    <select id="lockActiveLaboratory" resultType="string">
+        SELECT id FROM laboratory WHERE id = #{laboratoryId} AND delete_at IS NULL FOR UPDATE
+    </select>
+
+    <select id="hasActiveGateways" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1 FROM gateway
+            WHERE delete_at IS NULL AND JSON_CONTAINS(using_in, JSON_QUOTE(#{laboratoryId}))
+        )
+    </select>
+
+    <select id="hasActiveDevices" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1 FROM device WHERE belong_to = #{laboratoryId} AND delete_at IS NULL
+        )
+    </select>
+
     <select id="collectionOrgName" resultMap="pair">
         select id as f, org_name as s from laboratory;
     </select>

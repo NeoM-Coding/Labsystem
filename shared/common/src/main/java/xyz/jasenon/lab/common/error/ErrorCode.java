@@ -31,6 +31,8 @@ public enum ErrorCode {
     CONTACT_LOGIN_ASSIGNMENT_FORBIDDEN(120109, 400, "联系人不能通过用户更新接口分配登录信息或权限", RpcErrorType.VALIDATION),
     SELF_DELETION_FORBIDDEN(120110, 400, "不能删除当前登录用户", RpcErrorType.VALIDATION),
     CONTACT_NOT_FOUND(120111, 404, "用户或联系人不存在", RpcErrorType.NOT_FOUND),
+    LABORATORY_HAS_DEVICES(120113, 409, "实验室仍有关联设备，请先移除或迁移设备", RpcErrorType.CONFLICT),
+    LABORATORY_HAS_GATEWAYS(120114, 409, "实验室仍有关联网关，请先解除网关绑定或删除网关", RpcErrorType.CONFLICT),
     BI_TIME_DIMENSION_REQUIRED(160101, 400, "统计时间维度不能为空", RpcErrorType.VALIDATION),
     BI_CURRENT_SEMESTER_NOT_FOUND(160102, 404, "当前日期不在任何有效学期内", RpcErrorType.NOT_FOUND),
     SEMESTER_NAME_CONFLICT(150101, 409, "学期名称已存在", RpcErrorType.CONFLICT),

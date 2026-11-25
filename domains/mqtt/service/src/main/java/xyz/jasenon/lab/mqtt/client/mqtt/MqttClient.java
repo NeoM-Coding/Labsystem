@@ -1,5 +1,6 @@
 package xyz.jasenon.lab.mqtt.client.mqtt;
 
+import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.slf4j.Logger;
@@ -22,6 +23,16 @@ public class MqttClient extends AbstractSysClient<MqttTask> {
         super(serverURI, clientId, gatewayId);
         this.sendTopic = sendTopic;
         this.acceptTopic = acceptTopic;
+    }
+
+    public synchronized void connectAndSubscribe(MqttConnectOptions options) throws MqttException {
+        if (isStopped()) {
+            throw new MqttException(MqttException.REASON_CODE_CLIENT_CLOSED);
+        }
+        if (!isConnected()) {
+            connect(options);
+        }
+        subscribe(acceptTopic);
     }
 
     @Override

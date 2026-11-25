@@ -8,6 +8,9 @@ import xyz.jasenon.lab.mqtt.protocol.command.Task;
 import xyz.jasenon.lab.mqtt.client.common.PendingRequest;
 import xyz.jasenon.lab.mqtt.client.common.Poll;
 
+import xyz.jasenon.lab.common.error.ErrorCode;
+import xyz.jasenon.lab.common.exception.BusinessException;
+
 import java.util.Set;
 import java.util.concurrent.*;
 
@@ -22,6 +25,7 @@ public abstract class AbstractSysClient<REQ extends Task> extends MqttClient {
     );
     private final Thread worker;
     private volatile PendingRequest<REQ> current;
+    private volatile boolean stopped;
 
     public AbstractSysClient(String serverURI, String clientId, String gatewayId) throws MqttException {
         super(serverURI, clientId, new MemoryPersistence());
@@ -33,12 +37,13 @@ public abstract class AbstractSysClient<REQ extends Task> extends MqttClient {
     }
 
     private void loop() {
-        while (true) {
+        while (!stopped) {
             try {
                 PendingRequest<REQ> pending = next();
                 execute(pending);
             } catch (InterruptedException e) {
-                throw new RuntimeException(e);
+                Thread.currentThread().interrupt();
+                return;
             }
         }
     }
@@ -71,6 +76,9 @@ public abstract class AbstractSysClient<REQ extends Task> extends MqttClient {
         this.current = request;
 
         try {
+            if (stopped) {
+                throw offline();
+            }
             send(request.getRequest());
             Object result = request.getFuture().get(request.getTimeout(), TimeUnit.MILLISECONDS);
             onResponse(result);
@@ -126,11 +134,36 @@ public abstract class AbstractSysClient<REQ extends Task> extends MqttClient {
     }
 
     protected boolean offer(PendingRequest<REQ> req) {
-        return userQueue.offer(req);
+        synchronized (userQueue) {
+            if (!stopped) {
+                return userQueue.offer(req);
+            }
+        }
+        req.getFuture().completeExceptionally(offline());
+        return false;
     }
 
     protected boolean offer(Poll<REQ> req) {
-        return pollQueue.offer(req);
+        return !stopped && pollQueue.offer(req);
+    }
+
+    public final boolean isStopped() {
+        return stopped;
+    }
+
+    final void stopWorker() {
+        synchronized (userQueue) {
+            stopped = true;
+        }
+        worker.interrupt();
+        PendingRequest<REQ> pending;
+        while ((pending = userQueue.poll()) != null) {
+            pending.getFuture().completeExceptionally(offline());
+        }
+    }
+
+    private BusinessException offline() {
+        return new BusinessException(ErrorCode.DEPENDENCY_UNAVAILABLE, "MQTT 网关连接暂不可用");
     }
 
     protected boolean remove(Poll<REQ> req) {

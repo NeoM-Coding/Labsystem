@@ -1,14 +1,15 @@
 package xyz.jasenon.lab.mqtt.client;
 
 import xyz.jasenon.lab.common.error.ErrorCode;
-import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import org.apache.dubbo.config.annotation.DubboService;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.event.EventListener;
 import xyz.jasenon.lab.api.mqtt.MqttIo;
 import xyz.jasenon.lab.api.mqtt.dto.MqttMultiTaskDto;
 import xyz.jasenon.lab.api.mqtt.dto.MqttResponseDto;
@@ -71,9 +72,12 @@ public class SysClientManager implements MqttIo {
         watchdog.setName(this.getClass().getName() + "-" + "watchdog");
     }
 
-    @PostConstruct
-    public void startWatchdog() {
-        watchdog.start();
+    @EventListener(ApplicationReadyEvent.class)
+    public synchronized void startWatchdog() {
+        // The initial rebuild publishes events consumed by SysPollingManager.
+        if (watchdog.getState() == Thread.State.NEW) {
+            watchdog.start();
+        }
     }
 
     @PreDestroy

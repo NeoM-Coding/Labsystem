@@ -11,6 +11,7 @@ import org.springframework.aop.support.AopUtils;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import xyz.jasenon.lab.auth.context.UserContext;
 import xyz.jasenon.lab.auth.context.UserContextHolder;
+import xyz.jasenon.lab.common.rpc.RpcResult;
 import xyz.jasenon.lab.observability.annotation.Traced;
 import xyz.jasenon.lab.observability.context.TraceContext;
 import xyz.jasenon.lab.observability.context.Tracing;
@@ -63,12 +64,18 @@ public class TracedAspect {
                     long duration = (System.nanoTime() - startedAt) / 1_000_000;
                     if (error != null) log.error("trace_failure operation={} duration_ms={} error_type={}",
                             operation, duration, error.getClass().getName());
-                    else log.info("trace_success operation={} duration_ms={}", operation, duration);
+                    else if (value instanceof RpcResult<?> rpc && !rpc.successful()) {
+                        log.warn("trace_failure operation={} duration_ms={} rpc_code={}",
+                                operation, duration, rpc.error().code());
+                    } else log.info("trace_success operation={} duration_ms={}", operation, duration);
                 }).run());
                 return result;
             }
             long elapsedMs = (System.nanoTime() - startedAt) / 1_000_000;
-            if (traced.recordResult()) {
+            if (result instanceof RpcResult<?> rpc && !rpc.successful()) {
+                log.warn("trace_failure operation={} duration_ms={} rpc_code={}",
+                        operation, elapsedMs, rpc.error().code());
+            } else if (traced.recordResult()) {
                 log.info("trace_success operation={} duration_ms={} result={}", operation, elapsedMs, renderer.render(result));
             } else {
                 log.info("trace_success operation={} duration_ms={}", operation, elapsedMs);

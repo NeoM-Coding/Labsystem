@@ -212,7 +212,11 @@ public class SysClientManager implements MqttIo {
     }
 
     public static void remove(AbstractSysClient<? extends Task> client) {
-        ClientsRuntime.remove(client);
+        synchronized (ClientsRuntime.class) {
+            if (ClientsRuntime.remove(client)) {
+                close(client);
+            }
+        }
     }
 
     public static void register(AbstractSysClient<? extends Task> client)  {
@@ -331,8 +335,10 @@ public class SysClientManager implements MqttIo {
                     gateway.getSendTopic(),
                     gateway.getAcceptTopic()
             );
-            client.setCallback(new MqttCallback(client));
-            client.connect(connectOptions());
+            var connection = connectOptions();
+            client.setTimeToWait(TimeUnit.SECONDS.toMillis(connection.getConnectionTimeout()));
+            client.setCallback(new MqttCallback(client, connection));
+            client.connectAndSubscribe(connection);
             register(client);
             if (ClientsRuntime.client(gateway.getId()) == client) {
                 log.info("[{}] gateway-id:{} client registered", trigger, gateway.getId());
@@ -340,7 +346,7 @@ public class SysClientManager implements MqttIo {
             } else {
                 close(client);
             }
-        } catch (MqttException e) {
+        } catch (MqttException | RuntimeException e) {
             log.warn("[{}] gateway-id:{} client start failed; watchdog will retry", trigger, gateway.getId(), e);
             ClientsRuntime.remove(client);
             close(client);
@@ -361,23 +367,24 @@ public class SysClientManager implements MqttIo {
         return connectOptions;
     }
 
-    private void close(AbstractSysClient<? extends Task> client) {
+    private static void close(AbstractSysClient<? extends Task> client) {
         if (client == null) {
             return;
         }
-
-        try {
-            if (client.isConnected()) {
-                client.disconnect();
+        synchronized (client) {
+            client.stopWorker();
+            try {
+                // Also shuts down a Paho connection whose token timed out.
+                client.disconnectForcibly(0, 0, false);
+            } catch (MqttException e) {
+                log.warn("[GatewayWatchDog] gateway-id:{} disconnect failed", client.gatewayId, e);
             }
-        } catch (MqttException e) {
-            log.warn("[GatewayWatchDog] gateway-id:{} disconnect failed", client.gatewayId, e);
-        }
 
-        try {
-            client.close();
-        } catch (MqttException e) {
-            log.warn("[GatewayWatchDog] gateway-id:{} close failed", client.gatewayId, e);
+            try {
+                client.close(true);
+            } catch (MqttException e) {
+                log.warn("[GatewayWatchDog] gateway-id:{} close failed", client.gatewayId, e);
+            }
         }
     }
 

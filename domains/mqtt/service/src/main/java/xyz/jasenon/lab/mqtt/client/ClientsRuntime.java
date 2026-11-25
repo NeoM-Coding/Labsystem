@@ -21,11 +21,8 @@ final class ClientsRuntime {
         CLIENTS.put(client.gatewayId, client);
     }
 
-    static void remove(AbstractSysClient<? extends Task> client) {
-        if (client == null) {
-            return;
-        }
-        CLIENTS.remove(client.gatewayId, client);
+    static boolean remove(AbstractSysClient<? extends Task> client) {
+        return client != null && CLIENTS.remove(client.gatewayId, client);
     }
 
     static AbstractSysClient<? extends Task> remove(String gatewayId) {

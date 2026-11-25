@@ -2,7 +2,7 @@
   "uid": "lab-observability",
   "title": "Lab System 可观测性",
   "schemaVersion": 39,
-  "version": 2,
+  "version": 3,
   "timezone": "browser",
   "editable": false,
   "time": {
@@ -25,7 +25,7 @@
       "gridPos": {
         "x": 0,
         "y": 0,
-        "w": 8,
+        "w": 6,
         "h": 5
       },
       "datasource": {
@@ -61,12 +61,12 @@
     },
     {
       "id": 2,
-      "title": "服务端错误请求数",
+      "title": "HTTP 服务端错误数",
       "type": "stat",
       "gridPos": {
-        "x": 8,
+        "x": 6,
         "y": 0,
-        "w": 8,
+        "w": 6,
         "h": 5
       },
       "datasource": {
@@ -102,12 +102,12 @@
     },
     {
       "id": 3,
-      "title": "异常错误率",
+      "title": "HTTP 服务端错误率",
       "type": "stat",
       "gridPos": {
-        "x": 16,
+        "x": 12,
         "y": 0,
-        "w": 8,
+        "w": 6,
         "h": 5
       },
       "datasource": {
@@ -122,7 +122,7 @@
           "editorMode": "code"
         }
       ],
-      "description": "服务端错误请求数 ÷ HTTP 请求数。没有请求时显示 —。",
+      "description": "HTTP 服务端错误数 ÷ HTTP 请求数。没有请求时显示 —。",
       "fieldConfig": {
         "defaults": {
           "unit": "percent",
@@ -142,8 +142,49 @@
       }
     },
     {
+      "id": 13,
+      "title": "应用 ERROR 日志数",
+      "type": "stat",
+      "gridPos": {
+        "x": 18,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(count_over_time({job=\"lab-system-cloud\"} |~ `^ts=\\S+ level=ERROR service=`[$__range])) or vector(0)",
+          "queryType": "instant",
+          "editorMode": "code"
+        }
+      ],
+      "description": "统计各服务的 ERROR 日志事件，包括 RpcErrors 上报的服务端异常和 MQTT 重连耗尽。每条日志只按首行计数。",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "—"
+        },
+        "overrides": []
+      },
+      "options": {
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        }
+      }
+    },
+    {
       "id": 4,
-      "title": "请求与服务端错误趋势",
+      "title": "HTTP 请求与应用错误趋势",
       "type": "timeseries",
       "gridPos": {
         "x": 0,
@@ -168,7 +209,14 @@
           "expr": "sum(count_over_time({job=\"lab-system-cloud\"} |= \" message=http_request_completed status=\" |= \" server_error=true\"[$__interval])) or vector(0)",
           "queryType": "range",
           "editorMode": "code",
-          "legendFormat": "服务端错误"
+          "legendFormat": "HTTP 服务端错误"
+        },
+        {
+          "refId": "C",
+          "expr": "sum(count_over_time({job=\"lab-system-cloud\"} |~ `^ts=\\S+ level=ERROR service=`[$__interval])) or vector(0)",
+          "queryType": "range",
+          "editorMode": "code",
+          "legendFormat": "应用 ERROR 日志"
         }
       ],
       "interval": "1m",

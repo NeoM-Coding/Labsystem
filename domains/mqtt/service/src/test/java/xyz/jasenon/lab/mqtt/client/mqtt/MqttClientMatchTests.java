@@ -3,6 +3,9 @@ package xyz.jasenon.lab.mqtt.client.mqtt;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import xyz.jasenon.lab.mqtt.client.SysClientManager;
 import xyz.jasenon.lab.api.mqtt.dto.MqttTaskDto;
 import xyz.jasenon.lab.device.model.DeviceType;
 import xyz.jasenon.lab.common.ActiveQueue;
@@ -15,11 +18,18 @@ import xyz.jasenon.lab.mqtt.client.common.Poll;
 
 import java.util.ArrayDeque;
 import java.util.HashSet;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MqttClientMatchTests {
@@ -124,6 +134,45 @@ class MqttClientMatchTests {
         assertEquals(5000L, pollRequest.getTimeout());
         assertArrayEquals(new byte[]{1, 10, 2, (byte) 255, 0, 0, 13}, task.getPayload());
         assertTrue(MqttClient.matches(pollRequest.getRequest(), response));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void missingOrCorruptResponseCompletesRequestExceptionally(boolean injectCorruptFrame) throws Exception {
+        var sending = new CountDownLatch(1);
+        String gateway = "response-test";
+        var pending = new PendingRequest<>(request(gateway, new byte[]{1, 10, 2, (byte) 255, 0, 0, 13}),
+                PendingRequest.Type.USER, 200);
+        class TestClient extends MqttClient {
+            TestClient() throws org.eclipse.paho.client.mqttv3.MqttException {
+                super("tcp://localhost:1883", gateway, gateway, "send", "receive");
+            }
+
+            @Override
+            protected void send(MqttTask task) {
+                sending.countDown();
+            }
+
+            void submit() {
+                offer(pending);
+            }
+        }
+
+        var client = new TestClient();
+        SysClientManager.register(client);
+        try {
+            client.submit();
+            assertTrue(sending.await(2, TimeUnit.SECONDS));
+            if (injectCorruptFrame) {
+                Task corrupt = new Task(gateway, new byte[]{1, 10, 2, (byte) 255, 0});
+                assertTrue(MqttClient.matches(pending.getRequest(), corrupt));
+                assertNull(client.receive(corrupt));
+            }
+            var failure = assertThrows(ExecutionException.class, () -> pending.getFuture().get(2, TimeUnit.SECONDS));
+            assertInstanceOf(TimeoutException.class, failure.getCause());
+        } finally {
+            SysClientManager.remove(client);
+        }
     }
 
     private static MqttTask request(String gatewayId, byte[] payload) {

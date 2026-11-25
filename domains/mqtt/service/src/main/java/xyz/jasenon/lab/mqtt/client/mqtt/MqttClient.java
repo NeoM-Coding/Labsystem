@@ -1,5 +1,6 @@
 package xyz.jasenon.lab.mqtt.client.mqtt;
 
+import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.slf4j.Logger;
@@ -24,6 +25,16 @@ public class MqttClient extends AbstractSysClient<MqttTask> {
         this.acceptTopic = acceptTopic;
     }
 
+    public synchronized void connectAndSubscribe(MqttConnectOptions options) throws MqttException {
+        if (isStopped()) {
+            throw new MqttException(MqttException.REASON_CODE_CLIENT_CLOSED);
+        }
+        if (!isConnected()) {
+            connect(options);
+        }
+        subscribe(acceptTopic);
+    }
+
     @Override
     protected void send(MqttTask mqttTask) {
         log.info("req:{}",mqttTask.getPayload());
@@ -36,7 +47,12 @@ public class MqttClient extends AbstractSysClient<MqttTask> {
 
     @Override
     protected <RESP extends Task> boolean match(MqttTask mqttTask, RESP resp) {
-        return matches(mqttTask, resp);
+        if (!matches(mqttTask, resp)) {
+            return false;
+        }
+        byte[] payload = resp.getPayload();
+        return payload.length >= 2
+                && MqttTask.Explainer.verifier(mqttTask.getCommandLine().getCommand().getCheckType(), payload);
     }
 
     static boolean matches(MqttTask mqttTask, Task resp) {

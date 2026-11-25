@@ -2,12 +2,14 @@ package xyz.jasenon.lab.observability.context;
 
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.context.Context;
 import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Supplier;
 import org.slf4j.MDC;
+import xyz.jasenon.lab.common.rpc.RpcResult;
 
 /** Reusable boundary instrumentation; business code need not manage spans or scopes. */
 public final class Tracing {
@@ -24,6 +26,15 @@ public final class Tracing {
     }
     public static void attribute(String key, boolean value) { Span.current().setAttribute(key, value); }
     public static void attribute(String key, long value) { Span.current().setAttribute(key, value); }
+
+    private static void finishResult(Span span, Object result, Throwable error) {
+        if (error != null) {
+            Spans.error(span, error);
+        } else if (result instanceof RpcResult<?> rpc && !rpc.successful()) {
+            span.setAttribute("rpc.business.code", rpc.error().code());
+            span.setStatus(StatusCode.ERROR);
+        }
+    }
 
     /** Opaque context carrier, safe to capture on one thread and restore on another. */
     public static final class Propagation {
@@ -95,11 +106,12 @@ public final class Tracing {
                 if (result instanceof CompletionStage<?> stage) {
                     stage.whenComplete((value, error) -> {
                         try (var active = Spans.scope(span)) {
-                            if (error != null) Spans.error(span, error);
+                            finishResult(span, value, error);
                         } finally { span.end(); }
                     });
                     deferred = true;
                 }
+                else finishResult(span, result, null);
                 return result;
             } catch (Throwable error) { Spans.error(span, error); throw error; }
             finally { if (!deferred) span.end(); }
@@ -123,7 +135,7 @@ public final class Tracing {
                 CompletionStage<T> stage = Objects.requireNonNull(task.get(), "async task returned null");
                 return stage.whenComplete((result, error) -> {
                     try (var completionScope = Spans.scope(span)) {
-                        if (error != null) Spans.error(span, error);
+                        finishResult(span, result, error);
                     } finally { span.end(); }
                 });
             } catch (RuntimeException | Error error) {
